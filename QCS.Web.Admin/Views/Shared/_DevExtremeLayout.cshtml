@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>QCS Admin - @ViewData["Title"]</title>
+    @await RenderSectionAsync("ExternalDependencies", required: false)
+
+    <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+
+    <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
+    <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
+    <script src="~/js/devextreme/filesaver.min.js"></script>
+    <script src="~/js/devextreme/exceljs.min.js"></script>
+
+    <script src="~/js/devextreme/jquery.js"></script>
+    <script src="~/js/devextreme/bootstrap.js"></script>
+    <script src="~/js/devextreme/dx.all.js"></script>
+
+    <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
+    <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
+
+    <script src="~/src/devextreme-license.js"></script>
+    <script src="~/js/site.js"></script>
+    <script src="~/lib/font-awesome/js/all.min.js"></script>
+    <environment names="Development">
+        <script src="~/host/development.js"></script>
+    </environment>
+    <environment names="Staging,Production">
+        <script src="~/host/production.js"></script>
+    </environment>
+    <style>
+        .gridContainer {
+            margin: 0px 20px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.20);
+            border-radius: 8px;
+            height: calc(100vh - 100px);
+            min-width: 720px;
+            min-height: 480px;
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+
+<body style="padding-top: 3.5rem;">
+
+    <nav class="navbar navbar-dark bg-dark fixed-top navbar-expand-md">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="@Url.Action("Index", "Home")"><i class="fa-solid fa-tree"></i> QCS - Admin</a>
+
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div id="navbar" class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto">
+                 
+                    <li class="nav-item">
+                        <a href="@Url.Action("Index", "Home")" class="nav-link">Home</a>
+                    </li>
+                 
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main style="margin-top: 1.5rem;">
+        @RenderBody()
+    </main>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+
+</html>

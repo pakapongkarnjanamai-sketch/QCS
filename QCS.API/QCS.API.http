@@ -1,6 +1,0 @@
-@QCS.API_HostAddress = http://localhost:5157
-
-GET {{QCS.API_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

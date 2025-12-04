@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36717.8 d17.14
+VisualStudioVersion = 17.14.36717.8
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.API", "QCS.API\QCS.API.csproj", "{423F0392-729F-45AC-BAD7-A00F87AEC68B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Api", "QCS.API\QCS.Api.csproj", "{423F0392-729F-45AC-BAD7-A00F87AEC68B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DevExtreme NuGet.config", "DevExtreme NuGet.config", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
@@ -13,6 +13,18 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Web.User", "QCS.Web.User\QCS.Web.User.csproj", "{487CB526-68B1-4E66-8E23-824D12752BFC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Web.Admin", "QCS.Web.Admin\QCS.Web.Admin.csproj", "{50C20938-82B5-4998-8BF8-CB2CDF2513F9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core & Infrastructure", "Core & Infrastructure", "{BEA52D67-E982-4691-ADCB-9FF206C9E71D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Back-end (API)", "Back-end (API)", "{F7DCE79C-5985-4562-9A70-B6D45F74676A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Front-end (User Interface)", "Front-end (User Interface)", "{44C371D3-5F1B-4436-A098-C4BF45D9E9EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Domain", "QCS.Domain\QCS.Domain.csproj", "{E2BAE380-6B0A-4E5A-B060-AF1EB852D082}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Application", "QCS.Application\QCS.Application.csproj", "{B1D410AD-C51A-47FC-B92F-65138FBCA8C7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Infrastructure", "QCS.Infrastructure\QCS.Infrastructure.csproj", "{5F95905B-1FF4-49F8-9695-A44357D3B987}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,9 +44,29 @@ Global
 		{50C20938-82B5-4998-8BF8-CB2CDF2513F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50C20938-82B5-4998-8BF8-CB2CDF2513F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{50C20938-82B5-4998-8BF8-CB2CDF2513F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{423F0392-729F-45AC-BAD7-A00F87AEC68B} = {F7DCE79C-5985-4562-9A70-B6D45F74676A}
+		{487CB526-68B1-4E66-8E23-824D12752BFC} = {44C371D3-5F1B-4436-A098-C4BF45D9E9EB}
+		{50C20938-82B5-4998-8BF8-CB2CDF2513F9} = {44C371D3-5F1B-4436-A098-C4BF45D9E9EB}
+		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
+		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
+		{5F95905B-1FF4-49F8-9695-A44357D3B987} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {97A0BFFB-95F1-4683-AE64-44DD1498643C}
