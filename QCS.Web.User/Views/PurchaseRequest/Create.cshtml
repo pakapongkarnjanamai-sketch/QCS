@@ -1,5 +1,239 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@model QCS.Web.User.Models.RequestViewModel
+
 @{
+    ViewData["Title"] = "สร้างใบขอซื้อ (Create Request)";
+}
+
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>สร้างใบเปรียบเทียบราคาใหม่</h5>
+        </div>
+        <div class="card-body">
+            <form id="createForm" asp-action="Create" method="post" enctype="multipart/form-data">
+
+                <div id="headerForm"></div>
+
+                <hr class="my-4" />
+
+                <h5 class="text-secondary mb-3"><i class="fas fa-list me-2"></i>รายการใบเสนอราคา</h5>
+
+                <div class="mb-3">
+                    <div id="fileUploader"></div>
+                    <small class="text-muted">* อัปโหลดไฟล์ PDF ใบเสนอราคาจาก Vendor เพื่อเริ่มเปรียบเทียบ</small>
+                </div>
+
+                <div id="quotationGrid"></div>
+
+                <input type="hidden" id="quotationsJson" name="QuotationsJson" />
+
+                <div class="mt-4 text-end">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-light me-2">ยกเลิก</a>
+                    <button type="button" class="btn btn-success" onclick="submitForm()">
+                        <i class="fas fa-save me-1"></i> บันทึกและส่งอนุมัติ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // --- 1. ตัวแปรเก็บข้อมูลชั่วคราว ---
+            let quotationList = []; // เก็บข้อมูล Grid
+            let fileList = [];      // เก็บ File Object ที่ User เลือก
+
+            // --- 2. สร้าง Form Header ---
+            $("#headerForm").dxForm({
+                formData: @Json.Serialize(Model ?? new QCS.Web.User.Models.RequestViewModel()),
+                colCount: 2,
+                items: [
+                    {
+                        dataField: "Title",
+                        label: { text: "หัวข้อการจัดซื้อ" },
+                        editorOptions: { placeholder: "เช่น จัดซื้อคอมพิวเตอร์ 10 เครื่อง" },
+                        validationRules: [{ type: "required", message: "กรุณาระบุหัวข้อ" }],
+                        colSpan: 2
+                    },
+                    {
+                        dataField: "RequestDate",
+                        editorType: "dxDateBox",
+                        label: { text: "วันที่เอกสาร" },
+                        editorOptions: { value: new Date(), displayFormat: "dd/MM/yyyy" },
+                        validationRules: [{ type: "required" }]
+                    }
+                ]
+            });
+
+            // --- 3. สร้าง File Uploader ---
+            $("#fileUploader").dxFileUploader({
+                selectButtonText: "เลือกไฟล์ใบเสนอราคา (PDF)",
+                labelText: "หรือลากไฟล์มาวางที่นี่",
+                accept: ".pdf",
+                multiple: true,
+                uploadMode: "useForm", // ไม่ Upload อัตโนมัติ รอ Submit Form
+                onValueChanged: function (e) {
+                    // เมื่อมีการเลือกไฟล์
+                    e.value.forEach(file => {
+                        // เช็คว่าไฟล์นี้เคยเพิ่มหรือยัง
+                        if (!fileList.some(f => f.name === file.name && f.size === file.size)) {
+                            fileList.push(file);
+
+                            // เพิ่มแถวใหม่ใน Grid อัตโนมัติ
+                            quotationList.push({
+                                TempId: generateUUID(),
+                                VendorName: "", // ให้ User ไปกรอกต่อเอง
+                                TotalAmount: 0,
+                                IsSelected: false,
+                                FileName: file.name,
+                                FileObj: file // เก็บ Reference ไฟล์ไว้ (ไม่ส่งไป JSON)
+                            });
+                        }
+                    });
+
+                    refreshGrid();
+                    // Reset Uploader เพื่อให้ดูสะอาดตา (ไฟล์ถูกเก็บในตัวแปรแล้ว)
+                    e.component.reset();
+                }
+            });
+
+            // --- 4. สร้าง Grid ---
+            const gridInstance = $("#quotationGrid").dxDataGrid({
+                dataSource: quotationList,
+                keyExpr: "TempId",
+                showBorders: true,
+                editing: {
+                    mode: "cell",
+                    allowUpdating: true,
+                    allowDeleting: true
+                },
+                columns: [
+                    {
+                        dataField: "FileName",
+                        caption: "ไฟล์แนบ",
+                        allowEditing: false,
+                        width: 250
+                    },
+                    {
+                        dataField: "VendorName",
+                        caption: "ชื่อ Vendor",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "TotalAmount",
+                        caption: "ราคารวม (บาท)",
+                        dataType: "number",
+                        format: "#,##0.00",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "IsSelected",
+                        caption: "เลือกเจ้านี้",
+                        dataType: "boolean",
+                        width: 100
+                    }
+                ],
+                onRowRemoved: function(e) {
+                    // ลบไฟล์ออกจาก List เมื่อ User ลบแถวใน Grid
+                    fileList = fileList.filter(f => f.name !== e.data.FileName);
+                }
+            }).dxDataGrid("instance");
+
+            function refreshGrid() {
+                gridInstance.option("dataSource", quotationList);
+                gridInstance.refresh();
+            }
+
+            // Helper: UUID
+            function generateUUID() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            // --- 5. Submit Logic ---
+            window.submitForm = function() {
+                // 5.1 Validate Header Form
+                const formInstance = $("#headerForm").dxForm("instance");
+                if (!formInstance.validate().isValid) return;
+
+                // 5.2 Validate Grid Data
+                if (quotationList.length === 0) {
+                    DevExpress.ui.notify("กรุณาอัปโหลดใบเสนอราคาอย่างน้อย 1 รายการ", "error", 2000);
+                    return;
+                }
+
+                // 5.3 Prepare Data
+                // Serialize ข้อมูลใน Grid เป็น JSON String
+                const cleanData = quotationList.map(q => ({
+                    TempId: q.TempId,
+                    VendorName: q.VendorName,
+                    TotalAmount: q.TotalAmount,
+                    IsSelected: q.IsSelected,
+                    FileName: q.FileName
+                }));
+                $("#quotationsJson").val(JSON.stringify(cleanData));
+
+                // ใส่ข้อมูลจาก dxForm ลงใน input ของ HTML Form หลัก (เนื่องจาก dxForm ไม่ได้ submit เป็น name ตรงๆ เสมอไป)
+                const formData = formInstance.option("formData");
+                $("<input>").attr({type: "hidden", name: "Title", value: formData.Title}).appendTo("#createForm");
+                $("<input>").attr({type: "hidden", name: "RequestDate", value: formData.RequestDate.toISOString()}).appendTo("#createForm");
+
+                // Attach Files manually to the form input
+                // เนื่องจากเราใช้ Ajax ไม่ได้ง่ายๆ กับการ redirect, เราจะใช้ HTML Form Submit ปกติ
+                // แต่ต้องเอาไฟล์จาก fileList ยัดกลับเข้าไปใน input type="file" (ทำไม่ได้ด้วย security browser)
+
+                // *** วิธีแก้: เราจะใช้ FormData + Ajax Submit แทน ***
+                submitViaAjax(formData, cleanData);
+            }
+
+            function submitViaAjax(formDataObj, gridData) {
+                const formData = new FormData();
+
+                // Add Header Fields
+                formData.append("Title", formDataObj.Title);
+                formData.append("RequestDate", formDataObj.RequestDate.toISOString());
+                formData.append("QuotationsJson", JSON.stringify(gridData));
+
+                // Add Files
+                fileList.forEach(file => {
+                    formData.append("Attachments", file);
+                });
+
+                // Add AntiForgeryToken
+                formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
+
+                // Show Loading
+                const loadPanel = showLoading();
+
+                $.ajax({
+                    url: '@Url.Action("Create", "PurchaseRequest")',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        loadPanel.hide();
+                        window.location.href = '@Url.Action("Index", "Home")';
+                    },
+                    error: function(xhr) {
+                        loadPanel.hide();
+                        DevExpress.ui.notify("เกิดข้อผิดพลาด: " + xhr.responseText, "error", 3000);
+                    }
+                });
+            }
+
+            function showLoading() {
+                // สร้าง LoadPanel ชั่วคราวถ้ายังไม่มี
+                return $("<div>").dxLoadPanel({
+                    visible: true,
+                    shading: true,
+                    position: { of: "body" }
+                }).dxLoadPanel("instance");
+            }
+        });
+    </script>
 }
