@@ -1,0 +1,290 @@
+﻿@{
+    ViewData["Title"] = "Role Management";
+
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>Role Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="rolesDataGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+               const API_BASE_URL = "https://localhost:7127/api/";
+            // Configuration
+            const config = {
+                apiBaseUrl: API_BASE_URL,
+                endpoints: {
+                    roles: 'Role'
+                }
+            };
+
+            // Global variables
+            let rolesDataGrid = null;
+
+            // Initialize application
+            initializeApp();
+
+            function initializeApp() {
+                initializeRolesDataGrid();
+            }
+
+            // Initialize Roles DataGrid
+            function initializeRolesDataGrid() {
+                rolesDataGrid = $("#rolesDataGrid").dxDataGrid({
+                    dataSource: createDataStore(config.apiBaseUrl, config.endpoints.roles),
+                    remoteOperations: true,
+                    showBorders: true,
+                    rowAlternationEnabled: true,
+                    width: "100%",
+                    height: "calc(100vh - 200px)",
+                    allowColumnResizing: true,
+                    scrolling: {
+                        mode: 'virtual'
+                    },
+                    selection: {
+                        mode: 'single'
+                    },
+
+                    // Search Panel
+                    searchPanel: {
+                        width: "400px",
+                        visible: true,
+                        placeholder: "Search roles..."
+                    },
+
+                    // Header Filter
+                    headerFilter: {
+                        visible: true
+                    },
+
+                    // Filter Row
+                    filterRow: {
+                        visible: true
+                    },
+
+                    // Export
+                    export: {
+                        enabled: true,
+                        fileName: "Roles"
+                    },
+
+                    // Editing
+                    editing: {
+                        mode: "popup",
+                        allowAdding: true,
+                        allowUpdating: true,
+                        allowDeleting: true,
+                        useIcons: true,
+                        popup: {
+                            title: "Role Information",
+                            width: 700,
+                            height: 500,
+                            showTitle: true
+                        },
+                        form: {
+                            colCount: 1,
+                            items: [
+                                {
+                                    itemType: "group",
+                                    caption: "Role Details",
+                                    colCount: 1,
+                                    items: [
+                                        {
+                                            dataField: "name",
+                                            caption: "Role Name",
+                                            validationRules: [
+                                                { type: "required", message: "Role name is required" },
+                                                { type: "stringLength", min: 2, max: 50, message: "Role name must be between 2 and 50 characters" }
+                                            ],
+                                            editorOptions: {
+                                                placeholder: "Enter role name..."
+                                            }
+                                        },
+                                        {
+                                            dataField: "description",
+                                            caption: "Description",
+                                            editorType: "dxTextArea",
+                                            validationRules: [
+                                                { type: "stringLength", max: 500, message: "Description cannot exceed 500 characters" }
+                                            ],
+                                            editorOptions: {
+                                                placeholder: "Enter role description...",
+                                                height: 80,
+                                                maxLength: 500
+                                            }
+                                        },
+                                        {
+                                            dataField: "isActive",
+                                            caption: "Active Status",
+                                            editorType: "dxCheckBox",
+                                            editorOptions: {
+                                                text: "Role is active"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+
+                    // Columns
+                    columns: [
+                        {
+                            dataField: "id",
+                            caption: "ID",
+                            width: 80,
+                            allowEditing: false,
+                            sortOrder: "asc"
+                        },
+                        {
+                            dataField: "name",
+                            caption: "Role Name",
+                            width: 200,
+                            validationRules: [
+                                { type: "required", message: "Role name is required" },
+                                { type: "stringLength", min: 2, max: 50 }
+                            ]
+                        },
+                        {
+                            dataField: "description",
+                            caption: "Description",
+                            width: 400,
+                            cellTemplate: function(container, options) {
+                                const description = options.data.description || '';
+                                const truncated = description.length > 80 ?
+                                    description.substring(0, 80) + '...' : description;
+                                $("<div>")
+                                    .text(truncated || 'No description')
+                                    .attr('title', description)
+                                    .appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "isActive",
+                            caption: "Status",
+                            dataType: "boolean",
+                            width: 120,
+                            cellTemplate: function(container, options) {
+                                const isActive = options.data.isActive;
+                                const badgeClass = isActive ? 'bg-success' : 'bg-secondary';
+                                const text = isActive ? 'Active' : 'Inactive';
+                                const icon = isActive ? 'fas fa-check' : 'fas fa-times';
+                                $(`<span class="badge ${badgeClass}">
+                                    <i class="${icon} me-1"></i>${text}
+                                </span>`).appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "createdDate",
+                            caption: "Created Date",
+                            dataType: "datetime",
+                            width: 150,
+                            allowEditing: false,
+                            format: "dd/MM/yyyy HH:mm"
+                        },
+                        {
+                            dataField: "modifiedDate",
+                            caption: "Modified Date",
+                            dataType: "datetime",
+                            width: 150,
+                            allowEditing: false,
+                            format: "dd/MM/yyyy HH:mm",
+                            visible: false
+                        },
+                        {
+                            type: 'buttons',
+                            width: 100,
+                            buttons: [
+                                {
+                                    icon: 'edit',
+                                    text: 'Edit',
+                                    onClick: function (e) {
+                                        e.component.editRow(e.row.rowIndex);
+                                    }
+                                },
+                                {
+                                    icon: 'trash',
+                                    text: 'Delete',
+                                    visible: function (e) {
+                                        return e.row.data.isActive === false;
+                                    },
+                                    onClick: function (e) {
+                                        e.component.deleteRow(e.row.rowIndex);
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+
+                    // Summary
+                    summary: {
+                        totalItems: [{
+                            column: 'name',
+                            summaryType: 'count',
+                        }]
+                    },
+
+                    // Event Handlers
+                    onInitNewRow: function(e) {
+                        e.data.isActive = true;
+                    },
+
+                    onRowValidating: function(e) {
+                        if (e.newData.name) {
+                            const trimmedName = e.newData.name.trim();
+                            if (trimmedName.length < 2) {
+                                e.errorText = "Role name must be at least 2 characters long";
+                                e.isValid = false;
+                                return;
+                            }
+                        }
+                    },
+
+                    onRowInserted: function(e) {
+                        DevExpress.ui.notify("Role created successfully", "success", 3000);
+                        rolesDataGrid.refresh();
+                    },
+
+                    onRowUpdated: function(e) {
+                        DevExpress.ui.notify("Role updated successfully", "success", 3000);
+                        rolesDataGrid.refresh();
+                    },
+
+                    onRowRemoved: function(e) {
+                        DevExpress.ui.notify("Role deleted successfully", "success", 3000);
+                    }
+
+                }).dxDataGrid("instance");
+            }
+        });
+    </script>
+
+    <style>
+        .dx-field-item-label-text {
+            font-weight: 500;
+        }
+
+        .dx-group-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .badge {
+            font-size: 0.75em;
+        }
+    </style>
+}

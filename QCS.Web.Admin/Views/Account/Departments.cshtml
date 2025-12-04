@@ -1,0 +1,409 @@
+﻿@{
+    ViewData["Title"] = "Department Management";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building me-2"></i>Department Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="departmentsDataGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+               const API_BASE_URL = "https://localhost:7127/api/";
+            // Configuration
+            const config = {
+                apiBaseUrl: API_BASE_URL,
+                endpoints: {
+                    departments: 'Department'
+                }
+            };
+
+            // Global variables
+            let departmentsDataGrid = null;
+
+            // Initialize application
+            initializeApp();
+
+            function initializeApp() {
+                initializeDepartmentsDataGrid();
+            }
+
+            // Initialize Departments DataGrid
+            function initializeDepartmentsDataGrid() {
+                departmentsDataGrid = $("#departmentsDataGrid").dxDataGrid({
+                    dataSource: createDataStore(config.apiBaseUrl, config.endpoints.departments,{ key: "Id" }),
+                    remoteOperations: true,
+                    showBorders: true,
+                    rowAlternationEnabled: true,
+                    width: "100%",
+                    height: "calc(100vh - 200px)",
+                    allowColumnResizing: true,
+                    scrolling: {
+                        mode: 'virtual'
+                    },
+                    selection: {
+                        mode: 'single'
+                    },
+
+                    // Search Panel
+                    searchPanel: {
+                        width: "400px",
+                        visible: true,
+                        placeholder: "Search departments..."
+                    },
+
+                    // Header Filter
+                    headerFilter: {
+                        visible: true
+                    },
+
+                    // Filter Row
+                    filterRow: {
+                        visible: true
+                    },
+
+                    // Export
+                    export: {
+                        enabled: true,
+                        fileName: "Departments"
+                    },
+
+                    // Editing
+                    editing: {
+                        mode: "popup",
+                        allowAdding: true,
+                        allowUpdating: true,
+                        allowDeleting: true,
+                        useIcons: true,
+                        popup: {
+                            title: "Department Information",
+                            width: 800,
+                            height: 650,
+                            showTitle: true
+                        },
+                        form: {
+                            colCount: 1,
+                            items: [
+                                {
+                                    itemType: "group",
+                                    caption: "Department Information",
+                                    colCount: 2,
+                                    items: [
+                                        {
+                                            dataField: "code",
+                                            caption: "Department Code",
+                                            validationRules: [
+                                                { type: "required", message: "Department code is required" },
+                                                { type: "stringLength", min: 2, max: 20, message: "Code must be between 2 and 20 characters" },
+                                                { type: "pattern", pattern: "^[A-Z0-9_-]+$", message: "Code must contain only uppercase letters, numbers, underscore, and dash" }
+                                            ],
+                                            editorOptions: {
+                                                placeholder: "Enter department code (e.g., IT, HR, FIN)",
+                                            }
+                                        },
+                                        {
+                                            dataField: "isActive",
+                                            caption: "Active Status",
+                                            editorType: "dxCheckBox",
+                                            editorOptions: {
+                                                text: "Department is active"
+                                            }
+                                        },
+                                        {
+                                            dataField: "name",
+                                            caption: "Department Name",
+                                            colSpan: 2,
+                                            validationRules: [
+                                                { type: "required", message: "Department name is required" },
+                                                { type: "stringLength", min: 2, max: 100, message: "Name must be between 2 and 100 characters" }
+                                            ],
+                                            editorOptions: {
+                                                placeholder: "Enter department name..."
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    itemType: "group",
+                                    caption: "Statistics",
+                                    colCount: 2,
+                                    items: [
+                                        {
+                                            dataField: "userCount",
+                                            caption: "Users Count",
+                                            allowEditing: false,
+                                            editorOptions: {
+                                                readOnly: true
+                                            },
+                                            calculateDisplayValue: function(data) {
+                                                return data.userDepartments ? data.userDepartments.length : 0;
+                                            }
+                                        },
+                                        {
+                                            dataField: "documentCount",
+                                            caption: "Documents Count",
+                                            allowEditing: false,
+                                            editorOptions: {
+                                                readOnly: true
+                                            },
+                                            calculateDisplayValue: function(data) {
+                                                return data.documentDepartments ? data.documentDepartments.length : 0;
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+
+                    // Columns
+                    columns: [
+                        {
+                            dataField: "id",
+                            caption: "ID",
+                            width: 80,
+                            allowEditing: false,
+                            sortOrder: "asc"
+                        },
+                        {
+                            dataField: "code",
+                            caption: "Code",
+                            width: 120,
+                            validationRules: [
+                                { type: "required", message: "Department code is required" },
+                                { type: "stringLength", min: 2, max: 20 }
+                            ],
+                            cellTemplate: function(container, options) {
+                                const code = options.data.code || '';
+                                $(`<span class="badge bg-primary fs-6">${code}</span>`).appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "name",
+                            caption: "Department Name",
+                            width: 300,
+                            validationRules: [
+                                { type: "required", message: "Department name is required" },
+                                { type: "stringLength", min: 2, max: 100 }
+                            ]
+                        },
+                        {
+                            caption: "Users",
+                            width: 100,
+                            allowEditing: false,
+                            allowSorting: true,
+                            calculateCellValue: function(data) {
+                                return data.userDepartments ? data.userDepartments.length : 0;
+                            },
+                            cellTemplate: function(container, options) {
+                                const userCount = options.data.userDepartments ? options.data.userDepartments.length : 0;
+                                const badgeClass = userCount > 0 ? 'bg-info' : 'bg-secondary';
+                                $(`<span class="badge ${badgeClass}">
+                                    <i class="fas fa-users me-1"></i>${userCount}
+                                </span>`).appendTo(container);
+                            }
+                        },
+                        {
+                            caption: "Documents",
+                            width: 120,
+                            allowEditing: false,
+                            allowSorting: true,
+                            calculateCellValue: function(data) {
+                                return data.documentDepartments ? data.documentDepartments.length : 0;
+                            },
+                            cellTemplate: function(container, options) {
+                                const docCount = options.data.documentDepartments ? options.data.documentDepartments.length : 0;
+                                const badgeClass = docCount > 0 ? 'bg-warning' : 'bg-secondary';
+                                $(`<span class="badge ${badgeClass}">
+                                    <i class="fas fa-file-alt me-1"></i>${docCount}
+                                </span>`).appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "isActive",
+                            caption: "Status",
+                            dataType: "boolean",
+                            width: 120,
+                            cellTemplate: function(container, options) {
+                                const isActive = options.data.isActive;
+                                const badgeClass = isActive ? 'bg-success' : 'bg-secondary';
+                                const text = isActive ? 'Active' : 'Inactive';
+                                const icon = isActive ? 'fas fa-check' : 'fas fa-times';
+                                $(`<span class="badge ${badgeClass}">
+                                    <i class="${icon} me-1"></i>${text}
+                                </span>`).appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "createdAt",
+                            caption: "Created Date",
+                            dataType: "datetime",
+                            width: 150,
+                            allowEditing: false,
+                            format: "dd/MM/yyyy HH:mm"
+                        },
+                        {
+                            dataField: "createdBy",
+                            caption: "Created By",
+                            width: 150,
+                            allowEditing: false,
+                            visible: false
+                        },
+                        {
+                            dataField: "updatedBy",
+                            caption: "Updated By",
+                            width: 150,
+                            allowEditing: false,
+                            visible: false
+                        },
+                        {
+                            dataField: "updatedAt",
+                            caption: "Updated Date",
+                            dataType: "datetime",
+                            width: 150,
+                            allowEditing: false,
+                            format: "dd/MM/yyyy HH:mm",
+                            visible: false
+                        },
+                        {
+                            type: 'buttons',
+                            width: 100,
+                            buttons: [
+                                {
+                                    icon: 'edit',
+                                    text: 'Edit',
+                                    onClick: function (e) {
+                                        e.component.editRow(e.row.rowIndex);
+                                    }
+                                },
+                                {
+                                    icon: 'trash',
+                                    text: 'Delete',
+                                    visible: function (e) {
+                                        return e.row.data.isActive === false;
+                                    },
+                                    onClick: function (e) {
+                                        e.component.deleteRow(e.row.rowIndex);
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+
+                    // Summary
+                    summary: {
+                        totalItems: [{
+                            column: 'name',
+                            summaryType: 'count',
+                        }]
+                    },
+
+                    // Event Handlers
+                    onInitNewRow: function(e) {
+                        e.data.isActive = true;
+                    },
+                    onRowInserting: function(e) {
+                        // Ensure code is uppercase
+                        if (e.data.code) {
+                            e.data.code = e.data.code.toUpperCase();
+                        }
+                    },
+
+                    onRowUpdating: function(e) {
+                        // Ensure code is uppercase
+                        if (e.newData.code) {
+                            e.newData.code = e.newData.code.toUpperCase();
+                        }
+                    },
+
+                    onRowInserted: function(e) {
+                        DevExpress.ui.notify("Department created successfully", "success", 3000);
+                        departmentsDataGrid.refresh();
+                    },
+
+                    onRowUpdated: function(e) {
+                        DevExpress.ui.notify("Department updated successfully", "success", 3000);
+                        departmentsDataGrid.refresh();
+                    },
+
+                    onRowRemoved: function(e) {
+                        DevExpress.ui.notify("Department deleted successfully", "success", 3000);
+                    },
+
+                    onRowRemoving: function(e) {
+                        // Show confirmation with department info
+                        const department = e.data;
+                        const userCount = department.userDepartments ? department.userDepartments.length : 0;
+                        const docCount = department.documentDepartments ? department.documentDepartments.length : 0;
+
+                        if (userCount > 0 || docCount > 0) {
+                            e.cancel = true;
+                            DevExpress.ui.notify(
+                                `Cannot delete department "${department.code}" because it has ${userCount} users and ${docCount} documents assigned.`,
+                                "error",
+                                5000
+                            );
+                        }
+                    }
+
+                }).dxDataGrid("instance");
+            }
+        });
+    </script>
+
+    <style>
+        .dx-field-item-label-text {
+            font-weight: 500;
+        }
+
+        .dx-group-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .badge {
+            font-size: 0.75em;
+        }
+
+            .badge.fs-6 {
+                font-size: 0.875rem !important;
+            }
+
+        /* Readonly field styling */
+        .dx-texteditor.dx-state-readonly {
+            background-color: #f8f9fa;
+        }
+
+        /* Custom styling for department code badges */
+        .badge.bg-primary {
+            background-color: #0d6efd !important;
+        }
+
+        .badge.bg-info {
+            background-color: #0dcaf0 !important;
+        }
+
+        .badge.bg-warning {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+        }
+
+        /* Input uppercase transformation */
+        input[data-field="code"] {
+            text-transform: uppercase;
+        }
+    </style>
+}

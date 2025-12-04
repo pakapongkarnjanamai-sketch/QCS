@@ -73,6 +73,6 @@ namespace QCS.Domain.Models
 
         // Navigation properties
         public virtual ICollection<UserDepartment> UserDepartments { get; set; } = new List<UserDepartment>();
-        //public virtual ICollection<DocumentDepartment> DocumentDepartments { get; set; } = new List<DocumentDepartment>();
+    
     }
 }

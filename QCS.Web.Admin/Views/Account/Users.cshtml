@@ -1,0 +1,441 @@
+﻿@{
+    ViewData["Title"] = "User Management";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i>User Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="usersDataGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $(document).ready(function() {
+           const API_BASE_URL = "https://localhost:7127/api/";
+        // Configuration
+        const config = {
+            apiBaseUrl: API_BASE_URL,
+            employeeApiUrl: 'https://ap-ntc2137-prwb/Utility/EmployeeServiceAPI/api/LookupEmployee',
+
+            endpoints: {
+                users: 'Users',
+                roles: 'Role',
+                userRoles: 'UserRole',
+                departments: 'Department',
+                userDepartments: 'UserDepartment'
+            }
+        };
+
+        // Global variables
+        let allRoles = [];
+        let allDepartments = [];
+        let allEmployees = [];
+
+        // Initialize application
+        initializeApp();
+
+        async function initializeApp() {
+            await loadAllData();
+            initializeUsersDataGrid();
+        }
+
+        // Load all required data
+        async function loadAllData() {
+            try {
+                // Load Roles
+                const rolesStore = createDataStore(config.apiBaseUrl, config.endpoints.roles);
+                const rolesResult = await rolesStore.load({ take: 1000 });
+                allRoles = (rolesResult.data || rolesResult || []).filter(r => r.isActive !== false);
+
+                // Load Departments
+                const departmentsStore = createDataStore(config.apiBaseUrl, config.endpoints.departments);
+                const departmentsResult = await departmentsStore.load({ take: 1000 });
+                allDepartments = (departmentsResult.data || departmentsResult || []).filter(d => d.isActive !== false);
+
+                // Load Employees
+                await loadEmployees();
+
+                console.log('All data loaded successfully');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                DevExpress.ui.notify("Error loading reference data", "error", 3000);
+            }
+        }
+
+        // Load employees from API
+        async function loadEmployees() {
+            try {
+                const response = await fetch(config.employeeApiUrl);
+                const result = await response.json();
+                allEmployees = result.data || [];
+                console.log('Employees loaded:', allEmployees.length);
+            } catch (error) {
+                console.error('Error loading employees:', error);
+                allEmployees = [];
+            }
+        }
+
+
+
+        // Initialize Users DataGrid
+        function initializeUsersDataGrid() {
+            $("#usersDataGrid").dxDataGrid({
+                dataSource: createDataStore(config.apiBaseUrl, config.endpoints.users),
+                remoteOperations: true,
+                columnAutoWidth: true,
+                showBorders: true,
+                 width: "100%",
+                    height: "calc(100vh - 200px)",
+                selection: {
+                    mode: 'single',
+                },
+                hoverStateEnabled: true,
+                headerFilter: {
+                    visible: true,
+                    search: { enabled: true }
+                },
+                searchPanel: {
+                    visible: true,
+                    width: 300,
+                },
+                groupPanel: {
+                    emptyPanelText: 'Users',
+                    visible: true,
+                },
+                scrolling: {
+                    mode: 'virtual',
+                },
+                editing: {
+                    mode: "form",
+                    allowUpdating: true,
+                    allowDeleting: true,
+                    allowAdding: true,
+                    useIcons: true,
+                },
+                onExporting: function(e) {
+                    console.log('Exporting data...');
+                },
+                onRowInserted: function(e) {
+                    DevExpress.ui.notify("User created successfully", "success", 3000);
+                },
+                onRowUpdated: function(e) {
+                    DevExpress.ui.notify("User updated successfully", "success", 3000);
+                },
+                onRowRemoved: function(e) {
+                    DevExpress.ui.notify("User deleted successfully", "success", 3000);
+                },
+                columns: [
+                    {
+                        dataField: "id",
+                        caption: "ID",
+                        width: 50,
+                        editorOptions: { disabled: true }
+
+                    },
+                    {
+                        dataField: "nid",
+                        caption: "NikonID",
+                        validationRules: [{ type: "required" }],
+                        editCellTemplate: function (cellElement, cellInfo) {
+                            return $("<div>").dxAutocomplete({
+                                value: cellInfo.value,
+                                placeholder: 'NikonID...',
+                                dataSource: allEmployees,
+                                valueExpr: 'NID',
+                                displayExpr: 'NID',
+                                searchEnabled: true,
+                                minSearchLength: 1,
+                                onValueChanged: function (e) {
+                                    console.log('NID Value changed:', e.value);
+                                    cellInfo.setValue(e.value);
+
+                                    if (e.value) {
+
+                                        // Auto-fill when value is selected from dropdown
+                                        const selectedEmployee = allEmployees.find(emp => emp.NID === e.value);
+                                        if (selectedEmployee) {
+                                            setTimeout(() => {
+                                                const updatedData = {
+                                                    'employeeID': selectedEmployee.EID || '',
+                                                    'firstName': selectedEmployee.FirstNameEn || '',
+                                                    'lastName': selectedEmployee.LastNameEn || '',
+                                                    'email': selectedEmployee.Email || ''
+                                                };
+
+                                                Object.keys(updatedData).forEach(field => {
+                                                    cellInfo.component.cellValue(cellInfo.rowIndex, field, updatedData[field]);
+                                                });
+
+                                                DevExpress.ui.notify('Employee data auto-filled', 'success', 2000);
+                                            }, 100);
+                                        }
+                                    }
+                                },
+                            });
+                        }
+                    },
+                    {
+                        dataField: "employeeID",
+                        caption: "Employee ID",
+                        editCellTemplate: function (cellElement, cellInfo) {
+                            return $("<div>").dxAutocomplete({
+                                value: cellInfo.value,
+                                placeholder: 'Employee ID...',
+                                dataSource: allEmployees,
+                                valueExpr: 'EID',
+                                displayExpr:'EID',
+                                searchEnabled: true,
+                                minSearchLength: 1,
+                                onValueChanged: function (e) {
+                                    cellInfo.setValue(e.value);
+
+                                    if (e.value) {
+                                        const selectedEmployee = allEmployees.find(emp => emp.EID === e.value);
+                                        if (selectedEmployee) {
+                                            setTimeout(() => {
+                                                const updatedData = {
+                                                    'nid': selectedEmployee.NID || '',
+                                                    'firstName': selectedEmployee.FirstNameEn || '',
+                                                    'lastName': selectedEmployee.LastNameEn || '',
+                                                    'email': selectedEmployee.Email || ''
+                                                };
+
+                                                Object.keys(updatedData).forEach(field => {
+                                                    cellInfo.component.cellValue(cellInfo.rowIndex, field, updatedData[field]);
+                                                });
+
+                                                DevExpress.ui.notify('Employee data auto-filled', 'success', 2000);
+                                            }, 100);
+                                        }
+                                    }
+                                },
+                            });
+                        }
+                    },
+                    {
+                        dataField: "firstName",
+                        caption: "First Name",
+                        validationRules: [{ type: "required" }],
+                        editCellTemplate: function (cellElement, cellInfo) {
+                            return $("<div>").dxAutocomplete({
+                                value: cellInfo.value,
+                                placeholder: 'First Name...',
+                                dataSource: allEmployees,
+                                valueExpr: 'FirstNameEn',
+                                displayExpr: 'FirstNameEn',
+                                searchEnabled: true,
+                                minSearchLength: 1,
+                                onValueChanged: function (e) {
+                                    cellInfo.setValue(e.value);
+
+                                    if (e.value) {
+                                        const selectedEmployee = allEmployees.find(emp => emp.FirstNameEn === e.value);
+                                        if (selectedEmployee) {
+                                            setTimeout(() => {
+                                                const updatedData = {
+                                                    'nid': selectedEmployee.NID || '',
+                                                    'employeeID': selectedEmployee.EID || '',
+                                                    'lastName': selectedEmployee.LastNameEn || '',
+                                                    'email': selectedEmployee.Email || ''
+                                                };
+
+                                                Object.keys(updatedData).forEach(field => {
+                                                    cellInfo.component.cellValue(cellInfo.rowIndex, field, updatedData[field]);
+                                                });
+
+                                                DevExpress.ui.notify('Employee data auto-filled', 'success', 2000);
+                                            }, 100);
+                                        }
+                                    }
+                                },
+                            });
+                        }
+                    },
+                    {
+                        dataField: "lastName",
+                        caption: "Last Name",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "email",
+                        caption: "Email",
+                        validationRules: [
+                            { type: "required" },
+                            { type: "email" }
+                        ],
+                        editCellTemplate: function (cellElement, cellInfo) {
+                            return $("<div>").dxAutocomplete({
+                                value: cellInfo.value,
+                                placeholder: 'Email...',
+                                dataSource: allEmployees,
+                                valueExpr: 'Email',
+                                displayExpr:'Email',
+                                searchEnabled: true,
+                                minSearchLength: 1,
+                                onValueChanged: function (e) {
+                                    cellInfo.setValue(e.value);
+
+                                    if (e.value) {
+                                        const selectedEmployee = allEmployees.find(emp => emp.Email === e.value);
+                                        if (selectedEmployee) {
+                                            setTimeout(() => {
+                                                const updatedData = {
+                                                    'nid': selectedEmployee.NID || '',
+                                                    'employeeID': selectedEmployee.EID || '',
+                                                    'firstName': selectedEmployee.FirstNameEn || '',
+                                                    'lastName': selectedEmployee.LastNameEn || ''
+                                                };
+
+                                                Object.keys(updatedData).forEach(field => {
+                                                    cellInfo.component.cellValue(cellInfo.rowIndex, field, updatedData[field]);
+                                                });
+
+                                                DevExpress.ui.notify('Employee data auto-filled', 'success', 2000);
+                                            }, 100);
+                                        }
+                                    }
+                                },
+                            });
+                        }
+                    },
+                    {
+                        dataField: "phoneNumber",
+                        caption: "Phone Number"
+                    },
+                    {
+                        dataField: "roleIds",
+                        caption: "Roles",
+                        allowFiltering: false,
+                        placeholder: 'Roles...',
+                        // validationRules: [{ type: "required" }],
+                        lookup: {
+                            dataSource: allRoles,
+                            displayExpr: 'name',
+                            valueExpr: 'id',
+                        },
+                        editorType: "dxTagBox",
+                        editorOptions: {
+                            dataSource: allRoles,
+                            displayExpr: 'name',
+                            valueExpr: 'id',
+                            showSelectionControls: true,
+                            searchEnabled: true,
+                            applyValueMode: "instantly",
+                            placeholder: "Select Roles..."
+                        },
+                        cellTemplate(container, options) {
+                            const noBreakSpace = '\u00A0';
+                            if (options.data.userRoles && options.data.userRoles.length > 0) {
+                                let rolesHtml = '';
+                                options.data.userRoles.forEach(function(userRole) {
+                                    if (userRole.role) {
+                                        rolesHtml += `<span class="badge bg-primary me-1 mb-1">${userRole.role.name}</span>`;
+                                    }
+                                });
+                                container.html(rolesHtml);
+                            } else {
+                                container.text(noBreakSpace);
+                            }
+                        },
+                        calculateCellValue: function(data) {
+                            if (data.userRoles && data.userRoles.length > 0) {
+                                return data.userRoles.map(ur => ur.roleId);
+                            }
+                            return [];
+                        }
+                    },
+                    {
+                        dataField: "departmentIds",
+                        caption: "Departments",
+                        allowFiltering: false,
+                        placeholder: 'Departments...',
+                        lookup: {
+                            dataSource: allDepartments,
+                            displayExpr: function(item) {
+                                return item ? `${item.code} - ${item.name}` : '';
+                            },
+                            valueExpr: 'id',
+                        },
+                        editorType: "dxTagBox",
+                        editorOptions: {
+                            dataSource: allDepartments,
+                            displayExpr: function(item) {
+                                return item ? `${item.code} - ${item.name}` : '';
+                            },
+                            valueExpr: 'id',
+                            showSelectionControls: true,
+                            searchEnabled: true,
+                            applyValueMode: "instantly",
+                            placeholder: "Select Departments..."
+                        },
+                        cellTemplate(container, options) {
+                            const noBreakSpace = '\u00A0';
+                            if (options.data.userDepartments && options.data.userDepartments.length > 0) {
+                                let departmentsHtml = '';
+                                options.data.userDepartments.forEach(function(userDepartment) {
+                                    if (userDepartment.department) {
+                                        departmentsHtml += `<span class="badge bg-info me-1 mb-1">${userDepartment.department.code}</span>`;
+                                    }
+                                });
+                                container.html(departmentsHtml);
+                            } else {
+                                container.text(noBreakSpace);
+                            }
+                        },
+                        calculateCellValue: function(data) {
+                            if (data.userDepartments && data.userDepartments.length > 0) {
+                                return data.userDepartments.map(ud => ud.departmentId);
+                            }
+                            return [];
+                        }
+                    },
+                    {
+                        dataField: "lastLogin",
+                        caption: "Last Login",
+                        dataType: "datetime",
+                        allowEditing: false,
+                        format: "dd/MM/yyyy HH:mm"
+                    }
+                ],
+                toolbar: {
+                    items: [
+                        {
+                            name: "addRowButton",
+                            showText: 'always',
+                            options: {
+                                text: 'Add User'
+                            },
+                        },
+                        {
+                            name: "searchPanel",
+                        },
+                        {
+                            name: "exportButton"
+                        }
+                    ]
+                },
+                summary: {
+                    totalItems: [
+                        {
+                            column: 'nid',
+                            summaryType: 'count',
+                            alignment: "left",
+                            customizeText: (data) => {
+                                return 'Total Users: ' + data.value.toLocaleString();
+                            }
+                        },
+                    ]
+                },
+            });
+        }
+    });
+</script>
