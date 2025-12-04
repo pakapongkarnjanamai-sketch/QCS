@@ -1,0 +1,23 @@
+﻿@{
+    ViewData["Title"] = "Quotation";
+}
+
+
+<div class="gridContainer">
+    <div id="grid"></div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE_URL = "https://localhost:7127/api";
+
+                function initializeGrid() {
+                    $("#grid").dxDataGrid({
+                     dataSource: createDataStore(API_BASE_URL, 'Quotation'),
+                 })};
+
+                $(function () {
+                    initializeGrid();
+                });
+    </script>
+}

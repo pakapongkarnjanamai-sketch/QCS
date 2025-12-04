@@ -8,6 +8,18 @@ namespace QCS.Web.User.Controllers
         {
             return View();
         }
-       
+        public IActionResult PurchaseRequest()
+        {
+            return View();
+        }
+        public IActionResult Quotation()
+        {
+            return View();
+        }
+        public IActionResult ApprovalStep()
+        {
+            return View();
+        }
+
     }
 }
