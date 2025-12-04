@@ -19,7 +19,7 @@
         $(function () {
             $("#gridPR").dxDataGrid({
                 // ส่ง options { key: "Id" } เพราะใน C# เป็น PascalCase แต่ default ใน site.js เป็น 'id'
-                dataSource: createDataStore(API_BASE_URL, 'PurchaseRequests', { key: "Id" }),
+                dataSource: createDataStore(API_BASE_URL, 'CRUDPurchaseRequests', { key: "Id" }),
                 remoteOperations: true,
                 showBorders: true,
                 rowAlternationEnabled: true,

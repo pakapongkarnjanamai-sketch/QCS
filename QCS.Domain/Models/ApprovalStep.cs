@@ -17,5 +17,8 @@ namespace QCS.Domain.Models
         public string Status { get; set; } // Pending, Approved, Rejected
         public DateTime? ApprovalDate { get; set; }
         public string Comment { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore] // ป้องกัน Loop Reference เวลาส่ง API
+        public virtual PurchaseRequest PurchaseRequest { get; set; }
     }
 }

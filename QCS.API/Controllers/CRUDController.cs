@@ -5,26 +5,26 @@ using System.Data;
 
 namespace QCS.Api.Controllers
 {
-    public class ApprovalStepsController : GenericController<ApprovalStep>
+    public class CRUDApprovalStepsController : GenericController<ApprovalStep>
     {
-        public ApprovalStepsController(IRepository<ApprovalStep> repository, ILogger<GenericController<ApprovalStep>> logger)
+        public CRUDApprovalStepsController(IRepository<ApprovalStep> repository, ILogger<GenericController<ApprovalStep>> logger)
            : base(repository, logger)
         {
 
         }
     }
-    public class PurchaseRequestsController : GenericController<PurchaseRequest>
+    public class CRUDPurchaseRequestsController : GenericController<PurchaseRequest>
     {
-        public PurchaseRequestsController(IRepository<PurchaseRequest> repository, ILogger<GenericController<PurchaseRequest>> logger)
+        public CRUDPurchaseRequestsController(IRepository<PurchaseRequest> repository, ILogger<GenericController<PurchaseRequest>> logger)
            : base(repository, logger)
         {
 
         }
     }
 
-    public class QuotationsController : GenericController<Quotation>
+    public class CRUDQuotationsController : GenericController<Quotation>
     {
-        public QuotationsController(IRepository<Quotation> repository, ILogger<GenericController<Quotation>> logger)
+        public CRUDQuotationsController(IRepository<Quotation> repository, ILogger<GenericController<Quotation>> logger)
            : base(repository, logger)
         {
 

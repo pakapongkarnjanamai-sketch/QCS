@@ -3,135 +3,31 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QCS User - @ViewData["Title"]</title>
+    <title>QCS - @ViewData["Title"]</title>
+
+ 
+
+    @await RenderSectionAsync("ExternalDependencies", required: false)
+
 
     <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
 
     <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
     <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
     <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
-    <link href="~/css/site.css" rel="stylesheet" />
-
-    <style>
-        body {
-            background-color: #f4f6f9;
-        }
-
-        /* Menu Bar Styling */
-        .main-menu-container {
-            background-color: #0d6efd; /* ใช้สีน้ำเงิน (Primary) เพื่อแยกความต่างจาก Admin (สีดำ) */
-            padding: 0 15px;
-            display: flex;
-            align-items: center;
-            height: 50px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-        }
-
-        .app-brand {
-            color: #fff;
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-right: 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-        }
-
-            .app-brand:hover {
-                color: #e2e6ea;
-            }
-
-        /* ปรับสี dxMenu ให้เข้ากับ Blue Theme */
-        #topMenu .dx-menu-item {
-            color: rgba(255,255,255,0.9) !important;
-        }
-
-            #topMenu .dx-menu-item.dx-state-hover {
-                background-color: rgba(255,255,255,0.2) !important;
-                color: #fff !important;
-            }
-
-            #topMenu .dx-menu-item.dx-state-selected {
-                background-color: rgba(255,255,255,0.3) !important;
-                font-weight: bold;
-            }
-
-        #topMenu .dx-menu-item-text {
-            color: #fff;
-        }
-
-        .dx-menu-item-popout {
-            color: #fff !important;
-        }
-
-        .main-content {
-            margin-top: 70px;
-            min-height: calc(100vh - 130px);
-            padding-bottom: 2rem;
-        }
-
-        .gridContainer {
-            padding: 20px;
-            background-color: #fff;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            border-radius: 0.25rem;
-        }
-
-        footer {
-            background-color: #fff;
-            border-top: 1px solid #dee2e6;
-        }
-    </style>
-
-    @await RenderSectionAsync("Styles", required: false)
-
-    <script src="~/js/devextreme/jquery.js"></script>
-    <script src="~/js/devextreme/bootstrap.js"></script>
-
     <script src="~/js/devextreme/filesaver.min.js"></script>
     <script src="~/js/devextreme/exceljs.min.js"></script>
 
+    <script src="~/js/devextreme/jquery.js"></script>
+    <script src="~/js/devextreme/bootstrap.js"></script>
     <script src="~/js/devextreme/dx.all.js"></script>
+
     <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
     <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
 
     <script src="~/src/devextreme-license.js"></script>
     <script src="~/js/site.js"></script>
-
-    @await RenderSectionAsync("ExternalDependencies", required: false)
-</head>
-
-<body>
-    <div class="main-menu-container">
-        <a class="app-brand" href="@Url.Action("Index", "Home")">
-            <i class="fa-solid fa-file-signature me-2"></i> QCS User
-        </a>
-
-        <div id="topMenu" style="flex-grow: 1;"></div>
-
-        <div class="text-white d-flex align-items-center gap-2">
-            <span class="d-none d-md-inline small">Welcome, User</span>
-            <i class="fas fa-circle-user fa-lg"></i>
-        </div>
-    </div>
-
-    <main role="main" class="main-content container-fluid">
-        @RenderBody()
-    </main>
-
-    <footer class="footer mt-auto py-3 text-muted text-center text-small">
-        <div class="container-fluid">
-            <span class="text-muted">&copy; @DateTime.Now.Year - Quotation Comparison System (QCS)</span>
-        </div>
-    </footer>
-
     <script src="~/lib/font-awesome/js/all.min.js"></script>
-
     <environment names="Development">
         <script src="~/host/development.js"></script>
     </environment>
@@ -139,9 +35,69 @@
         <script src="~/host/production.js"></script>
     </environment>
 
+    <style>
+        .navbar {
+            padding-left: 24px;
+            padding-right: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            /* color: white !important; */
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+            .navbar-brand:hover {
+                color: #255C8C !important;
+                text-decoration: none;
+            }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding-top: 60px;
+        }
+
+
+        .gridContainer {
+            margin: 0px 20px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            height: calc(100vh - 120px);
+            min-width: 1280px;
+            min-height: 840px;
+        }
+
+    </style>
+
+    @await RenderSectionAsync("Styles", required: false)
+
+</head>
+
+<body>
+    <nav class="navbar navbar-light bg-light fixed-top navbar-expand-md">
+        <a class="navbar-brand" href="@Url.Action("Index", "Home")">
+            QCS
+            <span class="version-badge">User</span>
+        </a>
+        <div id="menu"></div>
+
+    </nav>
+
+ 
+        @RenderBody()
+ 
+
     <script>
         $(function () {
-            $("#topMenu").dxMenu({
+            $("#menu").dxMenu({
                 dataSource: [
                     {
                         text: "หน้าหลัก (Dashboard)",
@@ -168,7 +124,6 @@
                         text: "การอนุมัติ (Approvals)",
                         icon: "check",
                         path: "@Url.Action("Index", "Approval")", // หรือ ApprovalController
-                        badge: "3" // (Optional) ตัวอย่างการใส่ Badge แจ้งเตือนจำนวนงาน
                     }
                 ],
                 displayExpr: "text",

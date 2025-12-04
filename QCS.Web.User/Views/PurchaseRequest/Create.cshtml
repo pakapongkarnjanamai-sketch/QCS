@@ -1,238 +1,396 @@
-﻿@model QCS.Web.User.Models.RequestViewModel
+﻿@{
+    ViewData["Title"] = "Create Purchase Request";
+}
 
-@{
-    ViewData["Title"] = "สร้างใบขอซื้อ (Create Request)";
+@section Styles {
+    <style>
+     
+        .form-container {
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .file-info i {
+                color: #f05b41;
+                font-size: 1.2em;
+            }
+
+        .upload-instructions {
+            margin-top: 8px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .attachments-container {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px dashed #ced4da;
+        }
+    </style>
 }
 
 <div class="container mt-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>สร้างใบเปรียบเทียบราคาใหม่</h5>
-        </div>
-        <div class="card-body">
-            <form id="createForm" asp-action="Create" method="post" enctype="multipart/form-data">
+    <div class="form-container mb-3">
+        <h4><i class="fas fa-plus-circle text-primary me-2"></i>สร้างใบขอซื้อใหม่ (New Request)</h4>
+        <div id="actionButtons"></div>
+    </div>
 
-                <div id="headerForm"></div>
-
-                <hr class="my-4" />
-
-                <h5 class="text-secondary mb-3"><i class="fas fa-list me-2"></i>รายการใบเสนอราคา</h5>
-
-                <div class="mb-3">
-                    <div id="fileUploader"></div>
-                    <small class="text-muted">* อัปโหลดไฟล์ PDF ใบเสนอราคาจาก Vendor เพื่อเริ่มเปรียบเทียบ</small>
-                </div>
-
-                <div id="quotationGrid"></div>
-
-                <input type="hidden" id="quotationsJson" name="QuotationsJson" />
-
-                <div class="mt-4 text-end">
-                    <a asp-controller="Home" asp-action="Index" class="btn btn-light me-2">ยกเลิก</a>
-                    <button type="button" class="btn btn-success" onclick="submitForm()">
-                        <i class="fas fa-save me-1"></i> บันทึกและส่งอนุมัติ
-                    </button>
-                </div>
-            </form>
-        </div>
+    <div class="form-container">
+        <div id="quotationForm"></div>
     </div>
 </div>
+
+<div id="loadingIndicator"></div>
 
 @section Scripts {
     <script>
         $(function () {
-            // --- 1. ตัวแปรเก็บข้อมูลชั่วคราว ---
-            let quotationList = []; // เก็บข้อมูล Grid
-            let fileList = [];      // เก็บ File Object ที่ User เลือก
+            // === CONFIGURATION ===
+            const API_BASE_URL = "https://localhost:7127/api";
+            const VENDOR_API_URL = "https://ap-ntc2138-qawb/iChaSue/Service/Vendor/api";
 
-            // --- 2. สร้าง Form Header ---
-            $("#headerForm").dxForm({
-                formData: @Json.Serialize(Model ?? new QCS.Web.User.Models.RequestViewModel()),
-                colCount: 2,
-                items: [
-                    {
-                        dataField: "Title",
-                        label: { text: "หัวข้อการจัดซื้อ" },
-                        editorOptions: { placeholder: "เช่น จัดซื้อคอมพิวเตอร์ 10 เครื่อง" },
-                        validationRules: [{ type: "required", message: "กรุณาระบุหัวข้อ" }],
-                        colSpan: 2
-                    },
-                    {
-                        dataField: "RequestDate",
-                        editorType: "dxDateBox",
-                        label: { text: "วันที่เอกสาร" },
-                        editorOptions: { value: new Date(), displayFormat: "dd/MM/yyyy" },
-                        validationRules: [{ type: "required" }]
-                    }
-                ]
+            // === DATA STORE ===
+            const vendorStore = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: VENDOR_API_URL + "/GetAll",
+                onBeforeSend: function(method, ajaxOptions) {
+                    ajaxOptions.xhrFields = { withCredentials: true };
+                }
             });
 
-            // --- 3. สร้าง File Uploader ---
-            $("#fileUploader").dxFileUploader({
-                selectButtonText: "เลือกไฟล์ใบเสนอราคา (PDF)",
-                labelText: "หรือลากไฟล์มาวางที่นี่",
-                accept: ".pdf",
-                multiple: true,
-                uploadMode: "useForm", // ไม่ Upload อัตโนมัติ รอ Submit Form
-                onValueChanged: function (e) {
-                    // เมื่อมีการเลือกไฟล์
-                    e.value.forEach(file => {
-                        // เช็คว่าไฟล์นี้เคยเพิ่มหรือยัง
-                        if (!fileList.some(f => f.name === file.name && f.size === file.size)) {
-                            fileList.push(file);
+            const mockDocumentTypes = [
+                { id: 10, name: 'Main Quotation' },
+                { id: 20, name: 'Specifications' },
+                { id: 30, name: 'Terms & Conditions' }
+            ];
 
-                            // เพิ่มแถวใหม่ใน Grid อัตโนมัติ
-                            quotationList.push({
-                                TempId: generateUUID(),
-                                VendorName: "", // ให้ User ไปกรอกต่อเอง
-                                TotalAmount: 0,
-                                IsSelected: false,
-                                FileName: file.name,
-                                FileObj: file // เก็บ Reference ไฟล์ไว้ (ไม่ส่งไป JSON)
-                            });
+            // === DATA MODEL ===
+            const requestData = {
+                documentName: "",
+                // requestDate ถูกตัดออกจากหน้าจอ (จะ auto assign ตอน submit)
+
+                // ย้ายข้อมูลเหล่านี้มาอยู่ที่ Header แทน
+                vendorId: null,
+                validFrom: new Date(),
+                validUntil: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+                comment: "",
+
+                attachments: []
+            };
+
+            let fileList = [];
+            let attachmentGridInstance = null;
+            let formInstance = null;
+
+            // === INITIALIZATION ===
+            const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
+                shadingColor: "rgba(0,0,0,0.4)",
+                visible: false,
+                showIndicator: true,
+                showPane: true,
+                shading: true,
+                position: { of: "body" }
+            }).dxLoadPanel("instance");
+
+            renderForm();
+            renderActionButtons();
+
+            // === RENDER FUNCTIONS ===
+            function renderForm() {
+                formInstance = $("#quotationForm").dxForm({
+                    formData: requestData,
+                    colCount: 2,
+                    labelLocation: "top",
+                    items: [
+                        {
+                            itemType: "group",
+                            caption: "ข้อมูลเอกสาร (Document Info)",
+                            colCount: 2,
+                            colSpan: 2,
+                            items: [
+                                {
+                                    dataField: "documentName",
+                                    label: { text: "หัวข้อการจัดซื้อ (Title)" },
+                                    editorOptions: { placeholder: "เช่น จัดซื้ออุปกรณ์สำนักงาน..." },
+                                    colSpan: 2,
+                                    validationRules: [{ type: "required", message: "กรุณาระบุหัวข้อ" }]
+                                },
+                                // ย้าย Vendor มาที่นี่
+                                {
+                                    dataField: "vendorId",
+                                    label: { text: "ผู้ขาย (Vendor)" },
+                                    editorType: "dxSelectBox",
+                                    editorOptions: {
+                                        dataSource: vendorStore,
+                                        valueExpr: "id",
+                                        displayExpr: "name",
+                                        searchEnabled: true,
+                                        placeholder: "เลือก Vendor..."
+                                    },
+                                    colSpan: 2, // ให้กว้างเต็มบรรทัด
+                                    validationRules: [{ type: "required", message: "กรุณาเลือก Vendor" }]
+                                },
+                                // ย้าย Valid From/Until มาที่นี่
+                                {
+                                    dataField: "validFrom",
+                                    label: { text: "ราคาใช้ได้ตั้งแต่ (Valid From)" },
+                                    editorType: "dxDateBox",
+                                    editorOptions: { displayFormat: "dd/MM/yyyy", type: "date" },
+                                    validationRules: [{ type: "required" }]
+                                },
+                                {
+                                    dataField: "validUntil",
+                                    label: { text: "ถึงวันที่ (Valid Until)" },
+                                    editorType: "dxDateBox",
+                                    editorOptions: { displayFormat: "dd/MM/yyyy", type: "date" },
+                                    validationRules: [{ type: "required" }]
+                                },
+                                // ย้าย Comment มาที่นี่
+                                {
+                                    dataField: "comment",
+                                    label: { text: "หมายเหตุ (Comment)" },
+                                    editorType: "dxTextArea",
+                                    editorOptions: { height: 80 },
+                                    colSpan: 2
+                                }
+                            ]
+                        },
+                        {
+                            itemType: "group",
+                            caption: "เอกสารแนบ (Attachments)",
+                            colSpan: 2,
+                            items: [{
+                                template: renderAttachmentsSection
+                            }]
                         }
-                    });
-
-                    refreshGrid();
-                    // Reset Uploader เพื่อให้ดูสะอาดตา (ไฟล์ถูกเก็บในตัวแปรแล้ว)
-                    e.component.reset();
-                }
-            });
-
-            // --- 4. สร้าง Grid ---
-            const gridInstance = $("#quotationGrid").dxDataGrid({
-                dataSource: quotationList,
-                keyExpr: "TempId",
-                showBorders: true,
-                editing: {
-                    mode: "cell",
-                    allowUpdating: true,
-                    allowDeleting: true
-                },
-                columns: [
-                    {
-                        dataField: "FileName",
-                        caption: "ไฟล์แนบ",
-                        allowEditing: false,
-                        width: 250
-                    },
-                    {
-                        dataField: "VendorName",
-                        caption: "ชื่อ Vendor",
-                        validationRules: [{ type: "required" }]
-                    },
-                    {
-                        dataField: "TotalAmount",
-                        caption: "ราคารวม (บาท)",
-                        dataType: "number",
-                        format: "#,##0.00",
-                        validationRules: [{ type: "required" }]
-                    },
-                    {
-                        dataField: "IsSelected",
-                        caption: "เลือกเจ้านี้",
-                        dataType: "boolean",
-                        width: 100
-                    }
-                ],
-                onRowRemoved: function(e) {
-                    // ลบไฟล์ออกจาก List เมื่อ User ลบแถวใน Grid
-                    fileList = fileList.filter(f => f.name !== e.data.FileName);
-                }
-            }).dxDataGrid("instance");
-
-            function refreshGrid() {
-                gridInstance.option("dataSource", quotationList);
-                gridInstance.refresh();
+                    ]
+                }).dxForm("instance");
             }
 
-            // Helper: UUID
+            function renderAttachmentsSection(data, itemElement) {
+                const $container = $("<div>").addClass("attachments-container");
+
+                // 1. File Uploader
+                $("<div>").dxFileUploader({
+                    multiple: true,
+                    accept: ".pdf",
+                    uploadMode: "useForm",
+                    showFileList: false,
+                    labelText: "ลากไฟล์ PDF มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์",
+                    selectButtonText: "เลือกไฟล์ (Select Files)",
+                    allowedFileExtensions: ['.pdf'],
+                    onValueChanged: function (e) {
+                        if (e.value && e.value.length > 0) {
+                            e.value.forEach(file => handleFileUpload(file));
+                            e.component.reset();
+                        }
+                    }
+                }).appendTo($container);
+
+                // 2. Grid (ตัดคอลัมน์ที่ไม่ใช้ออก)
+                attachmentGridInstance = $("<div>").dxDataGrid({
+                    dataSource: requestData.attachments,
+                    showBorders: true,
+                    paging: { enabled: false },
+                    noDataText: "ยังไม่มีไฟล์แนบ",
+                    columnAutoWidth: true,
+                    editing: {
+                        mode: "cell",
+                        allowUpdating: true,
+                        allowDeleting: true,
+                        useIcons: true
+                    },
+                    onRowRemoved: function(e) {
+                        fileList = fileList.filter(f => f.name !== e.data.fileName);
+                    },
+                    columns: [
+                        {
+                            dataField: "fileName",
+                            caption: "ชื่อไฟล์",
+                            allowEditing: false,
+                            cellTemplate: function (container, options) {
+                                $("<div>").addClass("file-info")
+                                    .append($("<i>").addClass("fas fa-file-pdf"), $("<span>").text(options.value))
+                                    .appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "fileSize",
+                            caption: "ขนาด",
+                            width: 100,
+                            allowEditing: false,
+                            customizeText: function (cellInfo) {
+                                return formatFileSize(cellInfo.value);
+                            }
+                        },
+                        {
+                            dataField: "documentType",
+                            caption: "ประเภทเอกสาร",
+                            width: 250,
+                            lookup: {
+                                dataSource: mockDocumentTypes,
+                                valueExpr: "id",
+                                displayExpr: "name"
+                            },
+                            validationRules: [{ type: "required" }]
+                        },
+                        {
+                            type: "buttons",
+                            width: 50,
+                            buttons: ["delete"]
+                        }
+                    ]
+                }).dxDataGrid("instance");
+
+                attachmentGridInstance.element().appendTo($container);
+                $container.appendTo(itemElement);
+            }
+
+            function renderActionButtons() {
+                $("#actionButtons").dxToolbar({
+                    items: [
+                        {
+                            location: 'after',
+                            widget: 'dxButton',
+                            options: {
+                                text: 'ยกเลิก',
+                                stylingMode: 'outlined',
+                                onClick: () => window.location.href = '@Url.Action("Index", "Home")'
+                            }
+                        },
+                        {
+                            location: 'after',
+                            widget: 'dxButton',
+                            options: {
+                                text: 'บันทึกข้อมูล',
+                                icon: 'save',
+                                type: 'default',
+                                onClick: submitData
+                            }
+                        }
+                    ]
+                });
+            }
+
+            // === LOGIC FUNCTIONS ===
+
+            function handleFileUpload(file) {
+                if (file.type !== "application/pdf") {
+                    DevExpress.ui.notify("รองรับเฉพาะไฟล์ PDF เท่านั้น", "error", 2000);
+                    return;
+                }
+
+                if (fileList.some(f => f.name === file.name && f.size === file.size)) {
+                    DevExpress.ui.notify("ไฟล์นี้ถูกเพิ่มไปแล้ว", "warning", 2000);
+                    return;
+                }
+
+                fileList.push(file);
+
+                // Default Values for Grid Item
+                requestData.attachments.push({
+                    tempId: generateUUID(),
+                    fileName: file.name,
+                    fileSize: file.size,
+                    documentType: mockDocumentTypes[0].id
+                });
+
+                if (attachmentGridInstance) {
+                    attachmentGridInstance.option("dataSource", requestData.attachments);
+                    attachmentGridInstance.refresh();
+                }
+            }
+
+            async function submitData() {
+                if (!formInstance.validate().isValid) {
+                    DevExpress.ui.notify("กรุณากรอกข้อมูลให้ครบถ้วน", "error", 2000);
+                    return;
+                }
+
+                if (requestData.attachments.length === 0) {
+                    DevExpress.ui.notify("กรุณาแนบไฟล์อย่างน้อย 1 รายการ", "error", 2000);
+                    return;
+                }
+
+                loadingIndicator.show();
+
+                try {
+                    const formData = new FormData();
+
+                    // Header Fields
+                    formData.append("Title", requestData.documentName);
+                    // RequestDate ถูกตัดจากหน้าจอ ให้ใช้วันที่ปัจจุบัน
+                    formData.append("RequestDate", new Date().toISOString());
+
+                    // Map Attachments to JSON
+                    // นำข้อมูล Vendor/Date/Comment จาก Header ไปใส่ในทุก Item ของ Attachments
+                    const quotationsInfo = requestData.attachments.map(att => ({
+                        FileName: att.fileName,
+
+                        // ใช้ข้อมูลจาก Header (requestData) แทนข้อมูลใน row
+                        VendorId: requestData.vendorId,
+                        VendorName: "Vendor_" + requestData.vendorId, // (หรือให้ Backend ไปหาชื่อเองจาก ID)
+                        TotalAmount: 0, // ยกเลิกการกรอก TotalAmount -> ส่ง 0 ไปก่อน
+
+                        DocumentTypeId: att.documentType,
+
+                        // ใช้ข้อมูลจาก Header
+                        ValidFrom: requestData.validFrom ? requestData.validFrom.toISOString() : null,
+                        ValidUntil: requestData.validUntil ? requestData.validUntil.toISOString() : null,
+                        Comment: requestData.comment
+                    }));
+
+                    formData.append("QuotationsJson", JSON.stringify(quotationsInfo));
+
+                    // Append File Objects
+                    fileList.forEach(file => {
+                        formData.append("Attachments", file);
+                    });
+
+                    const response = await fetch(`${API_BASE_URL}/PurchaseRequest/Create`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(errorText || "Server returned error");
+                    }
+
+                    DevExpress.ui.notify("บันทึกข้อมูลสำเร็จ", "success", 2000);
+                    setTimeout(() => {
+                        window.location.href = '@Url.Action("Index", "Home")';
+                    }, 1000);
+
+                } catch (err) {
+                    console.error(err);
+                    DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 4000);
+                } finally {
+                    loadingIndicator.hide();
+                }
+            }
+
+            function formatFileSize(bytes) {
+                if (!bytes) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
             function generateUUID() {
                 return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
                     return v.toString(16);
                 });
-            }
-
-            // --- 5. Submit Logic ---
-            window.submitForm = function() {
-                // 5.1 Validate Header Form
-                const formInstance = $("#headerForm").dxForm("instance");
-                if (!formInstance.validate().isValid) return;
-
-                // 5.2 Validate Grid Data
-                if (quotationList.length === 0) {
-                    DevExpress.ui.notify("กรุณาอัปโหลดใบเสนอราคาอย่างน้อย 1 รายการ", "error", 2000);
-                    return;
-                }
-
-                // 5.3 Prepare Data
-                // Serialize ข้อมูลใน Grid เป็น JSON String
-                const cleanData = quotationList.map(q => ({
-                    TempId: q.TempId,
-                    VendorName: q.VendorName,
-                    TotalAmount: q.TotalAmount,
-                    IsSelected: q.IsSelected,
-                    FileName: q.FileName
-                }));
-                $("#quotationsJson").val(JSON.stringify(cleanData));
-
-                // ใส่ข้อมูลจาก dxForm ลงใน input ของ HTML Form หลัก (เนื่องจาก dxForm ไม่ได้ submit เป็น name ตรงๆ เสมอไป)
-                const formData = formInstance.option("formData");
-                $("<input>").attr({type: "hidden", name: "Title", value: formData.Title}).appendTo("#createForm");
-                $("<input>").attr({type: "hidden", name: "RequestDate", value: formData.RequestDate.toISOString()}).appendTo("#createForm");
-
-                // Attach Files manually to the form input
-                // เนื่องจากเราใช้ Ajax ไม่ได้ง่ายๆ กับการ redirect, เราจะใช้ HTML Form Submit ปกติ
-                // แต่ต้องเอาไฟล์จาก fileList ยัดกลับเข้าไปใน input type="file" (ทำไม่ได้ด้วย security browser)
-
-                // *** วิธีแก้: เราจะใช้ FormData + Ajax Submit แทน ***
-                submitViaAjax(formData, cleanData);
-            }
-
-            function submitViaAjax(formDataObj, gridData) {
-                const formData = new FormData();
-
-                // Add Header Fields
-                formData.append("Title", formDataObj.Title);
-                formData.append("RequestDate", formDataObj.RequestDate.toISOString());
-                formData.append("QuotationsJson", JSON.stringify(gridData));
-
-                // Add Files
-                fileList.forEach(file => {
-                    formData.append("Attachments", file);
-                });
-
-                // Add AntiForgeryToken
-                formData.append("__RequestVerificationToken", $('input[name="__RequestVerificationToken"]').val());
-
-                // Show Loading
-                const loadPanel = showLoading();
-
-                $.ajax({
-                    url: '@Url.Action("Create", "PurchaseRequest")',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        loadPanel.hide();
-                        window.location.href = '@Url.Action("Index", "Home")';
-                    },
-                    error: function(xhr) {
-                        loadPanel.hide();
-                        DevExpress.ui.notify("เกิดข้อผิดพลาด: " + xhr.responseText, "error", 3000);
-                    }
-                });
-            }
-
-            function showLoading() {
-                // สร้าง LoadPanel ชั่วคราวถ้ายังไม่มี
-                return $("<div>").dxLoadPanel({
-                    visible: true,
-                    shading: true,
-                    position: { of: "body" }
-                }).dxLoadPanel("instance");
             }
         });
     </script>
