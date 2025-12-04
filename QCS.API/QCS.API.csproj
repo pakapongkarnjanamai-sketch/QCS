@@ -22,5 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="..\QCS.Application\QCS.Application.csproj" />
     <ProjectReference Include="..\QCS.Infrastructure\QCS.Infrastructure.csproj" />
+    <ProjectReference Include="..\QCS.Web.Shared\QCS.Web.Shared.csproj" />
   </ItemGroup>
 </Project>

@@ -52,6 +52,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAssertion(context =>
             context.User.Identity?.Name?.StartsWith("NIKONOA\\", StringComparison.OrdinalIgnoreCase) == true));
 });
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<IDateTime, DateTimeService>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QCS.Domain.DTOs;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
 using System.Text.Json;
@@ -170,20 +171,5 @@ namespace QCS.API.Controllers
         }
     }
 
-    // DTOs
-    public class CreateRequestDto
-    {
-        public string Title { get; set; }
-        public DateTime RequestDate { get; set; }
-        public string QuotationsJson { get; set; }
-        public List<IFormFile> Attachments { get; set; }
-    }
-
-    public class QuotationItemDto
-    {
-        public string VendorName { get; set; }
-        public decimal TotalAmount { get; set; }
-        public bool IsSelected { get; set; }
-        public string FileName { get; set; }
-    }
+  
 }

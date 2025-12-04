@@ -55,12 +55,12 @@
         $(function () {
             // === CONFIGURATION ===
             const API_BASE_URL = "https://localhost:7127/api";
-            const VENDOR_API_URL = "https://ap-ntc2138-qawb/iChaSue/Service/Vendor/api";
+            const VENDOR_API_URL = "https://ap-ntc2138-qawb/iChaSue/Service/Supplier/api";
 
             // === DATA STORE ===
             const vendorStore = DevExpress.data.AspNet.createStore({
                 key: "id",
-                loadUrl: VENDOR_API_URL + "/GetAll",
+                loadUrl: VENDOR_API_URL + "/Suppliers",
                 onBeforeSend: function(method, ajaxOptions) {
                     ajaxOptions.xhrFields = { withCredentials: true };
                 }
@@ -120,7 +120,7 @@
                                     dataField: "documentName",
                                     label: { text: "หัวข้อการจัดซื้อ (Title)" },
                                     editorOptions: { placeholder: "เช่น จัดซื้ออุปกรณ์สำนักงาน..." },
-                                    colSpan: 2,
+                                    colSpan: 1,
                                     validationRules: [{ type: "required", message: "กรุณาระบุหัวข้อ" }]
                                 },
                                 // ย้าย Vendor มาที่นี่
@@ -130,12 +130,12 @@
                                     editorType: "dxSelectBox",
                                     editorOptions: {
                                         dataSource: vendorStore,
-                                        valueExpr: "id",
-                                        displayExpr: "name",
+                                        valueExpr: "Id",
+                                        displayExpr: "Name",
                                         searchEnabled: true,
                                         placeholder: "เลือก Vendor..."
                                     },
-                                    colSpan: 2, // ให้กว้างเต็มบรรทัด
+                                    colSpan: 1, // ให้กว้างเต็มบรรทัด
                                     validationRules: [{ type: "required", message: "กรุณาเลือก Vendor" }]
                                 },
                                 // ย้าย Valid From/Until มาที่นี่

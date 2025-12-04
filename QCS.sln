@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Application", "QCS.Appl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Infrastructure", "QCS.Infrastructure\QCS.Infrastructure.csproj", "{5F95905B-1FF4-49F8-9695-A44357D3B987}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QCS.Web.Shared", "QCS.Web.Shared\QCS.Web.Shared.csproj", "{BD5D1D76-D741-4734-A576-69F40C0586A9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5F95905B-1FF4-49F8-9695-A44357D3B987}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD5D1D76-D741-4734-A576-69F40C0586A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD5D1D76-D741-4734-A576-69F40C0586A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD5D1D76-D741-4734-A576-69F40C0586A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD5D1D76-D741-4734-A576-69F40C0586A9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -67,6 +73,7 @@ Global
 		{E2BAE380-6B0A-4E5A-B060-AF1EB852D082} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
 		{B1D410AD-C51A-47FC-B92F-65138FBCA8C7} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
 		{5F95905B-1FF4-49F8-9695-A44357D3B987} = {BEA52D67-E982-4691-ADCB-9FF206C9E71D}
+		{BD5D1D76-D741-4734-A576-69F40C0586A9} = {44C371D3-5F1B-4436-A098-C4BF45D9E9EB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {97A0BFFB-95F1-4683-AE64-44DD1498643C}
