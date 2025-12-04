@@ -22,6 +22,7 @@ namespace QCS.Infrastructure.Data
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
         public DbSet<PurchaseRequest> PurchaseRequests { get; set; }
         public DbSet<Quotation> Quotations { get; set; }
+        public DbSet<AttachmentFile> AttachmentFiles { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<Department> Departments { get; set; }

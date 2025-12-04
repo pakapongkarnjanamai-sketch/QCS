@@ -12,25 +12,23 @@ namespace QCS.API.Controllers
     public class PurchaseRequestController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _env;
 
-        public PurchaseRequestController(AppDbContext context, IWebHostEnvironment env)
+        public PurchaseRequestController(AppDbContext context)
         {
             _context = context;
-            _env = env;
         }
 
         // GET: api/PurchaseRequest/MyRequests
         [HttpGet("MyRequests")]
         public async Task<IActionResult> GetMyRequests()
         {
-            // ในที่นี้เราจะดึงข้อมูลทั้งหมดก่อน (ในระบบจริงควร Filter ตาม User ID)
+            // ดึงข้อมูลทั้งหมด (ในระบบจริงควร Filter ตาม User ID)
             var requests = await _context.PurchaseRequests
                 .Include(r => r.Quotations)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 
-            // แปลงเป็น DTO ให้ตรงกับ MyRequestHistoryViewModel ฝั่งหน้าบ้าน
+            // แปลงเป็น DTO สำหรับแสดงผลรายการ
             var result = requests.Select(r => new
             {
                 Id = r.Id,
@@ -39,7 +37,7 @@ namespace QCS.API.Controllers
                 RequestDate = r.RequestDate,
                 Status = r.Status,
                 TotalAmount = r.Quotations.Where(q => q.IsSelected).Sum(q => q.TotalAmount), // ยอดรวมเฉพาะเจ้าที่เลือก
-                CurrentHandler = GetCurrentHandler(r.Id), // Helper function
+                CurrentHandler = GetCurrentHandler(r.Id),
                 IsCompleted = r.Status == "Completed"
             });
 
@@ -52,6 +50,7 @@ namespace QCS.API.Controllers
         {
             var request = await _context.PurchaseRequests
                 .Include(r => r.Quotations)
+                    .ThenInclude(q => q.AttachmentFile) // Include ข้อมูลไฟล์เพื่อเอา ID มาทำ Link
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
@@ -74,12 +73,22 @@ namespace QCS.API.Controllers
                 Quotations = request.Quotations.Select(q => new
                 {
                     Id = q.Id,
+                    VendorId = q.VendorId,
                     VendorName = q.VendorName,
                     TotalAmount = q.TotalAmount,
                     IsSelected = q.IsSelected,
+
+                    // ข้อมูลเพิ่มเติม
+                    DocumentTypeId = q.DocumentTypeId,
+                    ValidFrom = q.ValidFrom,
+                    ValidUntil = q.ValidUntil,
+                    Comment = q.Comment,
+
                     OriginalFileName = q.OriginalFileName,
-                    // สร้าง URL สำหรับ Download ไฟล์ (ต้องมี Action Download หรือเปิด Static File)
-                    FilePath = q.FilePath // ในที่นี้ส่ง Path ไปก่อน
+                    // สร้าง URL สำหรับ Download ไฟล์จาก Action DownloadAttachment
+                    FilePath = q.AttachmentFileId.HasValue
+                        ? Url.Action("DownloadAttachment", new { id = q.AttachmentFileId })
+                        : null
                 })
             };
 
@@ -104,39 +113,51 @@ namespace QCS.API.Controllers
                     ApprovalSteps = new List<ApprovalStep>()
                 };
 
-                // 2. แปลง JSON Quotations
-                var quotationItems = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.QuotationsJson ?? "[]");
+                // 2. แปลง JSON Quotations เป็น Object (Case Insensitive)
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var quotationItems = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.QuotationsJson ?? "[]", options);
 
-                // 3. จัดการไฟล์แนบ (Upload)
-                string uploadFolder = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", "quotations");
-                if (!Directory.Exists(uploadFolder)) Directory.CreateDirectory(uploadFolder);
-
+                // 3. จัดการไฟล์แนบ (Save to Database as BLOB)
                 if (input.Attachments != null && quotationItems != null)
                 {
                     foreach (var file in input.Attachments)
                     {
                         if (file.Length > 0)
                         {
-                            // สร้างชื่อไฟล์ไม่ซ้ำ
-                            string fileName = $"{Guid.NewGuid()}_{file.FileName}";
-                            string filePath = Path.Combine(uploadFolder, fileName);
+                            // อ่านไฟล์เป็น Byte Array
+                            using var memoryStream = new MemoryStream();
+                            await file.CopyToAsync(memoryStream);
 
-                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            // สร้าง Entity AttachmentFile
+                            var attachment = new AttachmentFile
                             {
-                                await file.CopyToAsync(stream);
-                            }
+                                FileName = file.FileName,
+                                ContentType = file.ContentType,
+                                FileSize = file.Length,
+                                Data = memoryStream.ToArray() // เก็บ Binary ที่นี่
+                            };
 
-                            // หา Item ใน JSON ที่ชื่อไฟล์ตรงกัน เพื่อเอาข้อมูล Vendor/Price
+                            // หา Item ใน JSON ที่ชื่อไฟล์ตรงกัน เพื่อเอาข้อมูล Vendor/Price/Date
                             var info = quotationItems.FirstOrDefault(q => q.FileName == file.FileName);
                             if (info != null)
                             {
                                 pr.Quotations.Add(new Quotation
                                 {
+                                    // Map ข้อมูลทั่วไป
                                     VendorName = info.VendorName,
                                     TotalAmount = info.TotalAmount,
                                     IsSelected = info.IsSelected,
                                     OriginalFileName = file.FileName,
-                                    FilePath = $"/uploads/quotations/{fileName}" // Web Path
+
+                                    // Map ข้อมูลใหม่ที่เพิ่มเข้ามา
+                                    VendorId = info.VendorId,
+                                    DocumentTypeId = info.DocumentTypeId,
+                                    ValidFrom = info.ValidFrom,
+                                    ValidUntil = info.ValidUntil,
+                                    Comment = info.Comment,
+
+                                    // เชื่อมโยงกับไฟล์ที่สร้างใหม่
+                                    AttachmentFile = attachment
                                 });
                             }
                         }
@@ -144,7 +165,6 @@ namespace QCS.API.Controllers
                 }
 
                 // 4. สร้าง Workflow การอนุมัติ (Mockup)
-                // ในระบบจริงอาจจะดึงจาก Master Data ว่าต้องให้ใครเซ็นบ้าง
                 pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 1, ApproverName = "Manager A", Role = "Manager", Status = "Pending" });
                 pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 2, ApproverName = "Director B", Role = "Director", Status = "Pending" });
 
@@ -161,6 +181,18 @@ namespace QCS.API.Controllers
             }
         }
 
+        // Action สำหรับ Download ไฟล์จาก Database
+        [HttpGet("DownloadAttachment/{id}")]
+        public async Task<IActionResult> DownloadAttachment(int id)
+        {
+            var file = await _context.AttachmentFiles.FindAsync(id);
+            if (file == null) return NotFound();
+
+            // ส่งไฟล์กลับไปให้ Browser ดาวน์โหลด
+            return File(file.Data, file.ContentType ?? "application/octet-stream", file.FileName);
+        }
+
+        // Helper function
         private string GetCurrentHandler(int prId)
         {
             var step = _context.ApprovalSteps
@@ -170,6 +202,4 @@ namespace QCS.API.Controllers
             return step?.ApproverName ?? "-";
         }
     }
-
-  
 }
