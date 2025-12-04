@@ -1,5 +1,91 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
+﻿@{
+    ViewData["Title"] = "Purchase Request";
+}
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">รายการใบขอซื้อ (Purchase Requests)</h5>
+    </div>
+    <div class="card-body">
+        <div id="gridPR"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // อย่าลืมใส่ / ปิดท้าย เพื่อให้ site.js ต่อ String ได้ถูกต้อง
+        const API_BASE_URL = "https://localhost:7127/api/";
+
+        $(function () {
+            $("#gridPR").dxDataGrid({
+                // ส่ง options { key: "Id" } เพราะใน C# เป็น PascalCase แต่ default ใน site.js เป็น 'id'
+                dataSource: createDataStore(API_BASE_URL, 'PurchaseRequests', { key: "Id" }),
+                remoteOperations: true,
+                showBorders: true,
+                rowAlternationEnabled: true,
+                columnAutoWidth: true,
+
+                // เปิดฟีเจอร์การจัดการข้อมูล
+                filterRow: { visible: true },
+                searchPanel: { visible: true },
+                editing: {
+                    mode: "popup",
+                    allowAdding: true,
+                    allowUpdating: true,
+                    allowDeleting: true,
+                    popup: {
+                        title: "ข้อมูลใบขอซื้อ",
+                        showTitle: true,
+                        width: 700,
+                        height: 450
+                    },
+                    form: {
+                        items: [
+                            { itemType: "group", colCount: 2, colSpan: 2, items: ["DocumentNo", "RequestDate"] },
+                            { itemType: "group", colCount: 1, colSpan: 2, items: ["Title", "Status"] }
+                        ]
+                    }
+                },
+
+                // กำหนดคอลัมน์
+                columns: [
+                    {
+                        dataField: "Id",
+                        visible: false,
+                        allowEditing: false
+                    },
+                    {
+                        dataField: "DocumentNo",
+                        caption: "เลขที่เอกสาร",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "Title",
+                        caption: "หัวข้อการจัดซื้อ",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "RequestDate",
+                        caption: "วันที่ขอซื้อ",
+                        dataType: "date",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "Status",
+                        caption: "สถานะ",
+                        editorType: "dxSelectBox",
+                        editorOptions: {
+                            items: ["Draft", "Pending", "Approved", "Rejected"],
+                            value: "Draft" // ค่าเริ่มต้น
+                        }
+                    }
+                ],
+
+                // (Optional) กรณีอยากให้กดปุ่ม + แล้วไปหน้า Master-Detail
+                // onRowDblClick: function(e) {
+                //     window.location.href = `/PurchaseRequest/Detail/${e.data.Id}`;
+                // }
+            });
+        });
+    </script>
 }

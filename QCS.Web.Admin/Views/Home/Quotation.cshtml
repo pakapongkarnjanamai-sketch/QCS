@@ -1,23 +1,103 @@
 ﻿@{
-    ViewData["Title"] = "Quotation";
+    ViewData["Title"] = "Quotation Management";
 }
 
-
-<div class="gridContainer">
-    <div id="grid"></div>
+<div class="card">
+    <div class="card-header">
+        <h5>จัดการข้อมูล Quotation</h5>
+    </div>
+    <div class="card-body">
+        <div id="grid"></div>
+    </div>
 </div>
 
 @section Scripts {
     <script>
-        const API_BASE_URL = "https://localhost:7127/api";
+        // ระบุ URL ของ API ให้ถูกต้อง (ตาม launchSettings.json ของโปรเจกต์ API)
+        const API_BASE_URL = "https://localhost:7127/api/";
 
-                function initializeGrid() {
-                    $("#grid").dxDataGrid({
-                     dataSource: createDataStore(API_BASE_URL, 'Quotation'),
-                 })};
+        $(function () {
+            $("#grid").dxDataGrid({
+                dataSource: createDataStore(API_BASE_URL, 'Quotations'), // เรียกใช้ Helper ที่สร้างไว้
+                remoteOperations: true, // ให้ Server (API) ช่วยประมวลผล Filter/Sort/Paging
+                showBorders: true,
+                columnAutoWidth: true,
+                rowAlternationEnabled: true,
 
-                $(function () {
-                    initializeGrid();
-                });
+                // เปิดใช้งานการค้นหาและ Filter
+                filterRow: { visible: true },
+                searchPanel: { visible: true },
+
+                // เปิดใช้งาน CRUD (เพิ่ม/ลบ/แก้ไข)
+                editing: {
+                    mode: "popup", // หรือ "row", "cell", "form"
+                    allowAdding: true,
+                    allowUpdating: true,
+                    allowDeleting: true,
+                    popup: {
+                        title: "Quotation Info",
+                        showTitle: true,
+                        width: 700,
+                        height: 525
+                    }
+                },
+
+                // กำหนดคอลัมน์
+                columns: [
+                    {
+                        dataField: "Id",
+                        caption: "ID",
+                        width: 50,
+                        allowEditing: false, // ห้ามแก้ไข ID
+                        visible: false // ซ่อนไว้ถ้าไม่จำเป็น
+                    },
+                    {
+                        dataField: "VendorName",
+                        caption: "ชื่อผู้ขาย (Vendor)",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "TotalAmount",
+                        caption: "ยอดรวม",
+                        dataType: "number",
+                        format: "currency", // แสดงเป็นสกุลเงิน
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "IsSelected",
+                        caption: "เลือกเจ้านี้",
+                        dataType: "boolean"
+                    },
+                    {
+                        dataField: "OriginalFileName",
+                        caption: "ไฟล์แนบ",
+                        allowEditing: false, // ปกติไฟล์จะไม่แก้ชื่อตรงนี้
+                        cellTemplate: function(container, options) {
+                            // สร้าง Link ให้ดาวน์โหลดไฟล์ (ถ้ามี)
+                            if(options.value) {
+                                $("<a>")
+                                    .attr("href", options.data.FilePath) // ต้องมั่นใจว่า API ส่ง Path ที่เข้าถึงได้มา
+                                    .attr("target", "_blank")
+                                    .text(options.value)
+                                    .appendTo(container);
+                            } else {
+                                $("<span>").text("-").appendTo(container);
+                            }
+                        }
+                    },
+                    {
+                        dataField: "PurchaseRequestId",
+                        caption: "เลขที่ใบขอซื้อ (PR ID)",
+                        dataType: "number",
+                        // ถ้าอยากให้แสดงเป็น Dropdown เลือก PR ให้ใช้ lookup
+                        // lookup: {
+                        //     dataSource: createDataStore(API_BASE_URL, 'PurchaseRequest'),
+                        //     valueExpr: 'Id',
+                        //     displayExpr: 'DocumentNo'
+                        // }
+                    }
+                ]
+            });
+        });
     </script>
 }

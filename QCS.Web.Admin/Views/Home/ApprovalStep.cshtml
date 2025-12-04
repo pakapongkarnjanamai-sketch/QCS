@@ -1,5 +1,101 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
+﻿@{
+    ViewData["Title"] = "Approval Steps";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">ลำดับการอนุมัติ (Approval Steps)</h5>
+    </div>
+    <div class="card-body">
+        <div id="gridApproval"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE_URL = "https://localhost:7127/api/";
+
+        $(function () {
+            // สร้าง Lookup Store สำหรับดึงข้อมูล PurchaseRequest มาแสดงใน Dropdown
+            const prLookupStore = createDataStore(API_BASE_URL, 'PurchaseRequests', { key: "Id" });
+
+            $("#gridApproval").dxDataGrid({
+                dataSource: createDataStore(API_BASE_URL, 'ApprovalSteps', { key: "Id" }),
+                remoteOperations: true,
+                showBorders: true,
+
+                filterRow: { visible: true },
+                headerFilter: { visible: true },
+
+                editing: {
+                    mode: "row", // ใช้แบบ row เพื่อความรวดเร็วในการแก้ลำดับ
+                    allowAdding: true,
+                    allowUpdating: true,
+                    allowDeleting: true
+                },
+
+                columns: [
+                    {
+                        dataField: "PurchaseRequestId",
+                        caption: "เอกสารใบขอซื้อ",
+                        width: 200,
+                        validationRules: [{ type: "required" }],
+                        lookup: {
+                            dataSource: prLookupStore,
+                            valueExpr: "Id",
+                            displayExpr: "DocumentNo" // แสดงเป็นเลขที่เอกสาร
+                        }
+                    },
+                    {
+                        dataField: "Sequence",
+                        caption: "ลำดับ",
+                        dataType: "number",
+                        width: 80,
+                        sortOrder: "asc", // เรียงตามลำดับอัตโนมัติ
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "ApproverName",
+                        caption: "ชื่อผู้อนุมัติ",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "Role",
+                        caption: "ตำแหน่ง",
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        dataField: "Status",
+                        caption: "ผลการอนุมัติ",
+                        width: 120,
+                        editorType: "dxSelectBox",
+                        editorOptions: {
+                            items: ["Pending", "Approved", "Rejected"],
+                            value: "Pending"
+                        },
+                        cellTemplate: function(container, options) {
+                            // จัดสี Badge ตามสถานะ
+                            let color = 'secondary';
+                            if(options.value === 'Approved') color = 'success';
+                            if(options.value === 'Rejected') color = 'danger';
+
+                            $("<span class='badge bg-" + color + "'>")
+                                .text(options.value)
+                                .appendTo(container);
+                        }
+                    },
+                    {
+                        dataField: "ApprovalDate",
+                        caption: "วันที่อนุมัติ",
+                        dataType: "datetime",
+                        format: "dd/MM/yyyy HH:mm"
+                    },
+                    {
+                        dataField: "Comment",
+                        caption: "ความเห็น"
+                    }
+                ]
+            });
+        });
+    </script>
 }

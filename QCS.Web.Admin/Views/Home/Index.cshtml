@@ -1,17 +1,167 @@
 ﻿@{
-    ViewData["Title"] = "Test";
+    ViewData["Title"] = "Dashboard";
 }
 
-@section Styles {
-   
-}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">Total Requests</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h1 class="card-title fw-bold display-4" id="totalRequests">0</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 text-dark">Pending</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h1 class="card-title fw-bold display-4 text-dark" id="pendingRequests">0</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">Approved</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h1 class="card-title fw-bold display-4" id="approvedRequests">0</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger mb-3 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0">Rejected</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h1 class="card-title fw-bold display-4" id="rejectedRequests">0</h1>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="container-xxl bd-gutter mt-3 my-md-4 bd-layout">
-  
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-secondary"><i class="fas fa-chart-pie me-2"></i>Request Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="statusPieChart" style="height: 350px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-secondary"><i class="fas fa-chart-bar me-2"></i>Monthly Requests (@DateTime.Now.Year)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="monthlyBarChart" style="height: 350px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
     <script>
-    
+        $(function () {
+            // --- 1. Mock Data (จำลองข้อมูล) ---
+            // ในการใช้งานจริง ส่วนนี้ควร fetch มาจาก API เช่น: $.get(API_BASE_URL + '/Dashboard/Summary')
+            const summaryData = {
+                total: 125,
+                pending: 42,
+                approved: 78,
+                rejected: 5
+            };
+
+            const monthlyData = [
+                { month: "Jan", val: 12 }, { month: "Feb", val: 19 }, { month: "Mar", val: 15 },
+                { month: "Apr", val: 22 }, { month: "May", val: 18 }, { month: "Jun", val: 25 },
+                { month: "Jul", val: 20 }, { month: "Aug", val: 30 }, { month: "Sep", val: 28 },
+                { month: "Oct", val: 35 }, { month: "Nov", val: 10 }, { month: "Dec", val: 0 }
+            ];
+
+            const statusChartData = [
+                { status: "Pending", val: summaryData.pending },
+                { status: "Approved", val: summaryData.approved },
+                { status: "Rejected", val: summaryData.rejected }
+            ];
+
+            // --- 2. Update UI ---
+
+            // Update Number Cards (มี Animation เล็กน้อย)
+            animateValue("totalRequests", 0, summaryData.total, 1000);
+            animateValue("pendingRequests", 0, summaryData.pending, 1000);
+            animateValue("approvedRequests", 0, summaryData.approved, 1000);
+            animateValue("rejectedRequests", 0, summaryData.rejected, 1000);
+
+            // Render Pie Chart
+            $("#statusPieChart").dxPieChart({
+                dataSource: statusChartData,
+                palette: ["#ffc107", "#28a745", "#dc3545"], // สีตรงกับ Bootstrap (Warning, Success, Danger)
+                series: [{
+                    argumentField: "status",
+                    valueField: "val",
+                    label: {
+                        visible: true,
+                        connector: { visible: true },
+                        position: "columns",
+                        customizeText: function(arg) {
+                            return arg.argumentText + " (" + arg.percentText + ")";
+                        }
+                    }
+                }],
+                legend: {
+                    horizontalAlignment: "center",
+                    verticalAlignment: "bottom"
+                },
+                tooltip: {
+                    enabled: true,
+                    customizeTooltip: function (arg) {
+                        return { text: `${arg.argumentText}: ${arg.valueText} items` };
+                    }
+                }
+            });
+
+            // Render Bar Chart
+            $("#monthlyBarChart").dxChart({
+                dataSource: monthlyData,
+                series: {
+                    argumentField: "month",
+                    valueField: "val",
+                    name: "Requests",
+                    type: "bar",
+                    color: "#0d6efd" // Bootstrap Primary Color
+                },
+                legend: { visible: false },
+                argumentAxis: {
+                    label: { rotationAngle: 0 }
+                },
+                valueAxis: {
+                    allowDecimals: false
+                },
+                tooltip: {
+                    enabled: true
+                }
+            });
+
+            // Helper Function สำหรับทำตัวเลขวิ่งๆ
+            function animateValue(id, start, end, duration) {
+                if (start === end) return;
+                var range = end - start;
+                var current = start;
+                var increment = end > start ? 1 : -1;
+                var stepTime = Math.abs(Math.floor(duration / range));
+                var obj = document.getElementById(id);
+                var timer = setInterval(function() {
+                    current += increment;
+                    obj.innerHTML = current;
+                    if (current == end) {
+                        clearInterval(timer);
+                    }
+                }, stepTime);
+            }
+        });
     </script>
 }

@@ -1,6 +1,6 @@
 ﻿const createDataStore = (Url, controller, options = {}) => {
     const { action = '', key = null, ParamKeys = null, ParamKey = null } = options;
-    const baseUrl = `${Url}api/${controller}${action ? '/' + action : ''}`;
+    const baseUrl = `${Url}${controller}${action ? '/' + action : ''}`;
 
     // สร้าง query string จาก ParamKeys
     const queryString = ParamKeys ? Object.keys(ParamKeys)
