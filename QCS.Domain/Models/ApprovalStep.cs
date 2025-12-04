@@ -12,11 +12,11 @@ namespace QCS.Domain.Models
         public int PurchaseRequestId { get; set; }
 
         public int Sequence { get; set; } // ลำดับที่ 1, 2, 3
-        public string ApproverName { get; set; } // ชื่อคนอนุมัติ (เช่น Michael Brown)
-        public string Role { get; set; } // ตำแหน่ง (เช่น Manager)
-        public string Status { get; set; } // Pending, Approved, Rejected
+        public string? ApproverName { get; set; } // ชื่อคนอนุมัติ (เช่น Michael Brown)
+        public string? Role { get; set; } // ตำแหน่ง (เช่น Manager)
+        public string? Status { get; set; } // Pending, Approved, Rejected
         public DateTime? ApprovalDate { get; set; }
-        public string Comment { get; set; }
+        public string? Comment { get; set; }
 
         [System.Text.Json.Serialization.JsonIgnore] // ป้องกัน Loop Reference เวลาส่ง API
         public virtual PurchaseRequest PurchaseRequest { get; set; }

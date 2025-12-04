@@ -19,7 +19,7 @@ namespace QCS.Domain.Models
         public int DocumentTypeId { get; set; }   // ประเภทเอกสาร
         public DateTime? ValidFrom { get; set; }  // วันที่เริ่ม
         public DateTime? ValidUntil { get; set; } // วันที่สิ้นสุด
-        public string Comment { get; set; }       // หมายเหตุ
+        public string? Comment { get; set; }       // หมายเหตุ
 
         public bool IsSelected { get; set; }      // สถานะการเลือก (Selected)
 
