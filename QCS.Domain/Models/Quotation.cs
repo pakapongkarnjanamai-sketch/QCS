@@ -9,8 +9,8 @@ namespace QCS.Domain.Models
         public int PurchaseRequestId { get; set; }
 
         // ข้อมูลผู้ขาย
-        public string VendorId { get; set; }      // รหัส Vendor (ที่รับมาจากหน้าบ้าน)
-        public string VendorName { get; set; }
+        public int VendorId { get; set; }      // รหัส Vendor (ที่รับมาจากหน้าบ้าน)
+        public string? VendorName { get; set; }
 
         [Column(TypeName = "decimal(18, 2)")]
         public decimal TotalAmount { get; set; }
