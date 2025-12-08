@@ -21,6 +21,37 @@
             border-radius: 6px;
             border: 1px dashed #dee2e6;
         }
+
+        /* Status Badge Styling for Approval Flow */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: white;
+            display: inline-block;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .status-pending {
+            background-color: #6c757d;
+        }
+        /* สีเทา */
+        .status-review {
+            background-color: #ffc107;
+            color: #000;
+        }
+        /* สีเหลือง */
+        .status-approved {
+            background-color: #28a745;
+        }
+        /* สีเขียว */
+
+        /* ระยะห่างระหว่าง Card */
+        .mt-card {
+            margin-top: 20px;
+        }
     </style>
 }
 
@@ -38,6 +69,17 @@
     <div class="qcs-card">
         <div id="quotationForm"></div>
     </div>
+
+
+    <div class="qcs-card mt-card">
+        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+            <h6 class="m-0 text-secondary">
+                <i class="fas fa-history me-2"></i>
+                เส้นทางการอนุมัติ (Approval Flow & History)
+            </h6>
+        </div>
+        <div id="approvalFlowGrid"></div>
+    </div>
 </div>
 
 <div id="loadingIndicator"></div>
@@ -46,22 +88,33 @@
     <script>
         $(function () {
             // === 1. CONFIGURATION ===
-            const API_BASE_URL = "https://localhost:7127/api";
-            const API_CREATE_URL = '/PurchaseRequest/Create';
-            const VENDOR_API_URL = "https://ap-ntc2138-qawb/iChaSue/Service/Supplier/api/Suppliers";
+            const CONFIG = {
+                API_BASE_URL: "https://localhost:7127/api",
+                API_CREATE_ENDPOINT: '/PurchaseRequest/Create',
+                // URL API สำหรับดึง Vendor (ปรับตามจริง)
+                VENDOR_API_URL: "https://ap-ntc2138-qawb/iChaSue/Service/Supplier/api/Suppliers"
+            };
 
-            // === 2. DATA STORES ===
+            // === 2. DATA STORES & MOCK DATA ===
             const vendorStore = DevExpress.data.AspNet.createStore({
                 key: "id",
-                loadUrl: VENDOR_API_URL,
+                loadUrl: CONFIG.VENDOR_API_URL,
                 onBeforeSend: function(method, ajaxOptions) {
                     ajaxOptions.xhrFields = { withCredentials: true };
                 }
             });
+
             const documentTypes = [
                 { id: 10, name: 'Main Quotation (ใบเสนอราคาหลัก)' },
                 { id: 20, name: 'Specifications (รายละเอียดสเปค)' },
                 { id: 30, name: 'Terms & Conditions (เงื่อนไข)' }
+            ];
+
+            // [Simulation] Mock Data สำหรับ Approval Flow ที่จะเกิดขึ้น
+            const mockApprovalFlow = [
+                { step: 1, role: 'Purchasing Officer', approver: 'คุณสมชาย จัดซื้อ', status: 'Pending', statusText: 'รอตรวจสอบ', actionDate: '-' },
+                { step: 2, role: 'Department Head', approver: 'คุณวิชัย หัวหน้าแผนก', status: 'Pending', statusText: 'รออนุมัติ', actionDate: '-' },
+                { step: 3, role: 'General Manager', approver: 'คุณนิภา จีเอ็ม', status: 'Pending', statusText: 'รออนุมัติ', actionDate: '-' }
             ];
 
             // === 3. INITIAL DATA MODEL ===
@@ -71,9 +124,10 @@
                 validFrom: new Date(),
                 validUntil: new Date(new Date().setMonth(new Date().getMonth() + 1)),
                 comment: "",
-                attachments: []
+                attachments: [] // เก็บ Metadata ของไฟล์
             };
-            let fileList = [];
+
+            let fileList = []; // เก็บ File Object จริงๆ ที่จะ Upload
             let attachmentGridInstance = null;
             let formInstance = null;
 
@@ -88,7 +142,7 @@
                 message: "กำลังบันทึกข้อมูล..."
             }).dxLoadPanel("instance");
 
-            // Render Form
+            // 4.1 Render Form (Input Section Only)
             formInstance = $("#quotationForm").dxForm({
                 formData: requestData,
                 colCount: 2,
@@ -99,7 +153,6 @@
                         caption: "1. ข้อมูลทั่วไป (General Information)",
                         colSpan: 2,
                         colCount: 2,
-                        cssClass: "section-header",
                         items: [
                             {
                                 dataField: "documentName",
@@ -154,7 +207,58 @@
                 ]
             }).dxForm("instance");
 
-            // Render Action Toolbar
+            // 4.2 Render Approval Grid (Separate Card)
+            $("#approvalFlowGrid").dxDataGrid({
+                dataSource: mockApprovalFlow,
+                showBorders: true,
+                showRowLines: true,
+                columnAutoWidth: true,
+                paging: { enabled: false },
+                hoverStateEnabled: true,
+                columns: [
+                    {
+                        dataField: "step",
+                        caption: "#",
+                        width: 50,
+                        alignment: "center",
+                        sortOrder: "asc"
+                    },
+                    {
+                        dataField: "role",
+                        caption: "ตำแหน่ง (Role)",
+                        width: 200
+                    },
+                    {
+                        dataField: "approver",
+                        caption: "ผู้อนุมัติ (Approver)"
+                    },
+                    {
+                        dataField: "actionDate",
+                        caption: "วันที่ดำเนินการ",
+                        alignment: "center",
+                        width: 150
+                    },
+                    {
+                        dataField: "statusText",
+                        caption: "สถานะ (Status)",
+                        width: 150,
+                        alignment: "center",
+                        cellTemplate: function(container, options) {
+                            let statusClass = "status-pending";
+                            // Logic เปลี่ยนสีตามสถานะ (Mock)
+                            if(options.data.status === 'Approved') statusClass = "status-approved";
+                            if(options.data.status === 'Review') statusClass = "status-review";
+
+                            $("<span>")
+                                .addClass("status-badge " + statusClass)
+                                .text(options.value)
+                                .appendTo(container);
+                        }
+                    }
+                ]
+            });
+
+            // 4.3 Render Toolbar Buttons
             $("#actionButtons").dxToolbar({
                 items: [
                     {
@@ -183,12 +287,13 @@
             // === 5. TEMPLATE FUNCTIONS ===
             function renderAttachmentsSection(data, itemElement) {
                 const $container = $("<div>").addClass("attachments-container");
-                // File Uploader
+
+                // File Uploader Component
                 $("<div>").dxFileUploader({
                     multiple: true,
                     accept: ".pdf",
-                    uploadMode: "useForm",
-                    showFileList: false,
+                    uploadMode: "useForm", // ไม่ Upload ทันที รอ submit form
+                    showFileList: false,   // ซ่อน list default เพราะเราจะใช้ Grid แสดงแทน
                     labelText: "ลากไฟล์ PDF มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์",
                     selectButtonText: "เพิ่มไฟล์ (Add Files)",
                     allowedFileExtensions: ['.pdf'],
@@ -215,6 +320,7 @@
                         useIcons: true
                     },
                     onRowRemoved: function(e) {
+                        // ลบไฟล์จริงออกจาก Array fileList เมื่อลบแถวใน Grid
                         fileList = fileList.filter(f => f.name !== e.data.fileName);
                     },
                     columns: [
@@ -235,7 +341,7 @@
                             width: 120,
                             allowEditing: false,
                             alignment: "center",
-                            customizeText: function (cellInfo) { return formatFileSize(cellInfo.value); }
+                            customizeText: (cellInfo) => formatFileSize(cellInfo.value)
                         },
                         {
                             dataField: "documentType",
@@ -251,6 +357,7 @@
                         { type: "buttons", width: 60, buttons: ["delete"] }
                     ]
                 }).dxDataGrid("instance");
+
                 attachmentGridInstance.element().appendTo($container);
                 $container.appendTo(itemElement);
             }
@@ -261,17 +368,21 @@
                     DevExpress.ui.notify("รองรับเฉพาะไฟล์ PDF เท่านั้น", "error", 3000);
                     return;
                 }
+                // เช็คไฟล์ซ้ำ (ชื่อ+ขนาด)
                 if (fileList.some(f => f.name === file.name && f.size === file.size)) {
                     DevExpress.ui.notify(`ไฟล์ ${file.name} ถูกเพิ่มไปแล้ว`, "warning", 3000);
                     return;
                 }
+
                 fileList.push(file);
+                // เพิ่ม Metadata ลง Model สำหรับแสดงใน Grid
                 requestData.attachments.push({
                     tempId: generateUUID(),
                     fileName: file.name,
                     fileSize: file.size,
-                    documentType: documentTypes[0].id
+                    documentType: documentTypes[0].id // Default = Main Quotation
                 });
+
                 if (attachmentGridInstance) attachmentGridInstance.refresh();
             }
 
@@ -281,45 +392,64 @@
                     DevExpress.ui.notify("กรุณากรอกข้อมูลสำคัญให้ครบถ้วน", "error", 2000);
                     return;
                 }
+
                 if (requestData.attachments.length === 0) {
                     DevExpress.ui.notify("กรุณาแนบไฟล์อย่างน้อย 1 รายการ", "error", 2000);
                     return;
                 }
+
                 loadingIndicator.show();
+
                 try {
                     const formData = new FormData();
+
+                    // 1. Append Header Fields (ตามโครงสร้างใหม่)
                     formData.append("Title", requestData.documentName);
-                    formData.append("RequestDate", new Date().toISOString());
 
+                    // Vendor Info
                     const vendorEditor = formInstance.getEditor("vendorId");
-                    const selectedVendorName = vendorEditor.option("displayValue") || ("Vendor " + requestData.vendorId);
+                    const selectedVendorName = vendorEditor.option("displayValue") || "";
+                    formData.append("VendorId", requestData.vendorId);
+                    formData.append("VendorName", selectedVendorName);
 
-                    const quotationsInfo = requestData.attachments.map(att => ({
+                    // Dates & Comment
+                    if(requestData.validFrom) formData.append("ValidFrom", requestData.validFrom.toISOString());
+                    if(requestData.validUntil) formData.append("ValidUntil", requestData.validUntil.toISOString());
+                    formData.append("Comment", requestData.comment || "");
+
+                    // 2. Append Attachments & Metadata
+                    // สร้าง JSON Metadata สำหรับไฟล์แนบ
+                    const quotationsMeta = requestData.attachments.map(att => ({
                         FileName: att.fileName,
-                        VendorId: requestData.vendorId,
-                        VendorName: selectedVendorName,
-                        DocumentTypeId: att.documentType,
-                        ValidFrom: requestData.validFrom ? requestData.validFrom.toISOString() : null,
-                        ValidUntil: requestData.validUntil ? requestData.validUntil.toISOString() : null,
-                        Comment: requestData.comment,
-                        TotalAmount: 0
+                        DocumentTypeId: att.documentType
                     }));
+                    formData.append("QuotationsJson", JSON.stringify(quotationsMeta));
 
-                    formData.append("QuotationsJson", JSON.stringify(quotationsInfo));
-                    fileList.forEach(file => { formData.append("Attachments", file); });
+                    // แนบไฟล์ Binary
+                    fileList.forEach(file => {
+                        formData.append("Attachments", file);
+                    });
 
-                    const response = await fetch(API_BASE_URL+API_CREATE_URL, {
+                    // 3. Send API Request
+                    const response = await fetch(CONFIG.API_BASE_URL + CONFIG.API_CREATE_ENDPOINT, {
                         method: 'POST',
                         body: formData,
-                        credentials: 'include'
+                        credentials: 'include' // <--- เพิ่มตามคำขอครับ
                     });
+
                     if (!response.ok) {
                         const errorText = await response.text();
                         throw new Error(errorText || "Server error occurred.");
                     }
+
                     const result = await response.json();
                     DevExpress.ui.notify(`บันทึกสำเร็จ (เลขที่: ${result.docNo})`, "success", 2000);
-                    setTimeout(() => { window.location.href = '@Url.Action("Index", "PurchaseRequest")'; }, 1500);
+
+                    // Redirect กลับหน้า Index
+                    setTimeout(() => {
+                        window.location.href = '@Url.Action("Index", "PurchaseRequest")';
+                    }, 1500);
+
                 } catch (err) {
                     console.error("Submit Error:", err);
                     DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);
@@ -336,6 +466,7 @@
                 const i = Math.floor(Math.log(bytes) / Math.log(k));
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             }
+
             function generateUUID() {
                 return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);

@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
-using QCS.Domain.Enum;
+using QCS.Domain.Enum; // หรือ StatusConsts
+using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
-using System.Security.Claims; // สำหรับดึง User ปัจจุบัน
 
 namespace QCS.API.Controllers
 {
@@ -18,67 +18,103 @@ namespace QCS.API.Controllers
             _context = context;
         }
 
-        [HttpPost("Action")]
-        public async Task<IActionResult> TakeAction([FromBody] ApprovalActionDto input)
+        // POST: api/Approval/Approve
+        [HttpPost("Approve")]
+        public async Task<IActionResult> Approve([FromBody] ApprovalActionDto input)
         {
-            // 1. ดึง Step และ Include PR มาด้วย
-            var step = await _context.ApprovalSteps
-                .Include(s => s.PurchaseRequest)
-                .FirstOrDefaultAsync(s => s.Id == input.StepId);
-
-            if (step == null) return NotFound("Step not found");
-
-            // 2. Validate สถานะ: ต้องเป็น Pending เท่านั้นถึงจะทำรายการได้
-            if (step.Status != StatusConsts.Step_Pending)
-                return BadRequest("This step is already processed.");
-
-            // 3. Security Check: เช็คว่า User ที่ Login คือคนที่ต้องอนุมัติหรือไม่?
-            // (สมมติว่าใน Token เรามี Claim ชื่อ "Name" หรือ "Role")
-            // var currentUserName = User.FindFirst(ClaimTypes.Name)?.Value;
-            // var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-            // if (step.ApproverName != currentUserName && step.Role != currentUserRole)
-            // {
-            //      return Unauthorized("You are not authorized to approve this document.");
-            // }
-
-            // 4. อัปเดตสถานะของ Step
-            step.Status = input.IsApproved ? StatusConsts.Step_Approved : StatusConsts.Step_Rejected;
-            step.Comment = input.Comment;
-            step.ApprovalDate = DateTime.Now;
-
-            // 5. อัปเดตสถานะของ PR หลัก
-            var pr = step.PurchaseRequest;
-
-            if (!input.IsApproved)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                // กรณีไม่อนุมัติ -> เอกสารตกทันที
-                pr.Status = StatusConsts.PR_Rejected;
-            }
-            else
-            {
-                // กรณีอนุมัติ -> เช็คว่ามี Step ถัดไปไหม
-                var nextStep = await _context.ApprovalSteps
-                    .Where(s => s.PurchaseRequestId == pr.Id && s.Sequence > step.Sequence)
+                // 1. ดึงข้อมูล PR และ Step ที่เกี่ยวข้อง
+                var request = await _context.PurchaseRequests
+                    .Include(r => r.ApprovalSteps)
+                    .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
+
+                if (request == null) return NotFound("Purchase Request not found.");
+
+                // หา Step ปัจจุบันที่รออนุมัติ (เรียงตาม Sequence)
+                var currentStep = request.ApprovalSteps
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefault(s => s.Status == StatusConsts.Step_Pending);
+
+                if (currentStep == null)
+                    return BadRequest("No pending approval step found or document is already processed.");
+
+                // TODO: ในระบบจริง ต้องเช็คว่า User ปัจจุบันมีสิทธิ์อนุมัติ Step นี้หรือไม่ (เช็คจาก Role/User ID)
+                // if (currentStep.ApproverId != currentUserId) return Unauthorized();
+
+                // 2. อัปเดตสถานะ Step นี้
+                currentStep.Status = StatusConsts.Step_Approved;
+         
+                currentStep.Comment = input.Comment; // ความเห็นเพิ่มเติม (ถ้ามี)
+                // currentStep.ApproverId = ... (บันทึกคนกดจริง)
+
+                // 3. ตรวจสอบว่าเป็น Step สุดท้ายหรือไม่?
+                var nextStep = request.ApprovalSteps
+                    .OrderBy(s => s.Sequence)
+                    .FirstOrDefault(s => s.Sequence > currentStep.Sequence);
 
                 if (nextStep == null)
                 {
-                    // ไม่มี Step ต่อไป -> จบกระบวนการ
-                    pr.Status = StatusConsts.PR_Completed;
-
-                    // TODO: Trigger Email หรือ สร้าง PDF Final ที่นี่
+                    // ถ้าไม่มี Step ต่อไปแล้ว -> จบกระบวนการ (PR Approved)
+                    request.Status = StatusConsts.PR_Approved;
                 }
                 else
                 {
-                    // มี Step ต่อไป -> รอคนถัดไป
-                    pr.Status = $"{StatusConsts.PR_Pending} {nextStep.Role}";
+                    // ถ้ามี Step ต่อไป -> สถานะ PR ยังเป็น Pending (รอคนต่อไป)
+                    // อาจจะมีการส่ง Noti ให้คนถัดไปตรงนี้
                 }
-            }
 
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true });
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { message = "Approved successfully", newStatus = request.Status });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+
+        // POST: api/Approval/Reject
+        [HttpPost("Reject")]
+        public async Task<IActionResult> Reject([FromBody] ApprovalActionDto input)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var request = await _context.PurchaseRequests
+                    .Include(r => r.ApprovalSteps)
+                    .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
+
+                if (request == null) return NotFound("Purchase Request not found.");
+
+                var currentStep = request.ApprovalSteps
+                    .OrderBy(s => s.Sequence)
+                    .FirstOrDefault(s => s.Status == StatusConsts.Step_Pending);
+
+                if (currentStep == null)
+                    return BadRequest("No pending approval step found.");
+
+                // 1. อัปเดต Step เป็น Rejected
+                currentStep.Status = StatusConsts.Step_Rejected;
+
+                currentStep.Comment = input.Comment; // เหตุผลที่ไม่อนุมัติ
+
+                // 2. อัปเดต Header เป็น Rejected ทันที (จบข่าว)
+                request.Status = StatusConsts.PR_Rejected;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { message = "Rejected successfully", newStatus = request.Status });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
         }
     }
 }

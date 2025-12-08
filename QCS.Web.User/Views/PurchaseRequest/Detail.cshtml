@@ -1,13 +1,68 @@
 ﻿@model int
 @{
-    ViewData["Title"] = "รายละเอียดใบขอซื้อ (Request Detail)";
+    ViewData["Title"] = "รายละเอียดใบขอซื้อ (Purchase Request Detail)";
 }
 
 @section Styles {
     <style>
-        .selected-quotation {
-            background-color: #e8f5e9 !important; /* Highlight สีเขียวอ่อน */
-            font-weight: bold;
+        /* --- General Layout --- */
+        .qcs-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            border: 1px solid #eaeaea;
+        }
+
+        .mt-card {
+            margin-top: 20px;
+        }
+
+  
+        /* --- Attachments Grid --- */
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .file-info i {
+                color: #d9534f;
+                font-size: 1.4em;
+            }
+
+        .attachments-container {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px dashed #dee2e6;
+        }
+
+        /* --- Status Badge --- */
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-draft {
+            background-color: #6c757d;
+        }
+
+        .status-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .status-approved {
+            background-color: #28a745;
+        }
+
+        .status-rejected {
+            background-color: #dc3545;
         }
     </style>
 }
@@ -16,261 +71,375 @@
 
     <div class="qcs-card mb-3">
         <div class="page-header-row">
-            <h6 class="page-title">
-                <i class="fas fa-file-invoice-dollar"></i> รายละเอียดใบขอซื้อ (Request Detail)
+                <h6 class="page-title d-flex align-items-center text-nowrap">
+                    <i class="fas fa-file-invoice text-primary"></i>
+                    <span id="lblDocNo">Loading...</span>
+                    <span id="statusBadge"></span>
+                </h6>
+                <div id="actionButtons"></div>
+        </div>
+    </div>
+
+  
+
+    <div class="qcs-card">
+        <div id="quotationForm"></div>
+    </div>
+
+    <div class="qcs-card mt-card">
+        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+            <h6 class="m-0 text-secondary font-weight-bold">
+                <i class="fas fa-history me-2"></i>
+                ประวัติการอนุมัติ (Approval History)
             </h6>
-            <div class="d-flex gap-2">
-                <button class="dx-button dx-button-outlined dx-button-mode-outlined dx-widget dx-button-has-text dx-button-has-icon" onclick="history.back()" style="border-radius:4px;">
-                    <div class="dx-button-content">
-                        <i class="dx-icon dx-icon-arrowleft"></i>
-                        <span class="dx-button-text">ย้อนกลับ</span>
-                    </div>
-                </button>
-                <div id="approvalActionButtons"></div>
-            </div>
         </div>
-    </div>
-
-    <div class="qcs-card">
-        <div class="row">
-            <div class="col-md-8">
-                <h4 id="docTitle" class="mb-2 text-primary fw-bold">
-                    <i class="fas fa-spinner fa-spin small"></i> Loading...
-                </h4>
-                <div class="d-flex gap-4 text-muted mt-2">
-                    <span><i class="fas fa-barcode me-1"></i> เลขที่: <span id="docNo">-</span></span>
-                    <span><i class="far fa-calendar-alt me-1"></i> วันที่: <span id="reqDate">-</span></span>
-                    <span><i class="fas fa-user me-1"></i> ผู้ขอ: <span id="requesterName">-</span></span>
-                </div>
-            </div>
-            <div class="col-md-4 text-end align-self-center">
-                <div class="mb-1 text-muted small">สถานะเอกสาร</div>
-                <span id="docStatus" class="status-badge bg-secondary text-white">Loading...</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="qcs-card">
-        <div class="section-header">
-            <i class="fas fa-table me-2"></i>รายการใบเสนอราคา (Quotations)
-        </div>
-        <div id="quotationGrid"></div>
+        <div id="approvalFlowGrid"></div>
     </div>
 
 </div>
 
-<div id="approvalPopup"></div>
-<div id="loadingPanel"></div>
+<div id="loadingIndicator"></div>
 
 @section Scripts {
     <script>
         $(function () {
-            // === CONFIGURATION ===
+            // === 1. CONFIGURATION ===
             const PR_ID = @Model;
-            const API_BASE_URL = "https://localhost:7127/api";
-            const API_URL = {
-                GET_DETAIL: `${API_BASE_URL}/PurchaseRequest/${PR_ID}`,
-                ACTION: `${API_BASE_URL}/Approval/Action`,
-                DOWNLOAD: `${API_BASE_URL}/PurchaseRequest/DownloadAttachment`
+            const API_HOST = "https://localhost:7127"; // Host หลัก
+            const CONFIG = {
+                API_BASE_URL: API_HOST + "/api",
+                API_GET_DETAIL: `/PurchaseRequest/Detail/${PR_ID}`,
+                API_APPROVE: `/Approval/Approve`,
+                API_REJECT: `/Approval/Reject`
             };
 
-            let currentStepId = 0;
+            const documentTypes = [
+                { id: 10, name: 'Main Quotation (ใบเสนอราคาหลัก)' },
+                { id: 20, name: 'Specifications (รายละเอียดสเปค)' },
+                { id: 30, name: 'Terms & Conditions (เงื่อนไข)' }
+            ];
 
-            const loadingPanel = $("#loadingPanel").dxLoadPanel({
+            // Mock Data สำหรับ Approval (เพราะ JSON approvalSteps เป็น [])
+            const mockApprovalHistory = [
+                 { step: 1, role: 'Purchasing Officer', approverName: '-', actionDate: null, status: 'Pending', comment: 'รอการตรวจสอบ' }
+            ];
+
+            const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
                 shadingColor: "rgba(0,0,0,0.4)",
                 position: { of: "body" },
                 visible: false,
                 showIndicator: true,
                 showPane: true,
-                shading: true
+                shading: true,
+                message: "กำลังประมวลผล..."
             }).dxLoadPanel("instance");
 
-            const popup = $("#approvalPopup").dxPopup({
-                width: 500,
-                height: "auto",
-                showTitle: true,
-                dragEnabled: false,
-                hideOnOutsideClick: false,
-                visible: false
-            }).dxPopup("instance");
-
+            // === 2. INIT ===
+            initToolbar();
             loadData();
 
-            async function loadData() {
-                loadingPanel.show();
-                try {
-                    const response = await fetch(API_URL.GET_DETAIL, { credentials: 'include' });
-                    if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
+            // === 3. RENDER FUNCTIONS ===
 
-                    const data = await response.json();
-                    renderHeader(data);
-                    renderGrid(data.quotations);
-                    renderActionButtons(data.currentStepId);
-                    currentStepId = data.currentStepId;
-                } catch (err) {
-                    DevExpress.ui.notify(err.message, "error", 3000);
-                } finally {
-                    loadingPanel.hide();
-                }
-            }
-
-            function renderHeader(data) {
-                $("#docTitle").text(data.title);
-                $("#docNo").text(data.documentNo);
-                $("#reqDate").text(new Date(data.requestDate).toLocaleDateString('th-TH'));
-                $("#requesterName").text(data.requesterName);
-
-                const status = data.status;
-                const $badge = $("#docStatus");
-                $badge.text(status);
-                $badge.removeClass();
-                $badge.addClass("status-badge"); // Reset Base Class
-
-                // Map Class Logic
-                if (status.includes("Pending")) $badge.addClass("status-pending");
-                else if (status === "Approved") $badge.addClass("status-approved");
-                else if (status === "Rejected") $badge.addClass("status-rejected");
-                else if (status === "Completed") $badge.addClass("status-completed");
-                else $badge.addClass("bg-secondary text-white");
-            }
-
-            function renderGrid(quotations) {
-                $("#quotationGrid").dxDataGrid({
-                    dataSource: quotations,
-                    showBorders: true,
-                    columnAutoWidth: true,
-                    paging: { pageSize: 10 },
-                    onRowPrepared: function(e) {
-                        if (e.rowType === "data" && e.data.isSelected) {
-                            e.rowElement.addClass("selected-quotation");
-                        }
-                    },
-                    columns: [
+            function initToolbar() {
+                $("#actionButtons").dxToolbar({
+                    items: [
                         {
-                            dataField: "vendorName",
-                            caption: "ผู้ขาย (Vendor)",
-                            cellTemplate: function(container, options) {
-                                let html = `<div>${options.value}</div>`;
-                                if (options.data.isSelected) {
-                                    html += `<span class="badge bg-success mt-1"><i class="fas fa-check"></i> Selected</span>`;
-                                }
-                                $("<div>").html(html).appendTo(container);
+                            location: 'after',
+                            widget: 'dxButton',
+                            options: {
+                                text: 'ย้อนกลับ',
+                                stylingMode: 'outlined',
+                                icon: 'arrowleft',
+                                onClick: () => window.location.href = '@Url.Action("Index", "PurchaseRequest")' // ปรับ Link ตามจริง
                             }
                         },
                         {
-                            dataField: "documentTypeId",
-                            caption: "ประเภทเอกสาร",
-                            width: 150,
-                            lookup: {
-                                dataSource: [
-                                    { id: 10, name: 'Quotation' },
-                                    { id: 20, name: 'Spec' },
-                                    { id: 30, name: 'Condition' }
-                                ],
-                                valueExpr: 'id',
-                                displayExpr: 'name'
+                            location: 'after',
+                            widget: 'dxButton',
+                            options: {
+                                text: 'ไม่อนุมัติ',
+                                stylingMode: 'contained',
+                                type: 'danger',
+                                icon: 'clear',
+                                onClick: handleReject
                             }
                         },
                         {
-                            dataField: "totalAmount",
-                            caption: "ยอดรวม",
-                            dataType: "number",
-                            format: "#,##0.00",
-                            width: 120,
-                            visible: false
-                        },
-                        {
-                            dataField: "originalFileName",
-                            caption: "ไฟล์แนบ",
-                            cellTemplate: function (container, options) {
-                                if (options.data.filePath) {
-                                    $("<a/>")
-                                        .attr("href", options.data.filePath)
-                                        .attr("target", "_blank")
-                                        .addClass("btn btn-sm btn-outline-primary")
-                                        .html('<i class="fas fa-download"></i> ดาวน์โหลด')
-                                        .appendTo(container);
-                                } else {
-                                    $("<span>-</span>").appendTo(container);
-                                }
+                            location: 'after',
+                            widget: 'dxButton',
+                            options: {
+                                text: 'อนุมัติ',
+                                stylingMode: 'contained',
+                                type: 'success',
+                                icon: 'check',
+                                onClick: handleApprove
                             }
-                        },
-                        {
-                            dataField: "comment",
-                            caption: "หมายเหตุ"
                         }
                     ]
                 });
             }
 
-            function renderActionButtons(stepId) {
-                const container = $("#approvalActionButtons");
-                container.empty();
-                if (stepId > 0) {
-                    $("<div>").dxButton({
-                        text: "ไม่อนุมัติ (Reject)", type: "danger", stylingMode: "outlined", icon: "close",
-                        onClick: () => showActionPopup(false)
-                    }).appendTo(container);
-                    $("<div>").addClass("ms-2").dxButton({
-                        text: "อนุมัติ (Approve)", type: "success", icon: "check",
-                        onClick: () => showActionPopup(true)
-                    }).appendTo(container);
+            async function loadData() {
+                loadingIndicator.show();
+                try {
+                     const response = await fetch(CONFIG.API_BASE_URL + CONFIG.API_GET_DETAIL,{ credentials: 'include' });
+                    if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
+                    const data = await response.json();
+
+                    renderPageContent(data);
+
+                } catch (err) {
+                    console.error(err);
+                    DevExpress.ui.notify("Error loading data", "error", 3000);
+                    $("#lblDocNo").text("Error");
+                } finally {
+                    loadingIndicator.hide();
                 }
             }
 
-            function showActionPopup(isApprove) {
-                const actionText = isApprove ? "อนุมัติ (Approve)" : "ไม่อนุมัติ (Reject)";
-                popup.option({
-                    title: `ยืนยันผลการพิจารณา: ${actionText}`,
-                    contentTemplate: function(contentElement) {
-                        contentElement.append(`
-                            <div class="mb-3">
-                                <label class="form-label">ความคิดเห็นเพิ่มเติม (Comment):</label>
-                                <div id="commentTextArea"></div>
-                            </div>
-                            <div class="d-flex justify-content-end gap-2 mt-4">
-                                <div id="btnCancel"></div>
-                                <div id="btnConfirm"></div>
-                            </div>
-                        `);
-                        const commentBox = $("#commentTextArea").dxTextArea({
-                            height: 100,
-                            placeholder: isApprove ? "ระบุเหตุผล (ถ้ามี)..." : "กรุณาระบุเหตุผลที่ไม่อนุมัติ...",
-                        }).dxTextArea("instance");
+            function renderPageContent(data) {
+                // --- 1. Header Information Update ---
 
-                        $("#btnCancel").dxButton({ text: "ยกเลิก", onClick: () => popup.hide() });
-                        $("#btnConfirm").dxButton({
-                            text: "ยืนยัน (Confirm)", type: isApprove ? "success" : "danger",
-                            onClick: () => submitAction(isApprove, commentBox.option("value"))
-                        });
+                // Map: code -> Document No
+                $("#lblDocNo").text(data.code || "-");
+
+     
+
+                // Map: createdBy -> Requester (ใช้ replace ตัด Domain ออกถ้ามี เช่น NIKONOA\n4734)
+                let requester = data.createdBy || "-";
+                if(requester.includes("\\")) {
+                    requester = requester.split("\\")[1]; // เอาเฉพาะส่วนหลัง \
+                }
+        
+
+                // Map: status (1 = Pending)
+                renderStatusBadge(data.status);
+
+
+                // --- 2. Form Information (dxForm) ---
+                $("#quotationForm").dxForm({
+                    formData: data,
+                    readOnly: true,
+                    colCount: 2,
+                    labelLocation: "top",
+                    items: [
+                        {
+                            itemType: "group",
+                            caption: "1. ข้อมูลทั่วไป (General Information)",
+                            colSpan: 2,
+                            colCount: 2,
+                            items: [
+                                {
+                                    dataField: "title",
+                                    label: { text: "หัวข้อ (Title)" },
+                                    colSpan: 2
+                                },
+                                {
+                                    dataField: "vendorName",
+                                    label: { text: "ผู้ขาย (Vendor)" },
+                                    colSpan: 2
+                                },
+                                {
+                                    dataField: "validFrom",
+                                    label: { text: "ยืนราคาตั้งแต่วันที่" },
+                                    editorType: "dxDateBox",
+                                    editorOptions: { displayFormat: "dd/MM/yyyy" }
+                                },
+                                {
+                                    dataField: "validUntil",
+                                    label: { text: "ถึงวันที่" },
+                                    editorType: "dxDateBox",
+                                    editorOptions: { displayFormat: "dd/MM/yyyy" }
+                                },
+                                {
+                                    dataField: "comment",
+                                    label: { text: "หมายเหตุ" },
+                                    editorType: "dxTextArea",
+                                    editorOptions: { height: 60, autoResizeEnabled: true },
+                                    colSpan: 2
+                                }
+                            ]
+                        },
+                        {
+                            itemType: "group",
+                            caption: "2. เอกสารแนบ (Attachments)",
+                            colSpan: 2,
+                            items: [{
+                                template: (itemData, itemElement) => {
+                                    // ส่ง quotations array เข้าไป
+                                    renderAttachmentsGrid(data.quotations || [], itemElement);
+                                }
+                            }]
+                        }
+                    ]
+                });
+
+                // --- 3. Approval Grid ---
+                const approvalData = (data.approvalSteps && data.approvalSteps.length > 0)
+                                     ? data.approvalSteps
+                                     : mockApprovalHistory;
+
+                $("#approvalFlowGrid").dxDataGrid({
+                    dataSource: approvalData,
+                    showBorders: true,
+                    showRowLines: true,
+                    paging: { enabled: false },
+                    columns: [
+                        {
+                            caption: "#",
+                            cellTemplate: (container, options) => container.text(options.rowIndex + 1),
+                            width: 50, alignment: "center"
+                        },
+                        { dataField: "role", caption: "ตำแหน่ง" },
+                        { dataField: "approverName", caption: "ผู้อนุมัติ" },
+                        {
+                            dataField: "actionDate",
+                            caption: "วันที่",
+                            alignment: "center", width: 140,
+                            customizeText: (cell) => formatDate(cell.value)
+                        },
+                        {
+                            dataField: "status",
+                            caption: "สถานะ",
+                            alignment: "center", width: 120,
+                            cellTemplate: (container, options) => {
+                                const s = mapStatus(options.value);
+                                $("<span>").addClass("status-badge " + s.cls).text(s.text).appendTo(container);
+                            }
+                        },
+                        { dataField: "comment", caption: "ความเห็น" }
+                    ]
+                });
+            }
+
+            function renderAttachmentsGrid(files, itemElement) {
+                const $container = $("<div>").addClass("attachments-container");
+
+                $("<div>").dxDataGrid({
+                    dataSource: files,
+                    showBorders: true,
+                    columnAutoWidth: true,
+                    paging: { pageSize: 5 },
+                    columns: [
+                        {
+                            dataField: "fileName", // แก้จาก originalFileName เป็น fileName ตาม JSON ใหม่
+                            caption: "ชื่อไฟล์",
+                            cellTemplate: function (container, options) {
+                                $("<div>").addClass("file-info")
+                                    .append($("<i>").addClass("fas fa-file-pdf")) // สมมติว่าเป็น PDF หรือเขียน logic เช็ค type ได้
+                                    .append($("<span>").text(options.value))
+                                    .appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "documentTypeId",
+                            caption: "ประเภท",
+                            width: 250,
+                            lookup: { dataSource: documentTypes, valueExpr: "id", displayExpr: "name" }
+                        },
+                        {
+                            caption: "Actions",
+                            width: 120,
+                            alignment: "center",
+                            cellTemplate: function(container, options) {
+                                $("<button>").addClass("btn btn-sm btn-outline-primary")
+                                    .html('<i class="fas fa-download"></i> Load')
+                                    .on("click", () => {
+                                        if(options.data.filePath) {
+                                            // แปลง Backslash (\) เป็น Forward Slash (/)
+                                            let cleanPath = options.data.filePath.replace(/\\/g, "/");
+
+                                            // Construct Full URL (สมมติว่าไฟล์อยู่ที่ Host หลัก)
+                                            // ถ้า Uploads อยู่นอก wwwroot อาจต้องใช้ Controller Download แทน
+                                            const url = `${API_HOST}/${cleanPath}`;
+                                            window.open(url, '_blank');
+                                        } else {
+                                            DevExpress.ui.notify("ไม่พบ Path ไฟล์", "error", 1000);
+                                        }
+                                    })
+                                    .appendTo(container);
+                            }
+                        }
+                    ]
+                }).appendTo($container);
+
+                $container.appendTo(itemElement);
+            }
+
+            // === Helper Functions ===
+
+            function handleApprove() {
+                DevExpress.ui.dialog.confirm("ยืนยันการอนุมัติ?", "Confirm").done((res) => {
+                    if (res) sendApprovalAction("Approve", "");
+                });
+            }
+
+            function handleReject() {
+                const result = DevExpress.ui.dialog.custom({
+                    title: "ระบุเหตุผล (Reject Reason)",
+                    messageHtml: "<div id='rejectReasonBox'></div>",
+                    buttons: [
+                        { text: "ยืนยัน", type: "danger", onClick: () => "confirm" },
+                        { text: "ยกเลิก", onClick: () => "cancel" }
+                    ],
+                    onShowing: () => {
+                        setTimeout(() => {
+                             $("#rejectReasonBox").dxTextArea({ height: 100, placeholder: "ระบุเหตุผล..." });
+                        }, 100);
                     }
                 });
-                popup.show();
+
+                result.show().done((dialogResult) => {
+                    if (dialogResult === "confirm") {
+                        const reason = $("#rejectReasonBox .dx-textarea").dxTextArea("instance").option("value");
+                        if(!reason) { DevExpress.ui.notify("ต้องระบุเหตุผล", "warning", 2000); return; }
+                        sendApprovalAction("Reject", reason);
+                    }
+                });
             }
 
-            async function submitAction(isApproved, comment) {
-                if (!isApproved && !comment) {
-                    DevExpress.ui.notify("กรุณาระบุเหตุผลการไม่อนุมัติ", "warning", 2000);
-                    return;
-                }
-                loadingPanel.show();
-                popup.hide();
+            async function sendApprovalAction(action, comment) {
+                loadingIndicator.show();
                 try {
-                    const payload = { stepId: currentStepId, isApproved: isApproved, comment: comment || "-" };
-                    const response = await fetch(API_URL.ACTION, {
+                    const endpoint = (action === 'Approve') ? CONFIG.API_APPROVE : CONFIG.API_REJECT;
+                    const payload = { purchaseRequestId: PR_ID, comment: comment };
+
+                    const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
                         body: JSON.stringify(payload)
                     });
-                    if (!response.ok) throw new Error(await response.text() || "เกิดข้อผิดพลาด");
-                    DevExpress.ui.notify("บันทึกผลการพิจารณาเรียบร้อย", "success", 2000);
-                    setTimeout(loadData, 1000);
+
+                    if (!res.ok) throw new Error(await res.text());
+
+                    DevExpress.ui.notify(`Success: ${action}`, "success", 2000);
+                    setTimeout(() => location.reload(), 1500);
+
                 } catch (err) {
-                    DevExpress.ui.notify(err.message, "error", 3000);
+                    DevExpress.ui.notify("Error: " + err.message, "error", 3000);
                 } finally {
-                    loadingPanel.hide();
+                    loadingIndicator.hide();
                 }
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return "-";
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? "-" : d.toLocaleDateString('th-TH');
+            }
+
+            function mapStatus(status) {
+                // JSON ส่งมาเป็น Int: 0, 1, 2, 9
+                if (status == 0) return { text: 'Draft', cls: 'status-draft' };
+                if (status == 1) return { text: 'Pending', cls: 'status-pending' };
+                if (status == 2) return { text: 'Approved', cls: 'status-approved' };
+                if (status == 9) return { text: 'Rejected', cls: 'status-rejected' };
+                return { text: 'Unknown', cls: 'status-draft' };
+            }
+
+            function renderStatusBadge(status) {
+                const s = mapStatus(status);
+                $("#statusBadge").removeClass().addClass(`status-badge ${s.cls}`).text(s.text);
             }
         });
     </script>

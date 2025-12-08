@@ -1,24 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QCS.Domain.Models
 {
     public class ApprovalStep : BaseEntity
     {
-        public int Id { get; set; }
         public int PurchaseRequestId { get; set; }
+        // [ForeignKey("PurchaseRequestId")] // ถ้าจำเป็น
+        // public virtual PurchaseRequest PurchaseRequest { get; set; }
 
-        public int Sequence { get; set; } // ลำดับที่ 1, 2, 3
-        public string? ApproverName { get; set; } // ชื่อคนอนุมัติ (เช่น Michael Brown)
-        public string? Role { get; set; } // ตำแหน่ง (เช่น Manager)
-        public string? Status { get; set; } // Pending, Approved, Rejected
-        public DateTime? ApprovalDate { get; set; }
+        public int Sequence { get; set; }
+        public string ApproverName { get; set; } // หรือ ApproverId
+        public string Role { get; set; }
+
+        public int Status { get; set; } // <--- ต้องเป็น int ให้ตรงกับ Consts ใหม่
+
+        public DateTime? ActionDate { get; set; }
         public string? Comment { get; set; }
-
-        [System.Text.Json.Serialization.JsonIgnore] // ป้องกัน Loop Reference เวลาส่ง API
-        public virtual PurchaseRequest PurchaseRequest { get; set; }
     }
 }

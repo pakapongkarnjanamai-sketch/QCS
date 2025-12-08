@@ -2,19 +2,62 @@
     ViewData["Title"] = "รายการใบขอซื้อ (My Requests)";
 }
 
+@section Styles {
+    <style>
+        .doc-no-link {
+            color: #0d6efd;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+            .doc-no-link:hover {
+                text-decoration: underline;
+            }
+
+        /* Status Badge Styling (Theme เดียวกับหน้า Create/Detail) */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: white;
+            display: inline-block;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .status-draft {
+            background-color: #6c757d;
+        }
+
+        .status-pending {
+            background-color: #ffc107;
+            color: #000;
+        }
+
+        .status-approved {
+            background-color: #28a745;
+        }
+
+        .status-rejected {
+            background-color: #dc3545;
+        }
+    </style>
+}
+
 <div class="container mt-4">
     <div class="qcs-card mb-3">
-        <div class="page-header-row">
+        <div class="page-header-row d-flex justify-content-between align-items-center">
             <div>
-                <h6 class="page-title"><i class="fas fa-list-alt"></i> รายการใบขอซื้อ (My Purchase Requests)</h6>
-                <small class="text-muted ms-4 ps-2 d-block mt-1">รายการเอกสารที่สร้างโดยคุณและสถานะการอนุมัติ</small>
+                <h6 class="page-title mb-1">
+                    <i class="fas fa-list-alt text-primary me-2"></i>
+                    รายการใบขอซื้อ (My Purchase Requests)
+                </h6>
+                <small class="text-muted ms-4 ps-2">รายการเอกสารที่คุณสร้างและสถานะปัจจุบัน</small>
             </div>
 
-            <a href="@Url.Action("Create", "PurchaseRequest")" class="dx-button dx-button-default dx-button-mode-contained dx-widget dx-button-has-text dx-button-has-icon" role="button" style="text-decoration:none; border-radius:4px;">
-                <div class="dx-button-content">
-                    <i class="dx-icon dx-icon-plus"></i>
-                    <span class="dx-button-text">สร้างใบขอซื้อใหม่</span>
-                </div>
+            <a href="@Url.Action("Create", "PurchaseRequest")" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> สร้างใบขอซื้อใหม่
             </a>
         </div>
     </div>
@@ -27,21 +70,22 @@
 @section Scripts {
     <script>
         $(function () {
-            // === CONFIGURATION ===
-            const API_BASE_URL = "https://localhost:7127/api";
-            const API_URL = `${API_BASE_URL}/PurchaseRequest/MyRequests`;
-            const DETAIL_URL = '@Url.Action("Detail", "PurchaseRequest")';
+            // === 1. CONFIGURATION ===
+            const CONFIG = {
+                API_URL: "https://localhost:7127/api/PurchaseRequest/MyRequests",
+                DETAIL_URL: '@Url.Action("Detail", "PurchaseRequest")'
+            };
 
-            // === DATA STORE ===
+            // === 2. DATA STORE ===
             const store = DevExpress.data.AspNet.createStore({
                 key: "id",
-                loadUrl: API_URL,
+                loadUrl: CONFIG.API_URL,
                 onBeforeSend: function(method, ajaxOptions) {
-                    ajaxOptions.xhrFields = { withCredentials: true };
+                    ajaxOptions.xhrFields = { withCredentials: true }; // สำคัญ: ส่ง Cookie/Auth ไปด้วย
                 }
             });
 
-            // === GRID RENDERING ===
+            // === 3. RENDER GRID ===
             $("#requestsGrid").dxDataGrid({
                 dataSource: store,
                 showBorders: true,
@@ -53,9 +97,10 @@
                 paging: { pageSize: 10 },
                 pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
                 selection: { mode: "single" },
+                // คลิกแถวเพื่อไปหน้า Detail
                 onRowClick: function(e) {
                     if(e.rowType === "data") {
-                        window.location.href = `${DETAIL_URL}/${e.data.id}`;
+                        window.location.href = `${CONFIG.DETAIL_URL}/${e.data.id}`;
                     }
                 },
                 columns: [
@@ -64,62 +109,41 @@
                         caption: "เลขที่เอกสาร",
                         width: 160,
                         cellTemplate: function(container, options) {
+                            // แสดงเป็น Link สีน้ำเงิน
                             $("<span>").addClass("doc-no-link").text(options.value).appendTo(container);
                         }
                     },
                     {
                         dataField: "title",
-                        caption: "หัวข้อการจัดซื้อ",
+                        caption: "หัวข้อการจัดซื้อ (Title)",
                         minWidth: 200
                     },
                     {
+                        dataField: "vendorName", // เพิ่มคอลัมน์ Vendor ตาม Model ใหม่
+                        caption: "ผู้ขาย (Vendor)",
+                        width: 200
+                    },
+                    {
                         dataField: "requestDate",
-                        caption: "วันที่ขอ",
+                        caption: "วันที่สร้าง",
                         dataType: "date",
                         format: "dd/MM/yyyy",
                         width: 120,
                         alignment: "center"
                     },
                     {
-                        dataField: "totalAmount",
-                        caption: "ยอดรวม",
-                        dataType: "number",
-                        format: "#,##0.00",
-                        width: 150,
-                        visible: false
-                    },
-                    {
                         dataField: "status",
                         caption: "สถานะ",
-                        width: 180,
+                        width: 150,
                         alignment: "center",
                         cellTemplate: function (container, options) {
-                            const status = options.value || "";
-                            let cssClass = "status-draft";
+                            const statusText = options.value || "Draft";
+                            const cssClass = getStatusClass(statusText);
 
-                            // Map Class ตาม Global CSS
-                            if (status.includes("Pending")) cssClass = "status-pending";
-                            else if (status === "Approved") cssClass = "status-approved";
-                            else if (status === "Rejected") cssClass = "status-rejected";
-                            else if (status === "Completed") cssClass = "status-completed";
-
-                            $("<span>").addClass("status-badge " + cssClass).text(status).appendTo(container);
-                        }
-                    },
-                    {
-                        dataField: "currentHandler",
-                        caption: "ผู้พิจารณาปัจจุบัน",
-                        width: 180,
-                        cellTemplate: function(container, options) {
-                            const handler = options.value;
-                            if (handler && handler !== "-") {
-                                $("<div>").append(
-                                    $("<i>").addClass("fas fa-user-clock text-muted me-1"),
-                                    $("<span>").text(handler)
-                                ).appendTo(container);
-                            } else {
-                                $("<span>-</span>").appendTo(container);
-                            }
+                            $("<span>")
+                                .addClass("status-badge " + cssClass)
+                                .text(statusText)
+                                .appendTo(container);
                         }
                     },
                     {
@@ -128,11 +152,25 @@
                         buttons: [{
                             hint: "ดูรายละเอียด",
                             icon: "find",
-                            onClick: function(e) { window.location.href = `${DETAIL_URL}/${e.row.data.id}`; }
+                            onClick: function(e) {
+                                window.location.href = `${CONFIG.DETAIL_URL}/${e.row.data.id}`;
+                            }
                         }]
                     }
                 ]
             });
+
+            // Helper: แปลงข้อความสถานะเป็นชื่อ CSS Class
+            function getStatusClass(status) {
+                if (!status) return "status-draft";
+                const s = status.toLowerCase();
+
+                if (s.includes('pending')) return "status-pending";
+                if (s === 'approved') return "status-approved";
+                if (s === 'rejected') return "status-rejected";
+
+                return "status-draft";
+            }
         });
     </script>
 }

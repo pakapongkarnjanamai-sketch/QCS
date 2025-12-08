@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace QCS.Domain.DTOs
+﻿namespace QCS.Domain.DTOs
 {
     public class ApprovalActionDto
     {
-        public int StepId { get; set; }
+        public int PurchaseRequestId { get; set; }
         public string Comment { get; set; }
-        public bool IsApproved { get; set; }
+        // public int ActionByUserId { get; set; } // ถ้าจะส่ง User ID มาจากหน้าบ้าน (ไม่แนะนำ ควรดึงจาก Token)
     }
 }
