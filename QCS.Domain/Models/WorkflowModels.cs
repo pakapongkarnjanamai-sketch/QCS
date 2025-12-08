@@ -26,5 +26,8 @@ namespace QCS.Domain.Models
         public string NId { get; set; }
         public string EmployeeName { get; set; }
         public string AssignmentType { get; set; }
+
+        // เพิ่มตัวนี้เข้าไปครับ
+        public bool IsCurrentUser { get; set; }
     }
 }
