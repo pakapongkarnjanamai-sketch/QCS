@@ -35,18 +35,17 @@
         }
 
         .status-pending {
-            background-color: #6c757d;
+            background-color: #6c757d; /* สีเทา */
         }
-        /* สีเทา */
+
         .status-review {
-            background-color: #ffc107;
+            background-color: #ffc107; /* สีเหลือง */
             color: #000;
         }
-        /* สีเหลือง */
+
         .status-approved {
-            background-color: #28a745;
+            background-color: #28a745; /* สีเขียว */
         }
-        /* สีเขียว */
 
         /* ระยะห่างระหว่าง Card */
         .mt-card {
@@ -74,8 +73,8 @@
     <div class="qcs-card mt-card">
         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
             <h6 class="m-0 text-secondary">
-                <i class="fas fa-history me-2"></i>
-                เส้นทางการอนุมัติ (Approval Flow & History)
+                <i class="fas fa-project-diagram me-2"></i>
+                เส้นทางการอนุมัติ (Approval Route)
             </h6>
         </div>
         <div id="approvalFlowGrid"></div>
@@ -89,13 +88,18 @@
         $(function () {
             // === 1. CONFIGURATION ===
             const CONFIG = {
+                // Base URL ของ QCS.Api
                 API_BASE_URL: "https://localhost:7127/api",
+
                 API_CREATE_ENDPOINT: '/PurchaseRequest/Create',
+                // Endpoint ที่เราสร้างไว้ใน QCS.Api เพื่อ Proxy ไปหา Workflow Api
+                API_WORKFLOW_ROUTE: '/Workflow/route/1',
+
                 // URL API สำหรับดึง Vendor (ปรับตามจริง)
                 VENDOR_API_URL: "https://ap-ntc2138-qawb/iChaSue/Service/Supplier/api/Suppliers"
             };
 
-            // === 2. DATA STORES & MOCK DATA ===
+            // === 2. DATA STORES ===
             const vendorStore = DevExpress.data.AspNet.createStore({
                 key: "id",
                 loadUrl: CONFIG.VENDOR_API_URL,
@@ -108,13 +112,6 @@
                 { id: 10, name: 'Main Quotation (ใบเสนอราคาหลัก)' },
                 { id: 20, name: 'Specifications (รายละเอียดสเปค)' },
                 { id: 30, name: 'Terms & Conditions (เงื่อนไข)' }
-            ];
-
-            // [Simulation] Mock Data สำหรับ Approval Flow ที่จะเกิดขึ้น
-            const mockApprovalFlow = [
-                { step: 1, role: 'Purchasing Officer', approver: 'คุณสมชาย จัดซื้อ', status: 'Pending', statusText: 'รอตรวจสอบ', actionDate: '-' },
-                { step: 2, role: 'Department Head', approver: 'คุณวิชัย หัวหน้าแผนก', status: 'Pending', statusText: 'รออนุมัติ', actionDate: '-' },
-                { step: 3, role: 'General Manager', approver: 'คุณนิภา จีเอ็ม', status: 'Pending', statusText: 'รออนุมัติ', actionDate: '-' }
             ];
 
             // === 3. INITIAL DATA MODEL ===
@@ -207,36 +204,42 @@
                 ]
             }).dxForm("instance");
 
-            // 4.2 Render Approval Grid (Separate Card)
-            $("#approvalFlowGrid").dxDataGrid({
-                dataSource: mockApprovalFlow,
+            // 4.2 Render Approval Grid (Workflow Route from API)
+            const approvalGrid = $("#approvalFlowGrid").dxDataGrid({
+                dataSource: [], // เริ่มต้นเป็นว่าง รอโหลดจาก API
                 showBorders: true,
                 showRowLines: true,
                 columnAutoWidth: true,
                 paging: { enabled: false },
-                hoverStateEnabled: true,
+                loadPanel: { enabled: true }, // แสดง Loading ใน Grid ตอนโหลดข้อมูล
+                noDataText: "กำลังโหลดข้อมูลผู้อนุมัติ...",
                 columns: [
                     {
                         dataField: "step",
-                        caption: "#",
-                        width: 50,
+                        caption: "ลำดับ (Seq)",
+                        width: 80,
                         alignment: "center",
                         sortOrder: "asc"
                     },
                     {
                         dataField: "role",
-                        caption: "ตำแหน่ง (Role)",
-                        width: 200
+                        caption: "ขั้นตอน/ตำแหน่ง (Step Name)",
+                        width: 250
                     },
                     {
                         dataField: "approver",
-                        caption: "ผู้อนุมัติ (Approver)"
-                    },
-                    {
-                        dataField: "actionDate",
-                        caption: "วันที่ดำเนินการ",
-                        alignment: "center",
-                        width: 150
+                        caption: "ผู้อนุมัติ (Approver Name)",
+                        cellTemplate: function(container, options) {
+                            // ถ้ามีหลายคนให้แสดงเป็นรายการ
+                            const names = options.value ? options.value.split(',') : [];
+                            if(names.length > 1) {
+                                names.forEach(name => {
+                                    $("<div>").html('<i class="fas fa-user text-muted me-1"></i>' + name).appendTo(container);
+                                });
+                            } else {
+                                $("<span>").html('<i class="fas fa-user text-muted me-1"></i>' + (options.value || "Any")).appendTo(container);
+                            }
+                        }
                     },
                     {
                         dataField: "statusText",
@@ -244,19 +247,14 @@
                         width: 150,
                         alignment: "center",
                         cellTemplate: function(container, options) {
-                            let statusClass = "status-pending";
-                            // Logic เปลี่ยนสีตามสถานะ (Mock)
-                            if(options.data.status === 'Approved') statusClass = "status-approved";
-                            if(options.data.status === 'Review') statusClass = "status-review";
-
                             $("<span>")
-                                .addClass("status-badge " + statusClass)
+                                .addClass("status-badge status-pending") // Default เป็น Pending สำหรับ Create Mode
                                 .text(options.value)
                                 .appendTo(container);
                         }
                     }
                 ]
-            });
+            }).dxDataGrid("instance");
 
             // 4.3 Render Toolbar Buttons
             $("#actionButtons").dxToolbar({
@@ -284,7 +282,66 @@
                 ]
             });
 
-            // === 5. TEMPLATE FUNCTIONS ===
+            // === 5. LOAD WORKFLOW DATA ===
+            // เรียกฟังก์ชันนี้ทันทีเพื่อดึงข้อมูล Route
+            loadWorkflowData();
+
+           function loadWorkflowData() {
+                const apiUrl = CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE;
+
+                $.ajax({
+                    url: apiUrl,
+                    type: 'GET',
+                    dataType: 'json',
+                    // เพิ่มส่วนนี้เพื่อให้ส่ง Cookie Authentication (.AspNetCore.Identity.Application) ไปด้วย
+                    xhrFields: {
+                        withCredentials: true
+                    },
+                    crossDomain: true, // ย้ำให้แน่ใจว่าเป็น Cross Domain Request
+                    success: function (data) {
+                        if (data && data.steps) {
+                            // แปลงข้อมูลจาก API ให้เข้ากับ Column ของ Grid
+                            const mappedData = data.steps.map(step => {
+                                // ดึงชื่อพนักงานทั้งหมดใน Step นั้นมาต่อกัน
+                                const approverNames = step.assignments
+                                    ? step.assignments.map(a => a.employeeName || a.nId).join(',')
+                                    : "";
+
+                                return {
+                                    step: step.sequenceNo,
+                                    role: step.stepName,
+                                    approver: approverNames,
+                                    statusText: "รออนุมัติ" // สถานะเริ่มต้น
+                                };
+                            });
+
+                            // เรียงลำดับ
+                            mappedData.sort((a, b) => a.step - b.step);
+
+                            // อัปเดตข้อมูลเข้า Grid
+                            const grid = $("#approvalFlowGrid").dxDataGrid("instance");
+                            grid.option("dataSource", mappedData);
+                            grid.option("noDataText", "ไม่พบข้อมูลเส้นทางการอนุมัติ");
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Error loading workflow route:", error);
+                        console.log("Status:", xhr.status);
+
+                        const grid = $("#approvalFlowGrid").dxDataGrid("instance");
+
+                        if (xhr.status === 401) {
+                            grid.option("noDataText", "Session หมดอายุ หรือไม่มีสิทธิ์เข้าถึง (401)");
+                            // อาจจะ Redirect ไปหน้า Login ถ้าจำเป็น
+                            // window.location.href = '/Account/Login';
+                        } else {
+                            grid.option("noDataText", "เกิดข้อผิดพลาดในการโหลดข้อมูล Workflow");
+                        }
+                    }
+                });
+            }
+
+            // === 6. TEMPLATE FUNCTIONS ===
             function renderAttachmentsSection(data, itemElement) {
                 const $container = $("<div>").addClass("attachments-container");
 
@@ -362,7 +419,7 @@
                 $container.appendTo(itemElement);
             }
 
-            // === 6. LOGIC FUNCTIONS ===
+            // === 7. LOGIC FUNCTIONS ===
             function handleFileUpload(file) {
                 if (file.type !== "application/pdf") {
                     DevExpress.ui.notify("รองรับเฉพาะไฟล์ PDF เท่านั้น", "error", 3000);
@@ -434,7 +491,7 @@
                     const response = await fetch(CONFIG.API_BASE_URL + CONFIG.API_CREATE_ENDPOINT, {
                         method: 'POST',
                         body: formData,
-                        credentials: 'include' // <--- เพิ่มตามคำขอครับ
+                        credentials: 'include' // ส่ง cookie authentication ไปด้วย
                     });
 
                     if (!response.ok) {
