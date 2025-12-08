@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
+using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
 using System.Text.Json;
@@ -102,61 +103,64 @@ namespace QCS.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. สร้าง Header
+                // 1. สร้าง Running Number (Format: PR-yyyyMMdd-XXX)
+                var todayStr = DateTime.Now.ToString("yyyyMMdd");
+                var prefix = $"PR-{todayStr}-";
+
+                // นับจำนวนใบ PR ที่สร้างในวันนี้เพื่อหาเลขถัดไป
+                var countToday = await _context.PurchaseRequests
+                    .Where(x => x.DocumentNo.StartsWith(prefix))
+                    .CountAsync();
+
+                var runningNo = (countToday + 1).ToString("D3"); // แปลงเป็น 001, 002, ...
+                var newDocNo = $"{prefix}{runningNo}";
+
+                // 2. สร้าง Header
                 var pr = new PurchaseRequest
                 {
                     Title = input.Title,
                     RequestDate = input.RequestDate,
-                    Status = "Pending",
-                    DocumentNo = $"PR-{DateTime.Now:yyyyMMdd}-{new Random().Next(100, 999)}", // Generate เลขที่เอกสาร
+                    Status = StatusConsts.PR_Pending, // ใช้ Constant
+                    DocumentNo = newDocNo,
                     Quotations = new List<Quotation>(),
                     ApprovalSteps = new List<ApprovalStep>()
                 };
 
-                // 2. แปลง JSON Quotations เป็น Object (Case Insensitive)
+                // ... (Logic การจัดการ Quotations และ Attachments คงเดิม) ...
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var quotationItems = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.QuotationsJson ?? "[]", options);
 
-                // 3. จัดการไฟล์แนบ (Save to Database as BLOB)
                 if (input.Attachments != null && quotationItems != null)
                 {
                     foreach (var file in input.Attachments)
                     {
                         if (file.Length > 0)
                         {
-                            // อ่านไฟล์เป็น Byte Array
                             using var memoryStream = new MemoryStream();
                             await file.CopyToAsync(memoryStream);
 
-                            // สร้าง Entity AttachmentFile
                             var attachment = new AttachmentFile
                             {
                                 FileName = file.FileName,
                                 ContentType = file.ContentType,
                                 FileSize = file.Length,
-                                Data = memoryStream.ToArray() // เก็บ Binary ที่นี่
+                                Data = memoryStream.ToArray()
                             };
 
-                            // หา Item ใน JSON ที่ชื่อไฟล์ตรงกัน เพื่อเอาข้อมูล Vendor/Price/Date
                             var info = quotationItems.FirstOrDefault(q => q.FileName == file.FileName);
                             if (info != null)
                             {
                                 pr.Quotations.Add(new Quotation
                                 {
-                                    // Map ข้อมูลทั่วไป
                                     VendorName = info.VendorName,
                                     TotalAmount = info.TotalAmount,
                                     IsSelected = info.IsSelected,
                                     OriginalFileName = file.FileName,
-
-                                    // Map ข้อมูลใหม่ที่เพิ่มเข้ามา
                                     VendorId = info.VendorId,
                                     DocumentTypeId = info.DocumentTypeId,
                                     ValidFrom = info.ValidFrom,
                                     ValidUntil = info.ValidUntil,
                                     Comment = info.Comment,
-
-                                    // เชื่อมโยงกับไฟล์ที่สร้างใหม่
                                     AttachmentFile = attachment
                                 });
                             }
@@ -164,15 +168,15 @@ namespace QCS.API.Controllers
                     }
                 }
 
-                // 4. สร้าง Workflow การอนุมัติ (Mockup)
-                pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 1, ApproverName = "Manager A", Role = "Manager", Status = "Pending" });
-                pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 2, ApproverName = "Director B", Role = "Director", Status = "Pending" });
+                // 3. สร้าง Workflow (ตัวอย่าง)
+                pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 1, ApproverName = "Manager A", Role = "Manager", Status = StatusConsts.Step_Pending });
+                pr.ApprovalSteps.Add(new ApprovalStep { Sequence = 2, ApproverName = "Director B", Role = "Director", Status = StatusConsts.Step_Pending });
 
                 _context.PurchaseRequests.Add(pr);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return Ok(new { success = true, id = pr.Id });
+                return Ok(new { success = true, id = pr.Id, docNo = newDocNo });
             }
             catch (Exception ex)
             {
