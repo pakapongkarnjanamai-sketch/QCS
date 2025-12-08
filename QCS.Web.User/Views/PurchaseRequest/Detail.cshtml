@@ -1,5 +1,277 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+﻿@model int
 @{
+    ViewData["Title"] = "รายละเอียดใบขอซื้อ (Request Detail)";
+}
+
+@section Styles {
+    <style>
+        .selected-quotation {
+            background-color: #e8f5e9 !important; /* Highlight สีเขียวอ่อน */
+            font-weight: bold;
+        }
+    </style>
+}
+
+<div class="container mt-4">
+
+    <div class="qcs-card mb-3">
+        <div class="page-header-row">
+            <h6 class="page-title">
+                <i class="fas fa-file-invoice-dollar"></i> รายละเอียดใบขอซื้อ (Request Detail)
+            </h6>
+            <div class="d-flex gap-2">
+                <button class="dx-button dx-button-outlined dx-button-mode-outlined dx-widget dx-button-has-text dx-button-has-icon" onclick="history.back()" style="border-radius:4px;">
+                    <div class="dx-button-content">
+                        <i class="dx-icon dx-icon-arrowleft"></i>
+                        <span class="dx-button-text">ย้อนกลับ</span>
+                    </div>
+                </button>
+                <div id="approvalActionButtons"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="qcs-card">
+        <div class="row">
+            <div class="col-md-8">
+                <h4 id="docTitle" class="mb-2 text-primary fw-bold">
+                    <i class="fas fa-spinner fa-spin small"></i> Loading...
+                </h4>
+                <div class="d-flex gap-4 text-muted mt-2">
+                    <span><i class="fas fa-barcode me-1"></i> เลขที่: <span id="docNo">-</span></span>
+                    <span><i class="far fa-calendar-alt me-1"></i> วันที่: <span id="reqDate">-</span></span>
+                    <span><i class="fas fa-user me-1"></i> ผู้ขอ: <span id="requesterName">-</span></span>
+                </div>
+            </div>
+            <div class="col-md-4 text-end align-self-center">
+                <div class="mb-1 text-muted small">สถานะเอกสาร</div>
+                <span id="docStatus" class="status-badge bg-secondary text-white">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="qcs-card">
+        <div class="section-header">
+            <i class="fas fa-table me-2"></i>รายการใบเสนอราคา (Quotations)
+        </div>
+        <div id="quotationGrid"></div>
+    </div>
+
+</div>
+
+<div id="approvalPopup"></div>
+<div id="loadingPanel"></div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // === CONFIGURATION ===
+            const PR_ID = @Model;
+            const API_BASE_URL = "https://localhost:7127/api";
+            const API_URL = {
+                GET_DETAIL: `${API_BASE_URL}/PurchaseRequest/${PR_ID}`,
+                ACTION: `${API_BASE_URL}/Approval/Action`,
+                DOWNLOAD: `${API_BASE_URL}/PurchaseRequest/DownloadAttachment`
+            };
+
+            let currentStepId = 0;
+
+            const loadingPanel = $("#loadingPanel").dxLoadPanel({
+                shadingColor: "rgba(0,0,0,0.4)",
+                position: { of: "body" },
+                visible: false,
+                showIndicator: true,
+                showPane: true,
+                shading: true
+            }).dxLoadPanel("instance");
+
+            const popup = $("#approvalPopup").dxPopup({
+                width: 500,
+                height: "auto",
+                showTitle: true,
+                dragEnabled: false,
+                hideOnOutsideClick: false,
+                visible: false
+            }).dxPopup("instance");
+
+            loadData();
+
+            async function loadData() {
+                loadingPanel.show();
+                try {
+                    const response = await fetch(API_URL.GET_DETAIL, { credentials: 'include' });
+                    if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
+
+                    const data = await response.json();
+                    renderHeader(data);
+                    renderGrid(data.quotations);
+                    renderActionButtons(data.currentStepId);
+                    currentStepId = data.currentStepId;
+                } catch (err) {
+                    DevExpress.ui.notify(err.message, "error", 3000);
+                } finally {
+                    loadingPanel.hide();
+                }
+            }
+
+            function renderHeader(data) {
+                $("#docTitle").text(data.title);
+                $("#docNo").text(data.documentNo);
+                $("#reqDate").text(new Date(data.requestDate).toLocaleDateString('th-TH'));
+                $("#requesterName").text(data.requesterName);
+
+                const status = data.status;
+                const $badge = $("#docStatus");
+                $badge.text(status);
+                $badge.removeClass();
+                $badge.addClass("status-badge"); // Reset Base Class
+
+                // Map Class Logic
+                if (status.includes("Pending")) $badge.addClass("status-pending");
+                else if (status === "Approved") $badge.addClass("status-approved");
+                else if (status === "Rejected") $badge.addClass("status-rejected");
+                else if (status === "Completed") $badge.addClass("status-completed");
+                else $badge.addClass("bg-secondary text-white");
+            }
+
+            function renderGrid(quotations) {
+                $("#quotationGrid").dxDataGrid({
+                    dataSource: quotations,
+                    showBorders: true,
+                    columnAutoWidth: true,
+                    paging: { pageSize: 10 },
+                    onRowPrepared: function(e) {
+                        if (e.rowType === "data" && e.data.isSelected) {
+                            e.rowElement.addClass("selected-quotation");
+                        }
+                    },
+                    columns: [
+                        {
+                            dataField: "vendorName",
+                            caption: "ผู้ขาย (Vendor)",
+                            cellTemplate: function(container, options) {
+                                let html = `<div>${options.value}</div>`;
+                                if (options.data.isSelected) {
+                                    html += `<span class="badge bg-success mt-1"><i class="fas fa-check"></i> Selected</span>`;
+                                }
+                                $("<div>").html(html).appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "documentTypeId",
+                            caption: "ประเภทเอกสาร",
+                            width: 150,
+                            lookup: {
+                                dataSource: [
+                                    { id: 10, name: 'Quotation' },
+                                    { id: 20, name: 'Spec' },
+                                    { id: 30, name: 'Condition' }
+                                ],
+                                valueExpr: 'id',
+                                displayExpr: 'name'
+                            }
+                        },
+                        {
+                            dataField: "totalAmount",
+                            caption: "ยอดรวม",
+                            dataType: "number",
+                            format: "#,##0.00",
+                            width: 120,
+                            visible: false
+                        },
+                        {
+                            dataField: "originalFileName",
+                            caption: "ไฟล์แนบ",
+                            cellTemplate: function (container, options) {
+                                if (options.data.filePath) {
+                                    $("<a/>")
+                                        .attr("href", options.data.filePath)
+                                        .attr("target", "_blank")
+                                        .addClass("btn btn-sm btn-outline-primary")
+                                        .html('<i class="fas fa-download"></i> ดาวน์โหลด')
+                                        .appendTo(container);
+                                } else {
+                                    $("<span>-</span>").appendTo(container);
+                                }
+                            }
+                        },
+                        {
+                            dataField: "comment",
+                            caption: "หมายเหตุ"
+                        }
+                    ]
+                });
+            }
+
+            function renderActionButtons(stepId) {
+                const container = $("#approvalActionButtons");
+                container.empty();
+                if (stepId > 0) {
+                    $("<div>").dxButton({
+                        text: "ไม่อนุมัติ (Reject)", type: "danger", stylingMode: "outlined", icon: "close",
+                        onClick: () => showActionPopup(false)
+                    }).appendTo(container);
+                    $("<div>").addClass("ms-2").dxButton({
+                        text: "อนุมัติ (Approve)", type: "success", icon: "check",
+                        onClick: () => showActionPopup(true)
+                    }).appendTo(container);
+                }
+            }
+
+            function showActionPopup(isApprove) {
+                const actionText = isApprove ? "อนุมัติ (Approve)" : "ไม่อนุมัติ (Reject)";
+                popup.option({
+                    title: `ยืนยันผลการพิจารณา: ${actionText}`,
+                    contentTemplate: function(contentElement) {
+                        contentElement.append(`
+                            <div class="mb-3">
+                                <label class="form-label">ความคิดเห็นเพิ่มเติม (Comment):</label>
+                                <div id="commentTextArea"></div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2 mt-4">
+                                <div id="btnCancel"></div>
+                                <div id="btnConfirm"></div>
+                            </div>
+                        `);
+                        const commentBox = $("#commentTextArea").dxTextArea({
+                            height: 100,
+                            placeholder: isApprove ? "ระบุเหตุผล (ถ้ามี)..." : "กรุณาระบุเหตุผลที่ไม่อนุมัติ...",
+                        }).dxTextArea("instance");
+
+                        $("#btnCancel").dxButton({ text: "ยกเลิก", onClick: () => popup.hide() });
+                        $("#btnConfirm").dxButton({
+                            text: "ยืนยัน (Confirm)", type: isApprove ? "success" : "danger",
+                            onClick: () => submitAction(isApprove, commentBox.option("value"))
+                        });
+                    }
+                });
+                popup.show();
+            }
+
+            async function submitAction(isApproved, comment) {
+                if (!isApproved && !comment) {
+                    DevExpress.ui.notify("กรุณาระบุเหตุผลการไม่อนุมัติ", "warning", 2000);
+                    return;
+                }
+                loadingPanel.show();
+                popup.hide();
+                try {
+                    const payload = { stepId: currentStepId, isApproved: isApproved, comment: comment || "-" };
+                    const response = await fetch(API_URL.ACTION, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(await response.text() || "เกิดข้อผิดพลาด");
+                    DevExpress.ui.notify("บันทึกผลการพิจารณาเรียบร้อย", "success", 2000);
+                    setTimeout(loadData, 1000);
+                } catch (err) {
+                    DevExpress.ui.notify(err.message, "error", 3000);
+                } finally {
+                    loadingPanel.hide();
+                }
+            }
+        });
+    </script>
 }

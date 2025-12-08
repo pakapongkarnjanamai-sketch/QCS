@@ -21,5 +21,10 @@ namespace QCS.Web.User.Controllers
         {
             return View();
         }
+        public IActionResult Detail(int id)
+        {
+            // ส่ง id ไปให้ View เพื่อให้ JS เอาไปยิง API ต่อ
+            return View(id);
+        }
     }
 }

@@ -1,5 +1,138 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
+﻿@{
+    ViewData["Title"] = "รายการใบขอซื้อ (My Requests)";
+}
+
+<div class="container mt-4">
+    <div class="qcs-card mb-3">
+        <div class="page-header-row">
+            <div>
+                <h6 class="page-title"><i class="fas fa-list-alt"></i> รายการใบขอซื้อ (My Purchase Requests)</h6>
+                <small class="text-muted ms-4 ps-2 d-block mt-1">รายการเอกสารที่สร้างโดยคุณและสถานะการอนุมัติ</small>
+            </div>
+
+            <a href="@Url.Action("Create", "PurchaseRequest")" class="dx-button dx-button-default dx-button-mode-contained dx-widget dx-button-has-text dx-button-has-icon" role="button" style="text-decoration:none; border-radius:4px;">
+                <div class="dx-button-content">
+                    <i class="dx-icon dx-icon-plus"></i>
+                    <span class="dx-button-text">สร้างใบขอซื้อใหม่</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="qcs-card">
+        <div id="requestsGrid"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // === CONFIGURATION ===
+            const API_BASE_URL = "https://localhost:7127/api";
+            const API_URL = `${API_BASE_URL}/PurchaseRequest/MyRequests`;
+            const DETAIL_URL = '@Url.Action("Detail", "PurchaseRequest")';
+
+            // === DATA STORE ===
+            const store = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: API_URL,
+                onBeforeSend: function(method, ajaxOptions) {
+                    ajaxOptions.xhrFields = { withCredentials: true };
+                }
+            });
+
+            // === GRID RENDERING ===
+            $("#requestsGrid").dxDataGrid({
+                dataSource: store,
+                showBorders: true,
+                columnAutoWidth: true,
+                hoverStateEnabled: true,
+                rowAlternationEnabled: true,
+                searchPanel: { visible: true, width: 250, placeholder: "ค้นหาเอกสาร..." },
+                filterRow: { visible: true },
+                paging: { pageSize: 10 },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+                selection: { mode: "single" },
+                onRowClick: function(e) {
+                    if(e.rowType === "data") {
+                        window.location.href = `${DETAIL_URL}/${e.data.id}`;
+                    }
+                },
+                columns: [
+                    {
+                        dataField: "documentNo",
+                        caption: "เลขที่เอกสาร",
+                        width: 160,
+                        cellTemplate: function(container, options) {
+                            $("<span>").addClass("doc-no-link").text(options.value).appendTo(container);
+                        }
+                    },
+                    {
+                        dataField: "title",
+                        caption: "หัวข้อการจัดซื้อ",
+                        minWidth: 200
+                    },
+                    {
+                        dataField: "requestDate",
+                        caption: "วันที่ขอ",
+                        dataType: "date",
+                        format: "dd/MM/yyyy",
+                        width: 120,
+                        alignment: "center"
+                    },
+                    {
+                        dataField: "totalAmount",
+                        caption: "ยอดรวม",
+                        dataType: "number",
+                        format: "#,##0.00",
+                        width: 150,
+                        visible: false
+                    },
+                    {
+                        dataField: "status",
+                        caption: "สถานะ",
+                        width: 180,
+                        alignment: "center",
+                        cellTemplate: function (container, options) {
+                            const status = options.value || "";
+                            let cssClass = "status-draft";
+
+                            // Map Class ตาม Global CSS
+                            if (status.includes("Pending")) cssClass = "status-pending";
+                            else if (status === "Approved") cssClass = "status-approved";
+                            else if (status === "Rejected") cssClass = "status-rejected";
+                            else if (status === "Completed") cssClass = "status-completed";
+
+                            $("<span>").addClass("status-badge " + cssClass).text(status).appendTo(container);
+                        }
+                    },
+                    {
+                        dataField: "currentHandler",
+                        caption: "ผู้พิจารณาปัจจุบัน",
+                        width: 180,
+                        cellTemplate: function(container, options) {
+                            const handler = options.value;
+                            if (handler && handler !== "-") {
+                                $("<div>").append(
+                                    $("<i>").addClass("fas fa-user-clock text-muted me-1"),
+                                    $("<span>").text(handler)
+                                ).appendTo(container);
+                            } else {
+                                $("<span>-</span>").appendTo(container);
+                            }
+                        }
+                    },
+                    {
+                        type: "buttons",
+                        width: 60,
+                        buttons: [{
+                            hint: "ดูรายละเอียด",
+                            icon: "find",
+                            onClick: function(e) { window.location.href = `${DETAIL_URL}/${e.row.data.id}`; }
+                        }]
+                    }
+                ]
+            });
+        });
+    </script>
 }
