@@ -5,8 +5,8 @@ namespace QCS.Domain.Models
     public class ApprovalStep : BaseEntity
     {
         public int PurchaseRequestId { get; set; }
-        // [ForeignKey("PurchaseRequestId")] // ถ้าจำเป็น
-        // public virtual PurchaseRequest PurchaseRequest { get; set; }
+        [ForeignKey("PurchaseRequestId")] // ถ้าจำเป็น
+        public virtual PurchaseRequest PurchaseRequest { get; set; }
 
         public int Sequence { get; set; }
         public string ApproverName { get; set; } // หรือ ApproverId

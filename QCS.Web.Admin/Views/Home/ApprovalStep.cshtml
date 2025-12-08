@@ -2,7 +2,7 @@
     ViewData["Title"] = "Approval Steps";
 }
 
-<div class="card">
+<div class="card m-3">
     <div class="card-header">
         <h5 class="mb-0">ลำดับการอนุมัติ (Approval Steps)</h5>
     </div>
@@ -14,85 +14,111 @@
 @section Scripts {
     <script>
         const API_BASE_URL = "https://localhost:7127/api/";
+        const CONTROLLER_NAME = "CRUDApprovalSteps";
+
+        // Lookup สำหรับสถานะ (Int -> String)
+        const statusLookup = [
+            { id: 1, name: "Pending" },
+            { id: 2, name: "Approved" },
+            { id: 3, name: "Rejected" }
+        ];
 
         $(function () {
-            // สร้าง Lookup Store สำหรับดึงข้อมูล PurchaseRequest มาแสดงใน Dropdown
-            const prLookupStore = createDataStore(API_BASE_URL, 'CRUDPurchaseRequests', { key: "Id" });
+            // Store สำหรับดึงข้อมูล PR (เลขที่เอกสาร) มาแสดงใน Dropdown
+            const prLookupStore = DevExpress.data.AspNet.createStore({
+                key: "id", // Key ของ PR เป็นตัวพิมพ์เล็ก
+                loadUrl: API_BASE_URL + "CRUDPurchaseRequests",
+                onBeforeSend: function(method, ajaxOptions) {
+                    ajaxOptions.xhrFields = { withCredentials: true };
+                }
+            });
 
             $("#gridApproval").dxDataGrid({
-                dataSource: createDataStore(API_BASE_URL, 'ApprovalSteps', { key: "Id" }),
+                // Store หลักของหน้า Approval Steps
+                   dataSource: createDataStore(API_BASE_URL, CONTROLLER_NAME),
                 remoteOperations: true,
                 showBorders: true,
+                rowAlternationEnabled: true,
 
+                // Features
                 filterRow: { visible: true },
                 headerFilter: { visible: true },
+                searchPanel: { visible: true },
+                sorting: { mode: "multiple" },
 
+                // Editing Config
                 editing: {
-                    mode: "row", // ใช้แบบ row เพื่อความรวดเร็วในการแก้ลำดับ
+                    mode: "row",
                     allowAdding: true,
                     allowUpdating: true,
-                    allowDeleting: true
+                    allowDeleting: true,
+                    useIcons: true
                 },
 
+                // Column Definitions (camelCase ตาม JSON)
                 columns: [
                     {
-                        dataField: "PurchaseRequestId",
+                        dataField: "purchaseRequestId",
                         caption: "เอกสารใบขอซื้อ",
                         width: 200,
                         validationRules: [{ type: "required" }],
                         lookup: {
                             dataSource: prLookupStore,
-                            valueExpr: "Id",
-                            displayExpr: "DocumentNo" // แสดงเป็นเลขที่เอกสาร
+                            valueExpr: "id",
+                            displayExpr: "code" // ใช้ 'code' ตาม JSON ของ PR เพื่อโชว์เลขที่เอกสาร
                         }
                     },
                     {
-                        dataField: "Sequence",
+                        dataField: "sequence",
                         caption: "ลำดับ",
                         dataType: "number",
                         width: 80,
-                        sortOrder: "asc", // เรียงตามลำดับอัตโนมัติ
+                        sortOrder: "asc", // บังคับเรียงตามลำดับเสมอ
                         validationRules: [{ type: "required" }]
                     },
                     {
-                        dataField: "ApproverName",
+                        dataField: "approverName",
                         caption: "ชื่อผู้อนุมัติ",
                         validationRules: [{ type: "required" }]
                     },
                     {
-                        dataField: "Role",
+                        dataField: "role",
                         caption: "ตำแหน่ง",
                         validationRules: [{ type: "required" }]
                     },
                     {
-                        dataField: "Status",
-                        caption: "ผลการอนุมัติ",
+                        dataField: "status",
+                        caption: "สถานะ",
                         width: 120,
-                        editorType: "dxSelectBox",
-                        editorOptions: {
-                            items: ["Pending", "Approved", "Rejected"],
-                            value: "Pending"
+                        lookup: {
+                            dataSource: statusLookup,
+                            valueExpr: "id",
+                            displayExpr: "name"
                         },
-                        cellTemplate: function(container, options) {
-                            // จัดสี Badge ตามสถานะ
-                            let color = 'secondary';
-                            if(options.value === 'Approved') color = 'success';
-                            if(options.value === 'Rejected') color = 'danger';
+                        cellTemplate: function(element, info) {
+                            let statusName = info.displayValue || "Unknown";
+                            let colorClass = "badge bg-secondary"; // Default
 
-                            $("<span class='badge bg-" + color + "'>")
-                                .text(options.value)
-                                .appendTo(container);
+                            if (info.value === 2) colorClass = "badge bg-success"; // Approved
+                            else if (info.value === 3) colorClass = "badge bg-danger"; // Rejected
+                            else if (info.value === 1) colorClass = "badge bg-warning text-dark"; // Pending
+
+                            element.append(`<span class="${colorClass}">${statusName}</span>`);
                         }
                     },
                     {
-                        dataField: "ApprovalDate",
+                        dataField: "actionDate",
                         caption: "วันที่อนุมัติ",
                         dataType: "datetime",
-                        format: "dd/MM/yyyy HH:mm"
+                        format: "dd/MM/yyyy HH:mm",
+                        width: 160,
+                        allowEditing: false // ปกติวันที่อนุมัติควรอ่านอย่างเดียว (ระบบอัปเดตเอง)
                     },
                     {
-                        dataField: "Comment",
-                        caption: "ความเห็น"
+                        dataField: "comment",
+                        caption: "ความเห็น",
+                        visible: false, // ซ่อนใน Grid ปกติ (เปิดดูใน Form หรือขยายดูได้)
+                        formItem: { visible: true, editorType: "dxTextArea", editorOptions: { height: 60 } }
                     }
                 ]
             });

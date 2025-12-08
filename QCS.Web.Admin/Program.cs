@@ -1,7 +1,7 @@
-﻿
-using Microsoft.AspNetCore.Authentication.Negotiate;
+﻿using Microsoft.AspNetCore.Authentication.Negotiate;
 using QCS.Web.Shared.Middleware;
 using QCS.Web.Shared.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,9 +55,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IApiUserService, ApiUserService>();
 
 // HTTP Client for API calls
-builder.Services.AddHttpClient("QCS", client =>
+builder.Services.AddHttpClient("DocTrackerAPI", client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("ApiSettings:BaseUrl") ?? "https://localhost:7284");
+    client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("ApiSettings:BaseUrl") ?? "https://localhost:7127");
     client.Timeout = TimeSpan.FromSeconds(30);
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
 {
@@ -91,7 +91,6 @@ app.UseMiddleware<ApiUserSyncMiddleware>();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapControllers();
-
 
 app.MapControllerRoute(
     name: "default",

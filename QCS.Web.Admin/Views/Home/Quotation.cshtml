@@ -2,9 +2,9 @@
     ViewData["Title"] = "Quotation Management";
 }
 
-<div class="card">
-    <div class="card-header">
-        <h5>จัดการข้อมูล Quotation</h5>
+<div class="card m-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">จัดการข้อมูล Quotation</h5>
     </div>
     <div class="card-body">
         <div id="grid"></div>
@@ -13,88 +13,90 @@
 
 @section Scripts {
     <script>
-        // ระบุ URL ของ API ให้ถูกต้อง (ตาม launchSettings.json ของโปรเจกต์ API)
+        // ใช้ Port 7127 ตามการตั้งค่า Backend
         const API_BASE_URL = "https://localhost:7127/api/";
+        const CONTROLLER_NAME = "CRUDQuotations";
 
         $(function () {
             $("#grid").dxDataGrid({
-                dataSource: createDataStore(API_BASE_URL, 'CRUDQuotations'), // เรียกใช้ Helper ที่สร้างไว้
-                remoteOperations: true, // ให้ Server (API) ช่วยประมวลผล Filter/Sort/Paging
+                // เชื่อมต่อ API
+                dataSource: createDataStore(API_BASE_URL, CONTROLLER_NAME),
+                remoteOperations: true,
                 showBorders: true,
                 columnAutoWidth: true,
                 rowAlternationEnabled: true,
+                hoverStateEnabled: true,
 
-                // เปิดใช้งานการค้นหาและ Filter
+                // Filter & Search
                 filterRow: { visible: true },
-                searchPanel: { visible: true },
+                searchPanel: { visible: true, width: 240, placeholder: "ค้นหา..." },
+                paging: { pageSize: 10 },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
 
-                // เปิดใช้งาน CRUD (เพิ่ม/ลบ/แก้ไข)
+                // Editing (Popup Mode)
                 editing: {
-                    mode: "popup", // หรือ "row", "cell", "form"
-                    allowAdding: true,
-                    allowUpdating: true,
-                    allowDeleting: true,
+                    mode: "popup",
+                    allowAdding: false,
+                    allowUpdating: false,
+                    allowDeleting: false,
+                    useIcons: true,
                     popup: {
-                        title: "Quotation Info",
+                        title: "ข้อมูลใบเสนอราคา (Quotation)",
                         showTitle: true,
                         width: 700,
-                        height: 525
-                    }
+                        height: 450
+                    },
+                    
                 },
 
-                // กำหนดคอลัมน์
+                // Columns Definition (ใช้ camelCase ตาม JSON API)
                 columns: [
                     {
-                        dataField: "Id",
-                        caption: "ID",
-                        width: 50,
-                        allowEditing: false, // ห้ามแก้ไข ID
-                        visible: false // ซ่อนไว้ถ้าไม่จำเป็น
+                        dataField: "id",
+                        visible: false,
+                        allowEditing: false,
+                        formItem: { visible: false }
                     },
                     {
-                        dataField: "VendorName",
-                        caption: "ชื่อผู้ขาย (Vendor)",
-                        validationRules: [{ type: "required" }]
+                        dataField: "purchaseRequestId",
+                        caption: "อ้างอิงใบขอซื้อ (PR No.)",
+                        width: 180,
+                        validationRules: [{ type: "required" }],
+                        lookup: {
+                            // ดึงข้อมูล PR มาแสดงใน Dropdown
+                            dataSource: DevExpress.data.AspNet.createStore({
+                                key: "id",
+                                loadUrl: API_BASE_URL + "CRUDPurchaseRequests",
+                                onBeforeSend: function(method, ajaxOptions) {
+                                    ajaxOptions.xhrFields = { withCredentials: true };
+                                }
+                            }),
+                            valueExpr: "id",
+                            displayExpr: "code" // แสดงเลขที่เอกสาร (code) แทน ID
+                        }
                     },
+           
                     {
-                        dataField: "TotalAmount",
-                        caption: "ยอดรวม",
-                        dataType: "number",
-                        format: "currency", // แสดงเป็นสกุลเงิน
-                        validationRules: [{ type: "required" }]
-                    },
-                    {
-                        dataField: "IsSelected",
-                        caption: "เลือกเจ้านี้",
-                        dataType: "boolean"
-                    },
-                    {
-                        dataField: "OriginalFileName",
+                        dataField: "fileName", // ชื่อฟิลด์ตามที่เห็นใน Create.cshtml
                         caption: "ไฟล์แนบ",
-                        allowEditing: false, // ปกติไฟล์จะไม่แก้ชื่อตรงนี้
+                        allowEditing: false,
                         cellTemplate: function(container, options) {
-                            // สร้าง Link ให้ดาวน์โหลดไฟล์ (ถ้ามี)
-                            if(options.value) {
+                            if(options.data.filePath) {
+                                // แปลง Path ให้เป็น URL ที่ถูกต้อง (เปลี่ยน \ เป็น /)
+                                let cleanPath = options.data.filePath.replace(/\\/g, "/");
+                                let fileUrl = "https://localhost:7127/" + cleanPath;
+
                                 $("<a>")
-                                    .attr("href", options.data.FilePath) // ต้องมั่นใจว่า API ส่ง Path ที่เข้าถึงได้มา
+                                    .attr("href", fileUrl)
                                     .attr("target", "_blank")
-                                    .text(options.value)
+                                    .addClass("d-flex align-items-center text-decoration-none")
+                                    .append($("<i>").addClass("fas fa-file-pdf text-danger me-2"))
+                                    .append($("<span>").text(options.value || "Download"))
                                     .appendTo(container);
                             } else {
                                 $("<span>").text("-").appendTo(container);
                             }
                         }
-                    },
-                    {
-                        dataField: "PurchaseRequestId",
-                        caption: "เลขที่ใบขอซื้อ (PR ID)",
-                        dataType: "number",
-                        // ถ้าอยากให้แสดงเป็น Dropdown เลือก PR ให้ใช้ lookup
-                        // lookup: {
-                        //     dataSource: createDataStore(API_BASE_URL, 'PurchaseRequest'),
-                        //     valueExpr: 'Id',
-                        //     displayExpr: 'DocumentNo'
-                        // }
                     }
                 ]
             });

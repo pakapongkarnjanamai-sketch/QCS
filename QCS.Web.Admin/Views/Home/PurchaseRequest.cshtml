@@ -2,7 +2,7 @@
     ViewData["Title"] = "Purchase Request";
 }
 
-<div class="card">
+<div class="card m-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">รายการใบขอซื้อ (Purchase Requests)</h5>
     </div>
@@ -13,78 +13,122 @@
 
 @section Scripts {
     <script>
-        // อย่าลืมใส่ / ปิดท้าย เพื่อให้ site.js ต่อ String ได้ถูกต้อง
+        // ใช้ Port 7127 ตามที่คุณระบุ
         const API_BASE_URL = "https://localhost:7127/api/";
+        const CONTROLLER_NAME = "CRUDPurchaseRequests";
+
+        // กำหนดรายการสถานะสำหรับการแปลงค่าตัวเลข (Int) เป็นข้อความ
+        // 0=Draft, 1=Pending, 2=Approved, 3=Rejected, 4=Completed (สมมติลำดับตามมาตรฐาน)
+        const statusLookup = [
+            { id: 0, name: "Draft" },
+            { id: 1, name: "Pending" },
+            { id: 2, name: "Approved" },
+            { id: 3, name: "Rejected" },
+            { id: 4, name: "Completed" }
+        ];
 
         $(function () {
             $("#gridPR").dxDataGrid({
-                // ส่ง options { key: "Id" } เพราะใน C# เป็น PascalCase แต่ default ใน site.js เป็น 'id'
-                dataSource: createDataStore(API_BASE_URL, 'CRUDPurchaseRequests', { key: "Id" }),
+               dataSource: createDataStore(API_BASE_URL, CONTROLLER_NAME),
                 remoteOperations: true,
                 showBorders: true,
                 rowAlternationEnabled: true,
                 columnAutoWidth: true,
-
-                // เปิดฟีเจอร์การจัดการข้อมูล
+                hoverStateEnabled: true,
+                paging: { pageSize: 10 },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
                 filterRow: { visible: true },
-                searchPanel: { visible: true },
+                searchPanel: { visible: true, width: 240, placeholder: "ค้นหา..." },
+
+                // การแก้ไขข้อมูล (Popup)
                 editing: {
                     mode: "popup",
                     allowAdding: true,
                     allowUpdating: true,
                     allowDeleting: true,
+                    useIcons: true,
                     popup: {
                         title: "ข้อมูลใบขอซื้อ",
                         showTitle: true,
-                        width: 700,
-                        height: 450
+                        width: 750,
+                        height: 550
                     },
                     form: {
                         items: [
-                            { itemType: "group", colCount: 2, colSpan: 2, items: ["DocumentNo", "RequestDate"] },
-                            { itemType: "group", colCount: 1, colSpan: 2, items: ["Title", "Status"] }
+                            { itemType: "group", caption: "ข้อมูลหลัก", colCount: 2, items: ["code", "requestDate"] },
+                            { itemType: "group", caption: "รายละเอียด", colCount: 1, items: ["title", "vendorName", "status", "comment"] }
                         ]
                     }
                 },
 
-                // กำหนดคอลัมน์
+                // กำหนด Columns ให้ตรงกับ JSON Response
                 columns: [
                     {
-                        dataField: "Id",
+                        dataField: "id",
                         visible: false,
-                        allowEditing: false
+                        allowEditing: false,
+                        formItem: { visible: false }
                     },
                     {
-                        dataField: "DocumentNo",
+                        dataField: "code", // ตรงกับ JSON (แทน PRNumber)
                         caption: "เลขที่เอกสาร",
-                        validationRules: [{ type: "required" }]
+                        width: 150,
+                        validationRules: [{ type: "required", message: "กรุณาระบุเลขที่เอกสาร" }]
                     },
                     {
-                        dataField: "Title",
+                        dataField: "title", // ตรงกับ JSON
                         caption: "หัวข้อการจัดซื้อ",
-                        validationRules: [{ type: "required" }]
+                        validationRules: [{ type: "required", message: "กรุณาระบุหัวข้อ" }]
                     },
                     {
-                        dataField: "RequestDate",
+                        dataField: "requestDate", // ตรงกับ JSON
                         caption: "วันที่ขอซื้อ",
                         dataType: "date",
+                        format: "dd/MM/yyyy",
+                        width: 120,
                         validationRules: [{ type: "required" }]
                     },
                     {
-                        dataField: "Status",
+                        dataField: "vendorName", // ตรงกับ JSON
+                        caption: "ผู้ขาย (Vendor)",
+                        visible: true
+                    },
+                    {
+                        dataField: "status", // ตรงกับ JSON (ค่ามาเป็นตัวเลข 1)
                         caption: "สถานะ",
-                        editorType: "dxSelectBox",
-                        editorOptions: {
-                            items: ["Draft", "Pending", "Approved", "Rejected"],
-                            value: "Draft" // ค่าเริ่มต้น
+                        width: 120,
+                        lookup: {
+                            dataSource: statusLookup,
+                            valueExpr: "id",
+                            displayExpr: "name"
+                        },
+                        cellTemplate: function(element, info) {
+                            // แสดง Badge สีตามสถานะ
+                            let statusName = info.displayValue || "Unknown";
+                            let statusId = info.value;
+
+                            let colorClass = "badge bg-secondary"; // Default (Draft/0)
+                            if (statusId === 1) colorClass = "badge bg-warning text-dark"; // Pending
+                            else if (statusId === 2 || statusId === 4) colorClass = "badge bg-success"; // Approved/Completed
+                            else if (statusId === 3) colorClass = "badge bg-danger"; // Rejected
+
+                            element.append(`<span class="${colorClass}">${statusName}</span>`);
                         }
+                    },
+                    {
+                        dataField: "comment", // ตรงกับ JSON (แทน Description)
+                        caption: "รายละเอียดเพิ่มเติม",
+                        visible: false,
+                        editorType: "dxTextArea",
+                        editorOptions: { height: 80 }
                     }
                 ],
 
-                // (Optional) กรณีอยากให้กดปุ่ม + แล้วไปหน้า Master-Detail
-                // onRowDblClick: function(e) {
-                //     window.location.href = `/PurchaseRequest/Detail/${e.data.Id}`;
-                // }
+                onRowDblClick: function(e) {
+                    if (e.data && e.data.id) {
+                        window.location.href = '@Url.Action("Detail", "PurchaseRequest")/' + e.data.id;
+                    }
+                }
             });
         });
     </script>
