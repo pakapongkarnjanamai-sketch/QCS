@@ -5,14 +5,14 @@
 namespace QCS.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class EditCommentNull : Migration
+    public partial class SetRemarkNull : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "Quotations",
+                table: "PurchaseRequests",
                 type: "nvarchar(max)",
                 nullable: true,
                 oldClrType: typeof(string),
@@ -24,7 +24,7 @@ namespace QCS.Infrastructure.Migrations
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "Quotations",
+                table: "PurchaseRequests",
                 type: "nvarchar(max)",
                 nullable: false,
                 defaultValue: "",

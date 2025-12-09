@@ -241,7 +241,7 @@
                                     validationRules: [{ type: "required" }]
                                 },
                                 {
-                                    dataField: "comment", label: { text: "หมายเหตุ (Comment)" },
+                                    dataField: "remark", label: { text: "หมายเหตุ (Remark)" },
                                     editorType: "dxTextArea", editorOptions: { height: 80, placeholder: "รายละเอียดเพิ่มเติม..." }, colSpan: 2
                                 }
                             ]
@@ -293,7 +293,7 @@
                 const textArea = $("#actionReasonInput").dxTextArea("instance");
                 if (textArea) {
                     textArea.reset();
-                    textArea.option("value", requestData.comment);
+                    textArea.option("value", requestData.remark);
                 }
                 actionPopupInstance.show();
             }
@@ -331,8 +331,7 @@
                     if(requestData.validFrom) formData.append("ValidFrom", requestData.validFrom.toISOString());
                     if(requestData.validUntil) formData.append("ValidUntil", requestData.validUntil.toISOString());
 
-                    const finalComment = (popupComment !== null) ? popupComment : (requestData.comment || "");
-                    formData.append("Comment", finalComment);
+                      formData.append("Remark", requestData.remark);
 
                     const quotationsMeta = requestData.attachments.map(att => ({
                         FileName: att.fileName,

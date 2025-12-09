@@ -27,7 +27,7 @@ namespace QCS.Infrastructure.Migrations
                 oldType: "nvarchar(max)");
 
             migrationBuilder.AlterColumn<string>(
-                name: "Comment",
+                name: "Remark",
                 table: "ApprovalSteps",
                 type: "nvarchar(max)",
                 nullable: true,
@@ -67,7 +67,7 @@ namespace QCS.Infrastructure.Migrations
                 oldNullable: true);
 
             migrationBuilder.AlterColumn<string>(
-                name: "Comment",
+                name: "Remark",
                 table: "ApprovalSteps",
                 type: "nvarchar(max)",
                 nullable: false,

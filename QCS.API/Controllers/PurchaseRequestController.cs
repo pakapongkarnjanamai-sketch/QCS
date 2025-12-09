@@ -114,7 +114,7 @@ namespace QCS.API.Controllers
                     VendorName = request.VendorName,
                     ValidFrom = request.ValidFrom,
                     ValidUntil = request.ValidUntil,
-                    Comment = request.Comment,
+                    Remark = request.Remark,
                     CurrentStepId = (int)request.CurrentStep, // ส่ง CurrentStepId ไปด้วยเพื่อใช้ Highlight Grid
 
                     Quotations = request.Quotations.Select(q => new QuotationDetailDto
@@ -132,7 +132,7 @@ namespace QCS.API.Controllers
                         CanEdit = canEdit
                     },
 
-                    WorkflowRoute = workflowRoute // ข้อมูลนี้มี Status/Comment ติดไปด้วยแล้ว
+                    WorkflowRoute = workflowRoute // ข้อมูลนี้มี Status/Remark ติดไปด้วยแล้ว
                 };
 
                 return Ok(dto);
@@ -238,7 +238,7 @@ namespace QCS.API.Controllers
                 pr.VendorName = input.VendorName;
                 pr.ValidFrom = input.ValidFrom;
                 pr.ValidUntil = input.ValidUntil;
-                pr.Comment = input.Comment;
+                pr.Remark = input.Remark;
 
                 // 3. === [NEW] อัปเดตประเภทเอกสารของไฟล์เดิม ===
                 if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
@@ -352,9 +352,9 @@ namespace QCS.API.Controllers
 
                 var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
 
-                // 2. สร้าง Running Number (Format: PR-yyyyMMdd-XXX)
+                // 2. สร้าง Running Number (Format: QC-yyyyMMdd-XXX)
                 var todayStr = DateTime.Now.ToString("yyyyMMdd");
-                var prefix = $"PR-{todayStr}-";
+                var prefix = $"QC-{todayStr}-";
                 var countToday = await _context.PurchaseRequests
                     .Where(x => x.Code.StartsWith(prefix))
                     .CountAsync();
@@ -404,7 +404,7 @@ namespace QCS.API.Controllers
                     VendorName = input.VendorName,
                     ValidFrom = input.ValidFrom,
                     ValidUntil = input.ValidUntil,
-                    Comment = input.Comment,
+                    Remark = input.Remark,
 
                     ApprovalSteps = new List<ApprovalStep>(),
                     Quotations = new List<Quotation>()

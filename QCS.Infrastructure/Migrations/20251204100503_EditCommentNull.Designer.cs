@@ -40,7 +40,7 @@ namespace QCS.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Comment")
+                    b.Property<string>("Remark")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -223,7 +223,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int?>("AttachmentFileId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Comment")
+                    b.Property<string>("Remark")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")

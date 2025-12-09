@@ -22,7 +22,7 @@ namespace QCS.Domain.DTOs
 
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
-        public string Comment { get; set; }
+        public string? Remark { get; set; }
 
         public PurchaseRequestPermissionsDto Permissions { get; set; } = new();
 

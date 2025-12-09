@@ -36,7 +36,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<DateTime?>("ActionDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Comment")
+                    b.Property<string>("Remark")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -173,7 +173,7 @@ namespace QCS.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Comment")
+                    b.Property<string>("Remark")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 

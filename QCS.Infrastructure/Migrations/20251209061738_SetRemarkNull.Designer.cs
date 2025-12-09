@@ -12,8 +12,8 @@ using QCS.Infrastructure.Data;
 namespace QCS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251204094153_CreateRequest2")]
-    partial class CreateRequest2
+    [Migration("20251209061738_SetRemarkNull")]
+    partial class SetRemarkNull
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,15 +33,10 @@ namespace QCS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ApprovalDate")
+                    b.Property<DateTime?>("ActionDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ApproverName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Remark")
-                        .IsRequired()
+                    b.Property<string>("Comment")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -64,9 +59,8 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -175,6 +169,10 @@ namespace QCS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -182,19 +180,20 @@ namespace QCS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("DocumentNo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("CurrentStepId")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Remark")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("RequestDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -206,6 +205,19 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("VendorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VendorName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -223,7 +235,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int?>("AttachmentFileId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Remark")
+                    b.Property<string>("ContentType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -237,21 +249,22 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int>("DocumentTypeId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsSelected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("OriginalFileName")
+                    b.Property<string>("FileName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
                     b.Property<int>("PurchaseRequestId")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -259,20 +272,6 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("ValidFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ValidUntil")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("VendorId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("VendorName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -475,13 +474,15 @@ namespace QCS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("AttachmentFileId");
 
-                    b.HasOne("QCS.Domain.Models.PurchaseRequest", null)
+                    b.HasOne("QCS.Domain.Models.PurchaseRequest", "PurchaseRequest")
                         .WithMany("Quotations")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("AttachmentFile");
+
+                    b.Navigation("PurchaseRequest");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.UserDepartment", b =>

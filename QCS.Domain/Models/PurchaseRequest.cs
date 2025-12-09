@@ -24,7 +24,7 @@ namespace QCS.Domain.Models
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
-        public string Comment { get; set; } // ใช้แทน Description
+        public string? Remark { get; set; } 
 
         public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
         public virtual ICollection<ApprovalStep>  ApprovalSteps  { get; set; } = new List<ApprovalStep>();

@@ -35,35 +35,6 @@
             border: 1px solid #dee2e6;
         }
 
-        .status-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: white;
-            display: inline-block;
-            min-width: 80px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .status-draft {
-            background-color: #6c757d;
-        }
-
-        .status-pending {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .status-approved {
-            background-color: #28a745;
-        }
-
-        .status-rejected {
-            background-color: #dc3545;
-        }
-
         .current-user-row {
             font-weight: bold;
             color: #007bff;
@@ -260,7 +231,7 @@
                                 },
                                 { dataField: "validFrom", label: { text: "Valid From" }, editorType: "dxDateBox", editorOptions: { displayFormat: "dd/MM/yyyy" }, validationRules: [{ type: "required" }] },
                                 { dataField: "validUntil", label: { text: "Valid Until" }, editorType: "dxDateBox", editorOptions: { displayFormat: "dd/MM/yyyy" }, validationRules: [{ type: "required" }] },
-                                { dataField: "comment", label: { text: "Comment" }, editorType: "dxTextArea", editorOptions: { height: 60, autoResizeEnabled: true }, colSpan: 2 }
+                                { dataField: "remark", label: { text: "Remark" }, editorType: "dxTextArea", editorOptions: { height: 60, autoResizeEnabled: true }, colSpan: 2 }
                             ]
                         },
                         {
@@ -442,7 +413,7 @@
                     formData.append("VendorName", vendorName || "");
                     if(data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
                     if(data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
-                    formData.append("Comment", data.comment || "");
+                    formData.append("Remark", data.remark || "");
 
                     // Files & Types
                     const currentGridData = attachmentGridInstance.option("dataSource");
@@ -605,7 +576,7 @@
                                     }
                                 },
                                 {
-                                    dataField: "comment", caption: "Comment",
+                                    dataField: "remark", caption: "Remark",
                                     customizeText: (cellInfo) => cellInfo.value || "-"
                                 }
                             ]

@@ -5,18 +5,20 @@
 namespace QCS.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class EditCommentNull : Migration
+    public partial class testRemark : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "Quotations",
+                table: "PurchaseRequests",
                 type: "nvarchar(max)",
-                nullable: true,
+                nullable: false,
+                defaultValue: "",
                 oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
+                oldType: "nvarchar(max)",
+                oldNullable: true);
         }
 
         /// <inheritdoc />
@@ -24,13 +26,11 @@ namespace QCS.Infrastructure.Migrations
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "Quotations",
+                table: "PurchaseRequests",
                 type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "",
+                nullable: true,
                 oldClrType: typeof(string),
-                oldType: "nvarchar(max)",
-                oldNullable: true);
+                oldType: "nvarchar(max)");
         }
     }
 }

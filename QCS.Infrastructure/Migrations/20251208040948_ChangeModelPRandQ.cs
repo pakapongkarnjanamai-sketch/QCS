@@ -48,7 +48,7 @@ namespace QCS.Infrastructure.Migrations
                 table: "Quotations");
 
             migrationBuilder.DropColumn(
-                name: "Comment",
+                name: "Remark",
                 table: "Quotations");
 
             migrationBuilder.DropColumn(
@@ -128,7 +128,7 @@ namespace QCS.Infrastructure.Migrations
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
-                name: "Comment",
+                name: "Remark",
                 table: "PurchaseRequests",
                 type: "nvarchar(max)",
                 nullable: false,
@@ -215,7 +215,7 @@ namespace QCS.Infrastructure.Migrations
                 table: "PurchaseRequests");
 
             migrationBuilder.DropColumn(
-                name: "Comment",
+                name: "Remark",
                 table: "PurchaseRequests");
 
             migrationBuilder.DropColumn(
@@ -256,7 +256,7 @@ namespace QCS.Infrastructure.Migrations
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
-                name: "Comment",
+                name: "Remark",
                 table: "Quotations",
                 type: "nvarchar(max)",
                 nullable: true);

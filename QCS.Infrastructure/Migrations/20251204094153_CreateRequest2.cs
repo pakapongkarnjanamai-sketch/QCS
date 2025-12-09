@@ -12,7 +12,7 @@ namespace QCS.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "Comment",
+                name: "Remark",
                 table: "Quotations",
                 type: "nvarchar(max)",
                 nullable: false,
@@ -42,7 +42,7 @@ namespace QCS.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Comment",
+                name: "Remark",
                 table: "Quotations");
 
             migrationBuilder.DropColumn(
