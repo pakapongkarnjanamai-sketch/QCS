@@ -20,6 +20,12 @@ namespace QCS.Domain.Models
         public int SequenceNo { get; set; }
         public string StepName { get; set; }
         public List<WorkflowAssignmentDto> Assignments { get; set; }
+
+        // === [NEW] เพิ่มส่วนนี้เพื่อเก็บสถานะของแต่ละ Step ===
+        public int? Status { get; set; }        // 0, 1, 2, 9
+        public DateTime? ActionDate { get; set; }
+        public string? ApproverName { get; set; } // ชื่อคนที่กดอนุมัติจริง
+        public string? Comment { get; set; }
     }
 
     public class WorkflowAssignmentDto

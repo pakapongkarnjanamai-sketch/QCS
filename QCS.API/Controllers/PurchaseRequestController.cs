@@ -33,7 +33,7 @@ namespace QCS.API.Controllers
         {
             try
             {
-                // 1. ดึงข้อมูลจาก DB (เหมือนเดิม)
+                // 1. ดึงข้อมูล Request พร้อม ApprovalSteps
                 var request = await _context.PurchaseRequests
                     .Include(r => r.Quotations)
                     .Include(r => r.ApprovalSteps)
@@ -41,41 +41,81 @@ namespace QCS.API.Controllers
 
                 if (request == null) return NotFound("ไม่พบข้อมูลเอกสาร");
 
-                // 2. ดึงข้อมูล Workflow (เหมือนเดิม)
+                // 2. ดึง Workflow Route
                 var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1);
 
-                // 3. คำนวณ Permission (เหมือนเดิม)
-                bool canApprove = false;
-                if (request.Status == StatusConsts.PR_Pending && workflowRoute != null)
+                // 3. === [NEW] Merge ประวัติการอนุมัติลงใน Workflow Route ===
+                if (workflowRoute != null && workflowRoute.Steps != null)
                 {
-                    var currentStepConfig = workflowRoute.Steps
-                        .FirstOrDefault(s => s.SequenceNo == (int)request.CurrentStep);
+                    // ดึงรายชื่อ User ที่เกี่ยวข้องทั้งหมดเพื่อมา map ชื่อ (จาก UpdatedBy)
+                    var approverIds = request.ApprovalSteps
+                        .Where(x => !string.IsNullOrEmpty(x.UpdatedBy))
+                        .Select(x => x.UpdatedBy)
+                        .Distinct()
+                        .ToList();
 
-                    if (currentStepConfig != null)
+                    var usersMap = await _context.Users
+                        .Where(u => approverIds.Contains(u.EmployeeID) || approverIds.Contains(u.NID)) // เช็คตาม field ที่เก็บใน UpdatedBy
+                        .ToDictionaryAsync(u => u.EmployeeID, u => $"{u.FirstName} {u.LastName}"); // หรือใช้ Key ที่เหมาะสม
+
+                    foreach (var step in workflowRoute.Steps)
                     {
-                        if (currentStepConfig.Assignments == null || !currentStepConfig.Assignments.Any())
+                        // หา Step ที่ตรงกันใน DB
+                        var history = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == step.SequenceNo);
+                        if (history != null)
                         {
-                            canApprove = true;
-                        }
-                        else
-                        {
-                            canApprove = currentStepConfig.Assignments.Any(a => a.IsCurrentUser);
+                            step.Status = history.Status;
+                            step.ActionDate = history.ActionDate;
+                            step.Comment = history.Comment;
+
+                            // พยายามหาชื่อคนอนุมัติ
+                            if (!string.IsNullOrEmpty(history.UpdatedBy) && usersMap.ContainsKey(history.UpdatedBy))
+                            {
+                                step.ApproverName = usersMap[history.UpdatedBy];
+                            }
+                            else
+                            {
+                                step.ApproverName = history.UpdatedBy; // fallback แสดง ID ไปก่อน
+                            }
                         }
                     }
                 }
 
-                // 4. Map DTO (แก้ไขเพิ่ม WorkflowRoute)
+                // 4. คำนวณ Permission (เหมือนเดิม)
+                bool canApprove = false;
+                bool canEdit = false;
+                var currentUserId = User.Identity?.Name;
+                if (request.Status == StatusConsts.PR_Draft && request.CreatedBy == currentUserId)
+                {
+                    canEdit = true;
+                }
+                if (request.Status == StatusConsts.PR_Pending && workflowRoute != null)
+                {
+                    var currentStepConfig = workflowRoute.Steps
+                        .FirstOrDefault(s => s.SequenceNo == (int)request.CurrentStep); // หรือ request.CurrentStepId
+
+                    if (currentStepConfig != null)
+                    {
+                        if (currentStepConfig.Assignments == null || !currentStepConfig.Assignments.Any())
+                            canApprove = true;
+                        else
+                            canApprove = currentStepConfig.Assignments.Any(a => a.IsCurrentUser);
+                    }
+                }
+
+                // 5. Map DTO ส่งกลับ
                 var dto = new PurchaseRequestDetailDto
                 {
                     PurchaseRequestId = request.Id,
                     DocumentNo = request.Code,
                     Title = request.Title,
                     RequestDate = request.RequestDate,
-                    Status = request.Status.ToString(), // แก้เป็น int ตาม Enum ถ้าจำเป็น
+                    Status = request.Status.ToString(),
                     VendorName = request.VendorName,
                     ValidFrom = request.ValidFrom,
                     ValidUntil = request.ValidUntil,
                     Comment = request.Comment,
+                    CurrentStepId = (int)request.CurrentStep, // ส่ง CurrentStepId ไปด้วยเพื่อใช้ Highlight Grid
 
                     Quotations = request.Quotations.Select(q => new QuotationDetailDto
                     {
@@ -88,12 +128,11 @@ namespace QCS.API.Controllers
                     Permissions = new PurchaseRequestPermissionsDto
                     {
                         CanApprove = canApprove,
-                        CanReject = canApprove
+                        CanReject = canApprove,
+                        CanEdit = canEdit
                     },
 
-                    // === [NEW] ใส่ข้อมูล Workflow ลงไปตรงนี้ ===
-                    WorkflowRoute = workflowRoute
-                    // ======================================
+                    WorkflowRoute = workflowRoute // ข้อมูลนี้มี Status/Comment ติดไปด้วยแล้ว
                 };
 
                 return Ok(dto);
@@ -151,13 +190,151 @@ namespace QCS.API.Controllers
         // ==========================================
         // 2. Endpoint สำหรับ "สร้าง (Create)" -> Submit
         // ==========================================
-        [HttpPost("Create")]
-        public async Task<IActionResult> Create([FromForm] CreatePurchaseRequestDto input)
+        [HttpPost("Submit")] // <--- เปลี่ยนชื่อจาก Create เป็น Submit
+        public async Task<IActionResult> Submit([FromForm] CreatePurchaseRequestDto input)
         {
-            // isSubmit = true หมายถึงส่ง Workflow ทันที
+            // isSubmit = true -> Status จะเป็น Pending, Step 1 = Approved, ส่งไป Step 2
             return await ProcessCreation(input, isSubmit: true);
         }
+        // ==========================================
+        // 3. Endpoint สำหรับ "บันทึกแก้ไข (Update)" -> สถานะยังคงเป็น Draft
+        // ==========================================
+        [HttpPost("Update")]
+        public async Task<IActionResult> Update([FromForm] UpdatePurchaseRequestDto input)
+        {
+            return await ProcessUpdate(input, isSubmit: false);
+        }
 
+        // ==========================================
+        // 4. Endpoint สำหรับ "บันทึกและส่งอนุมัติ (Submit Update)" -> เปลี่ยนสถานะเป็น Pending
+        // ==========================================
+        [HttpPost("SubmitUpdate")]
+        public async Task<IActionResult> SubmitUpdate([FromForm] UpdatePurchaseRequestDto input)
+        {
+            return await ProcessUpdate(input, isSubmit: true);
+        }
+
+        // ==========================================
+        // Shared Update Logic
+        // ==========================================
+        private async Task<IActionResult> ProcessUpdate(UpdatePurchaseRequestDto input, bool isSubmit)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. ดึงข้อมูล
+                var pr = await _context.PurchaseRequests
+                    .Include(r => r.Quotations)
+                    .Include(r => r.ApprovalSteps)
+                    .FirstOrDefaultAsync(r => r.Id == input.Id);
+
+                if (pr == null) return NotFound("ไม่พบข้อมูลเอกสาร");
+
+                // ... (ตรวจสอบสิทธิ์) ...
+
+                // 2. อัปเดตข้อมูลทั่วไป (เหมือนเดิม)
+                pr.Title = input.Title;
+                pr.VendorId = input.VendorId;
+                pr.VendorName = input.VendorName;
+                pr.ValidFrom = input.ValidFrom;
+                pr.ValidUntil = input.ValidUntil;
+                pr.Comment = input.Comment;
+
+                // 3. === [NEW] อัปเดตประเภทเอกสารของไฟล์เดิม ===
+                if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
+                {
+                    var updates = JsonSerializer.Deserialize<List<UpdateQuotationItemDto>>(
+                        input.UpdatedQuotationsJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+
+                    if (updates != null)
+                    {
+                        foreach (var update in updates)
+                        {
+                            var existingFile = pr.Quotations.FirstOrDefault(q => q.Id == update.Id);
+                            if (existingFile != null)
+                            {
+                                existingFile.DocumentTypeId = update.DocumentTypeId;
+                            }
+                        }
+                    }
+                }
+
+                // 4. ลบไฟล์ (เหมือนเดิม)
+                if (!string.IsNullOrEmpty(input.DeletedFileIds))
+                {
+                    var idsToDelete = input.DeletedFileIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                                          .Select(int.Parse).ToList();
+                    var filesToRemove = pr.Quotations.Where(q => idsToDelete.Contains(q.Id)).ToList();
+                    foreach (var file in filesToRemove)
+                    {
+                        // System.IO.File.Delete(...) // ลบไฟล์จริงถ้าต้องการ
+                        _context.Quotations.Remove(file);
+                    }
+                }
+
+                // 5. === [UPDATED] เพิ่มไฟล์ใหม่ พร้อมระบุ Type ===
+                if (input.NewAttachments != null && input.NewAttachments.Count > 0)
+                {
+                    var uploadPath = Path.Combine(_env.WebRootPath, "uploads", DateTime.Now.ToString("yyyyMM"));
+                    if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+
+                    // Deserilaize ข้อมูล Metadata ของไฟล์ใหม่
+                    var newFilesMeta = JsonSerializer.Deserialize<List<QuotationItemDto>>(
+                        input.QuotationsJson ?? "[]",
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+
+                    foreach (var file in input.NewAttachments)
+                    {
+                        if (file.Length > 0)
+                        {
+                            var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
+                            var fullPath = Path.Combine(uploadPath, uniqueFileName);
+
+                            using (var stream = new FileStream(fullPath, FileMode.Create))
+                            {
+                                await file.CopyToAsync(stream);
+                            }
+
+                            // หา Type จากชื่อไฟล์
+                            var meta = newFilesMeta?.FirstOrDefault(m => m.FileName == file.FileName)
+                                       ?? new QuotationItemDto { DocumentTypeId = 10 }; // Default
+
+                            pr.Quotations.Add(new Quotation
+                            {
+                                FileName = file.FileName,
+                                FilePath = Path.Combine("uploads", DateTime.Now.ToString("yyyyMM"), uniqueFileName),
+                                ContentType = file.ContentType,
+                                FileSize = file.Length,
+                                DocumentTypeId = meta.DocumentTypeId // <--- ใช้ค่าที่ส่งมา
+                            });
+                        }
+                    }
+                }
+
+                // 6. Workflow Logic (เหมือนเดิม)
+                if (isSubmit)
+                {
+                    pr.Status = StatusConsts.PR_Pending;
+                    var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+                    if (step1 != null) { step1.Status = StatusConsts.Step_Approved; step1.ActionDate = DateTime.Now; }
+                    var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
+                    if (step2 != null) { step2.Status = StatusConsts.Step_Pending; pr.CurrentStepId = 2; }
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { success = true, id = pr.Id });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
         // ==========================================
         // Shared Logic Method
         // ==========================================

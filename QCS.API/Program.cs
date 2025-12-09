@@ -77,7 +77,19 @@ builder.Services.AddCors(options =>
     });
 });
 
-
+builder.Services.AddHttpClient("VendorApi", client =>
+{
+    // ใส่ Base URL ของ Vendor API
+    client.BaseAddress = new Uri("https://ap-ntc2138-qawb/iChaSue/Service/Supplier/api/");
+    // เพิ่ม Header ถ้าจำเป็น (เช่น API Key)
+    // client.DefaultRequestHeaders.Add("ApiKey", "xxx"); 
+}).ConfigurePrimaryHttpMessageHandler(() => {
+    // กรณีเป็น Server ภายในที่ Certificate อาจจะไม่สมบูรณ์ (Optional: ใช้เฉพาะ Dev/Test)
+    return new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
+    };
+});
 var app = builder.Build();
 
 
