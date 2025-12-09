@@ -470,15 +470,60 @@ namespace QCS.API.Controllers
                 await transaction.RollbackAsync();
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
-        }
+        }// GET: api/PurchaseRequest/ViewFile/{id}
+        [HttpGet("ViewFile/{id}")]
+        public async Task<IActionResult> ViewFile(int id)
+        {
+            try
+            {
+                // 1. ค้นหา Quotation พร้อมข้อมูล AttachmentFile
+                // สำคัญ: ต้อง .Include(q => q.AttachmentFile) เพื่อดึงข้อมูล Binary ออกมาด้วย
+                var quotation = await _context.Quotations
+                    .Include(q => q.AttachmentFile)
+                    .FirstOrDefaultAsync(q => q.Id == id);
 
+                if (quotation == null)
+                    return NotFound("ไม่พบข้อมูลเอกสาร");
+
+                // 2. ตรวจสอบและส่งไฟล์กลับ
+
+                // กรณี A: มีข้อมูลใน Database (AttachmentFile)
+                if (quotation.AttachmentFile != null && quotation.AttachmentFile.Data != null)
+                {
+                    // การ Return แบบนี้ Browser จะพยายาม "เปิดดู (Preview)" ถ้าเป็น PDF หรือรูปภาพ
+                    return File(quotation.AttachmentFile.Data, quotation.AttachmentFile.ContentType);
+
+                    // หมายเหตุ: ถ้าต้องการบังคับ "ดาวน์โหลด" ให้เพิ่มพารามิเตอร์ชื่อไฟล์เข้าไปตัวที่ 3
+                    // return File(quotation.AttachmentFile.Data, quotation.AttachmentFile.ContentType, quotation.FileName);
+                }
+
+                // กรณี B: (Fallback) ไฟล์เก่าที่เก็บใน Disk (เผื่อระบบเก่า)
+                if (!string.IsNullOrEmpty(quotation.FilePath))
+                {
+                    // ตัด path ส่วนเกินออก (ถ้ามี) เพื่อหา path จริงใน wwwroot
+                    // ตัวอย่าง: ถ้าใน DB เก็บ "uploads/2023/file.pdf"
+                    var fullPath = Path.Combine(_env.WebRootPath, quotation.FilePath);
+
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        var fileBytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+                        var contentType = quotation.ContentType ?? "application/pdf";
+                        return File(fileBytes, contentType);
+                    }
+                }
+
+                return NotFound("ไม่พบไฟล์ต้นฉบับในระบบ");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+            }
+        }
         private async Task HandleFileUploads(CreatePurchaseRequestDto input, PurchaseRequest pr)
         {
             if (input.Attachments == null || input.Attachments.Count == 0) return;
 
-            var uploadPath = Path.Combine(_env.WebRootPath, "uploads", DateTime.Now.ToString("yyyyMM"));
-            if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
-
+            // ส่วน Deserialize Metadata (เหมือนเดิม)
             var metaDataList = JsonSerializer.Deserialize<List<QuotationItemDto>>(
                 input.QuotationsJson ?? "[]",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
@@ -488,25 +533,45 @@ namespace QCS.API.Controllers
             {
                 if (file.Length > 0)
                 {
-                    var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
-                    var fullPath = Path.Combine(uploadPath, uniqueFileName);
-
-                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    // 1. อ่านไฟล์เป็น Byte Array (เพื่อเก็บลง DB)
+                    byte[] fileData;
+                    using (var memoryStream = new MemoryStream())
                     {
-                        await file.CopyToAsync(stream);
+                        await file.CopyToAsync(memoryStream);
+                        fileData = memoryStream.ToArray();
                     }
 
+                    // 2. สร้าง Entity AttachmentFile
+                    var attachment = new AttachmentFile
+                    {
+                        FileName = file.FileName,
+                        ContentType = file.ContentType,
+                        FileSize = file.Length,
+                        Data = fileData
+                        // CreatedAt, CreatedBy จะถูกจัดการโดย DbContext.SaveChanges
+                    };
+
+                    // 3. เตรียม Metadata (Document Type)
                     var meta = metaDataList?.FirstOrDefault(m => m.FileName == file.FileName)
                                ?? new QuotationItemDto { DocumentTypeId = 10 };
 
-                    pr.Quotations.Add(new Quotation
+                    // 4. สร้าง Quotation และเชื่อมโยง Relation
+                    var quotation = new Quotation
                     {
                         FileName = file.FileName,
-                        FilePath = Path.Combine("uploads", DateTime.Now.ToString("yyyyMM"), uniqueFileName),
                         ContentType = file.ContentType,
                         FileSize = file.Length,
-                        DocumentTypeId = meta.DocumentTypeId
-                    });
+                        DocumentTypeId = meta.DocumentTypeId,
+
+                        // ไม่ต้องใช้ FilePath แล้ว (หรืออาจใส่เป็น string.Empty ถ้า field นี้บังคับ)
+                        FilePath = "Database",
+
+                        // *** เชื่อมโยง object AttachmentFile ที่นี่ ***
+                        // เมื่อ save changes EF Core จะบันทึก AttachmentFile ก่อนแล้วนำ ID มาใส่ให้ Quotation อัตโนมัติ
+                        AttachmentFile = attachment
+                    };
+
+                    pr.Quotations.Add(quotation);
                 }
             }
         }

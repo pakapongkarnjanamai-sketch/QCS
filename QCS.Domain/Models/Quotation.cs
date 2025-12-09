@@ -14,5 +14,10 @@ namespace QCS.Domain.Models
         public long FileSize { get; set; }
 
         public int DocumentTypeId { get; set; } // 10, 20, 30
+
+        public int? AttachmentFileId { get; set; }
+
+        [ForeignKey("AttachmentFileId")]
+        public virtual AttachmentFile AttachmentFile { get; set; }
     }
 }
