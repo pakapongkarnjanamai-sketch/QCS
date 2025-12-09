@@ -40,6 +40,20 @@ namespace QCS.Application.Services
                 if (result != null)
                 {
                     MarkCurrentUser(result);
+                    var firstStep = result.Steps?.OrderBy(s => s.SequenceNo).FirstOrDefault();
+                    if (firstStep != null)
+                    {
+                        // ถ้าไม่มี assignments เลย = ใครก็ได้ (true)
+                        // ถ้ามี assignments ต้องเช็คว่ามี User ปัจจุบันหรือไม่
+                        if (firstStep.Assignments == null || !firstStep.Assignments.Any())
+                        {
+                            result.CanInitiate = true;
+                        }
+                        else
+                        {
+                            result.CanInitiate = firstStep.Assignments.Any(a => a.IsCurrentUser);
+                        }
+                    }
                 }
 
                 return result;

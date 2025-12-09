@@ -1,9 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
-using QCS.Domain.Enum; // ใช้ Enum/Const เพื่อความชัดเจน
+using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
 using System.Text.Json;
@@ -16,7 +15,7 @@ namespace QCS.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
-        private readonly WorkflowIntegrationService _workflowService; // เพิ่ม Service นี้
+        private readonly WorkflowIntegrationService _workflowService;
 
         public PurchaseRequestController(
             AppDbContext context,
@@ -28,50 +27,96 @@ namespace QCS.API.Controllers
             _workflowService = workflowService;
         }
 
-        // GET: api/PurchaseRequest/Detail/{id}
+
         [HttpGet("Detail/{id}")]
         public async Task<IActionResult> GetRequestDetail(int id)
         {
             try
             {
+                // 1. ดึงข้อมูลจาก DB (เหมือนเดิม)
                 var request = await _context.PurchaseRequests
                     .Include(r => r.Quotations)
-                    .Include(r => r.ApprovalSteps) // โหลด Step ที่สร้างไว้
+                    .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == id);
 
                 if (request == null) return NotFound("ไม่พบข้อมูลเอกสาร");
 
-                return Ok(request);
+                // 2. ดึงข้อมูล Workflow (เหมือนเดิม)
+                var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1);
+
+                // 3. คำนวณ Permission (เหมือนเดิม)
+                bool canApprove = false;
+                if (request.Status == StatusConsts.PR_Pending && workflowRoute != null)
+                {
+                    var currentStepConfig = workflowRoute.Steps
+                        .FirstOrDefault(s => s.SequenceNo == (int)request.CurrentStep);
+
+                    if (currentStepConfig != null)
+                    {
+                        if (currentStepConfig.Assignments == null || !currentStepConfig.Assignments.Any())
+                        {
+                            canApprove = true;
+                        }
+                        else
+                        {
+                            canApprove = currentStepConfig.Assignments.Any(a => a.IsCurrentUser);
+                        }
+                    }
+                }
+
+                // 4. Map DTO (แก้ไขเพิ่ม WorkflowRoute)
+                var dto = new PurchaseRequestDetailDto
+                {
+                    PurchaseRequestId = request.Id,
+                    DocumentNo = request.Code,
+                    Title = request.Title,
+                    RequestDate = request.RequestDate,
+                    Status = request.Status.ToString(), // แก้เป็น int ตาม Enum ถ้าจำเป็น
+                    VendorName = request.VendorName,
+                    ValidFrom = request.ValidFrom,
+                    ValidUntil = request.ValidUntil,
+                    Comment = request.Comment,
+
+                    Quotations = request.Quotations.Select(q => new QuotationDetailDto
+                    {
+                        Id = q.Id,
+                        OriginalFileName = q.FileName,
+                        FilePath = q.FilePath,
+                        DocumentTypeId = q.DocumentTypeId
+                    }).ToList(),
+
+                    Permissions = new PurchaseRequestPermissionsDto
+                    {
+                        CanApprove = canApprove,
+                        CanReject = canApprove
+                    },
+
+                    // === [NEW] ใส่ข้อมูล Workflow ลงไปตรงนี้ ===
+                    WorkflowRoute = workflowRoute
+                    // ======================================
+                };
+
+                return Ok(dto);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, $"Internal Server Error: {ex.Message}");
             }
         }
+
         // GET: api/PurchaseRequest/MyRequests
         [HttpGet("MyRequests")]
         public async Task<IActionResult> GetMyRequests()
         {
             try
             {
-                // 1. ระบุตัวตน User ปัจจุบัน
-                // สมมติว่า User.Identity.Name เก็บ User ID หรือ Username ที่ใช้ใน field CreatedBy
-                // หรือถ้าใช้ JWT Claims ให้ดึงจาก ClaimTypes.NameIdentifier
                 var currentUserId = User.Identity?.Name;
 
-                if (string.IsNullOrEmpty(currentUserId))
-                {
-                    // กรณี Test Local อาจจะยังไม่มี Auth ให้ Return ทั้งหมดไปก่อน หรือ Return 401
-                    // return Unauthorized("User not authenticated."); 
+                // สำหรับการทดสอบ (ถ้ายังไม่มี Auth จริง)
+                // if (string.IsNullOrEmpty(currentUserId)) currentUserId = "h8197"; 
 
-                    // *สำหรับการทดสอบช่วงแรก ถ้ายังไม่ Login:*
-                    // สามารถ comment 2 บรรทัดบน แล้ว hardcode ค่าไปก่อนได้ เช่น:
-                    // currentUserId = "h8197"; 
-                }
-
-                // 2. Query ข้อมูลเฉพาะของ User นั้น
                 var requests = await _context.PurchaseRequests
-                    .Where(r => r.CreatedBy == currentUserId) // กรองด้วย CreatedBy
+                    .Where(r => r.CreatedBy == currentUserId)
                     .OrderByDescending(r => r.RequestDate)
                     .Select(r => new
                     {
@@ -82,7 +127,6 @@ namespace QCS.API.Controllers
                         Status = r.Status,
                         VendorName = r.VendorName,
                         CurrentStepId = r.CurrentStepId
-                        // Map fields อื่นๆ ตามต้องการ
                     })
                     .ToListAsync();
 
@@ -93,21 +137,43 @@ namespace QCS.API.Controllers
                 return StatusCode(500, $"Internal Server Error: {ex.Message}");
             }
         }
-        // POST: api/PurchaseRequest/Create
+
+        // ==========================================
+        // 1. Endpoint สำหรับ "บันทึก (Save)" -> Draft
+        // ==========================================
+        [HttpPost("Save")]
+        public async Task<IActionResult> Save([FromForm] CreatePurchaseRequestDto input)
+        {
+            // isSubmit = false หมายถึงยังไม่ส่ง Workflow (เป็น Draft)
+            return await ProcessCreation(input, isSubmit: false);
+        }
+
+        // ==========================================
+        // 2. Endpoint สำหรับ "สร้าง (Create)" -> Submit
+        // ==========================================
         [HttpPost("Create")]
         public async Task<IActionResult> Create([FromForm] CreatePurchaseRequestDto input)
+        {
+            // isSubmit = true หมายถึงส่ง Workflow ทันที
+            return await ProcessCreation(input, isSubmit: true);
+        }
+
+        // ==========================================
+        // Shared Logic Method
+        // ==========================================
+        private async Task<IActionResult> ProcessCreation(CreatePurchaseRequestDto input, bool isSubmit)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. ดึงข้อมูล Workflow Route (ID 1) เพื่อมาสร้าง Step ใน Database
-                // (ถ้าอนาคตมีหลาย Route ต้องรับ RouteId มาจาก input)
+                // 1. ดึงข้อมูล Workflow Route (ID 1)
                 var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
-
                 if (routeData == null || routeData.Steps == null)
                 {
                     return BadRequest("ไม่สามารถดึงข้อมูล Workflow Route ได้");
                 }
+
+                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
 
                 // 2. สร้าง Running Number (Format: PR-yyyyMMdd-XXX)
                 var todayStr = DateTime.Now.ToString("yyyyMMdd");
@@ -118,68 +184,98 @@ namespace QCS.API.Controllers
 
                 var newDocNo = $"{prefix}{(countToday + 1):D3}";
 
-                // 3. สร้าง Header (PurchaseRequest)
+                // 3. กำหนด CurrentStepId และ Status ของเอกสาร
+                int currentStepId;
+                int docStatus;
+
+                if (isSubmit)
+                {
+                    // กรณี Create (ส่งอนุมัติ): 
+                    // งานของ Step 1 (Purchaser) ถือว่าเสร็จแล้ว -> ส่งต่อไป Step 2
+                    var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
+                    if (nextStep != null)
+                    {
+                        currentStepId = nextStep.SequenceNo; // ไป Step 2
+                        docStatus = StatusConsts.PR_Pending; // สถานะเอกสาร: รออนุมัติ
+                    }
+                    else
+                    {
+                        // ถ้า Workflow มีแค่ Step เดียว -> จบกระบวนการเลย
+                        currentStepId = 99; // Completed sequence
+                        docStatus = StatusConsts.PR_Completed;
+                    }
+                }
+                else
+                {
+                    // กรณี Save (บันทึกร่าง):
+                    // งานยังอยู่ที่ Step 1 (Purchaser)
+                    currentStepId = 1;
+                    docStatus = StatusConsts.PR_Draft; // สถานะเอกสาร: ร่าง
+                }
+
+                // 4. สร้าง Header (PurchaseRequest)
                 var pr = new PurchaseRequest
                 {
                     Code = newDocNo,
                     Title = input.Title,
                     RequestDate = DateTime.Now,
 
-                    // สถานะเริ่มต้น
-                    Status = StatusConsts.PR_Pending,
+                    Status = docStatus,           // int
+                    CurrentStepId = currentStepId, // int sequenceNo
 
-                    // ข้อมูลจาก Form
                     VendorId = input.VendorId,
                     VendorName = input.VendorName,
                     ValidFrom = input.ValidFrom,
                     ValidUntil = input.ValidUntil,
                     Comment = input.Comment,
 
-                    // Initialize Collections
                     ApprovalSteps = new List<ApprovalStep>(),
                     Quotations = new List<Quotation>()
                 };
 
-                // 4. *** สำคัญ *** สร้าง ApprovalSteps จาก Workflow API ลง Database
-                // เพื่อให้ ApprovalController ทำงานต่อได้
-                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
-
+                // 5. สร้าง Approval Steps (รายการอนุมัติย่อย)
                 foreach (var step in sortedSteps)
                 {
-                    var isFirstStep = step.SequenceNo == sortedSteps.First().SequenceNo;
+                    int stepStatus = StatusConsts.Step_Draft; // Default: ยังมาไม่ถึง
+                    DateTime? actionDate = null;
+
+                    if (step.SequenceNo == 1) // Step 1: Purchaser
+                    {
+                        if (isSubmit)
+                        {
+                            // ถ้ากด Create แสดงว่า Step 1 ทำเสร็จแล้ว -> Approved
+                            stepStatus = StatusConsts.Step_Approved;
+                            actionDate = DateTime.Now;
+                        }
+                        else
+                        {
+                            // ถ้ากด Save แสดงว่ากำลังทำอยู่ -> Pending
+                            stepStatus = StatusConsts.Step_Pending;
+                        }
+                    }
+                    else if (step.SequenceNo == 2) // Step 2: Verifier
+                    {
+                        if (isSubmit)
+                        {
+                            // ถ้าส่งงานมาแล้ว -> มารอที่ Step 2
+                            stepStatus = StatusConsts.Step_Pending;
+                        }
+                        else
+                        {
+                            // ถ้ายังเป็น Draft -> ยังมาไม่ถึง
+                            stepStatus = StatusConsts.Step_Draft;
+                        }
+                    }
+                    // Step 3+ เป็น Draft/Waiting ทั้งหมด
 
                     var approvalStep = new ApprovalStep
                     {
-                        Sequence = step.SequenceNo, // 1, 2, 3...
-                        Role = step.StepName,       // Purchaser, Manager...
-             
-                        // Step แรกสถานะเป็น Pending (รออนุมัติ) ส่วน Step อื่นๆ รอ (Draft/Waiting)
-                        Status = isFirstStep ? StatusConsts.Step_Pending : StatusConsts.Step_Draft,
-
-                        // บันทึกวันที่เริ่มต้นเฉพาะ Step แรก
-                        ActionDate = null
+                        Sequence = step.SequenceNo,
+                        Role = step.StepName,
+                        Status = stepStatus,
+                        ActionDate = actionDate
                     };
-
-                    // (Optional) ถ้าต้องการบันทึกชื่อผู้อนุมัติลงไปเลย (snapshot) ทำตรงนี้ได้
-                    // string assigneeNames = string.Join(",", step.Assignments.Select(a => a.EmployeeName));
-                    // approvalStep.ApproverName = assigneeNames;
-
                     pr.ApprovalSteps.Add(approvalStep);
-                }
-
-                // 5. กำหนด Current Step ของ Header ให้ตรงกับ Step แรก
-                if (sortedSteps.Any())
-                {
-                    var firstSeq = sortedSteps.First().SequenceNo;
-                    // แปลง Sequence เป็น Enum (ถ้าตรงกัน) หรือเก็บเป็น Int
-                    if (Enum.IsDefined(typeof(WorkflowStep), firstSeq))
-                    {
-                        pr.CurrentStep = (WorkflowStep)firstSeq;
-                    }
-                    else
-                    {
-                        pr.CurrentStepId = firstSeq;
-                    }
                 }
 
                 // 6. จัดการไฟล์แนบ
@@ -190,7 +286,7 @@ namespace QCS.API.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return Ok(new { success = true, id = pr.Id, docNo = pr.Code });
+                return Ok(new { success = true, id = pr.Id, docNo = pr.Code, status = pr.Status });
             }
             catch (Exception ex)
             {
@@ -199,7 +295,6 @@ namespace QCS.API.Controllers
             }
         }
 
-        // แยก Logic Upload File ออกมาเพื่อให้อ่านง่าย
         private async Task HandleFileUploads(CreatePurchaseRequestDto input, PurchaseRequest pr)
         {
             if (input.Attachments == null || input.Attachments.Count == 0) return;

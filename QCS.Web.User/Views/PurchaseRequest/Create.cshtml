@@ -36,8 +36,6 @@
             border: 1px dashed #dee2e6;
         }
 
-   
-
         /* --- Unauthorized State --- */
         .unauthorized-overlay {
             opacity: 0.6;
@@ -149,11 +147,11 @@
                         location: 'after',
                         widget: 'dxButton',
                         options: {
-                            elementAttr: { id: "btnSubmit" }, // ID สำหรับอ้างอิง
+                            elementAttr: { id: "btnSubmit" },
                             text: 'สร้างใบขอซื้อ',
                             icon: 'save',
                             type: 'default',
-                            disabled: true, // <--- ปิดการใช้งานไว้ก่อน จนกว่าจะเช็คสิทธิ์ผ่าน
+                            disabled: true, // เริ่มต้นปิดไว้ก่อน รอโหลดสิทธิ์
                             onClick: submitData
                         }
                     }
@@ -229,7 +227,7 @@
             loadWorkflowRoute();
 
             function loadWorkflowRoute() {
-                loadingIndicator.show(); // แสดง Loading ระหว่างเช็คสิทธิ์
+                loadingIndicator.show();
 
                 const routeGrid = $("#workflowRouteGrid").dxDataGrid({
                     dataSource: [],
@@ -256,7 +254,6 @@
                             caption: "รายชื่อผู้มีสิทธิ์ (Authorized Users)",
                             cellTemplate: function(container, options) {
                                 const assignments = options.data.rawAssignments || [];
-
                                 if(assignments.length === 0) {
                                     $("<span>").text("Any").appendTo(container);
                                     return;
@@ -273,7 +270,6 @@
                                     } else {
                                         $div.html(`<i class="fas fa-user text-muted me-1"></i>${name}`);
                                     }
-
                                     $div.appendTo(container);
                                 });
                             }
@@ -298,39 +294,27 @@
                             });
                             routeGrid.option("dataSource", gridData);
 
-                            // 2. === PERMISSION CHECK LOGIC ===
-                            // หา Step แรกสุด (Sequence 1)
-                            const firstStep = data.steps.find(s => s.sequenceNo === 1);
-
-                            let isAuthorized = false;
-
-                            if (firstStep) {
-                                // ถ้าไม่มีการกำหนด assignments (length 0) ถือว่าใครก็ทำได้ (Any)
-                                if (!firstStep.assignments || firstStep.assignments.length === 0) {
-                                    isAuthorized = true;
-                                } else {
-                                    // เช็คว่ามี user ปัจจุบันอยู่ในรายการหรือไม่
-                                    isAuthorized = firstStep.assignments.some(a => a.isCurrentUser === true);
-                                }
-                            }
+                            // ===============================================
+                            // 2. === PERMISSION CHECK (UPDATED) ===
+                            // ใช้ค่า canInitiate จาก Backend โดยตรง
+                            // ===============================================
+                            const isAuthorized = data.canInitiate;
 
                             // 3. Update UI based on Permission
                             const items = toolbarInstance.option("items");
                             const submitBtn = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnSubmit");
 
                             if (isAuthorized) {
-                                if(submitBtn) submitBtn.options.disabled = false; // Enable Button
-                     
+                                if(submitBtn) submitBtn.options.disabled = false;
                             } else {
-                                if(submitBtn) submitBtn.options.disabled = true; // Ensure Disabled
+                                if(submitBtn) submitBtn.options.disabled = true;
 
-                      
-                                // Optional: Disable Form Interaction
+                                // Disable Form Interaction & Notify
                                 $("#formContainer").addClass("unauthorized-overlay");
-
+                                DevExpress.ui.notify("คุณไม่มีสิทธิ์สร้างเอกสารในขั้นตอนนี้ (Permission Denied)", "warning", 5000);
                             }
 
-                            toolbarInstance.option("items", items); // Repaint Toolbar
+                            toolbarInstance.option("items", items);
                         }
                     },
                     error: function (xhr, status, error) {
@@ -348,7 +332,6 @@
             // === 5. TEMPLATE FUNCTIONS ===
             function renderAttachmentsSection(data, itemElement) {
                 const $container = $("<div>").addClass("attachments-container");
-
                 $("<div>").dxFileUploader({
                     multiple: true,
                     accept: ".pdf",
@@ -417,7 +400,6 @@
                         }
                     ]
                 }).dxDataGrid("instance");
-
                 attachmentGridInstance.element().appendTo($container);
                 $container.appendTo(itemElement);
             }
@@ -454,7 +436,6 @@
                 }
 
                 loadingIndicator.show();
-
                 try {
                     const formData = new FormData();
                     formData.append("Title", requestData.documentName);
@@ -494,7 +475,6 @@
                     setTimeout(() => {
                         window.location.href = '@Url.Action("Index", "PurchaseRequest")';
                     }, 1500);
-
                 } catch (err) {
                     console.error("Submit Error:", err);
                     DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);

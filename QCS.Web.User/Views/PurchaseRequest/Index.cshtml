@@ -4,26 +4,30 @@
 
 @section Styles {
     <style>
+        /* --- Link Styling --- */
         .doc-no-link {
             color: #0d6efd;
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
+            cursor: pointer;
         }
 
             .doc-no-link:hover {
                 text-decoration: underline;
+                color: #0a58ca;
             }
 
-        /* Status Badge Styling (Theme เดียวกับหน้า Create/Detail) */
+        /* --- Status Badge (Theme เดียวกับหน้า Detail) --- */
         .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 5px 12px;
+            border-radius: 20px;
             font-size: 0.85em;
             font-weight: 500;
             color: white;
             display: inline-block;
-            min-width: 80px;
+            min-width: 90px;
             text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .status-draft {
@@ -32,7 +36,7 @@
 
         .status-pending {
             background-color: #ffc107;
-            color: #000;
+            color: #212529;
         }
 
         .status-approved {
@@ -42,6 +46,15 @@
         .status-rejected {
             background-color: #dc3545;
         }
+
+        /* --- Card & Layout --- */
+        .qcs-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            border: 1px solid #eaeaea;
+        }
     </style>
 }
 
@@ -49,9 +62,9 @@
     <div class="qcs-card mb-3">
         <div class="page-header-row d-flex justify-content-between align-items-center">
             <div>
-                <h6 class="page-title mb-1">
+                <h6 class="page-title mb-1 d-flex align-items-center">
                     <i class="fas fa-list-alt text-primary me-2"></i>
-                    รายการใบขอซื้อ (My Purchase Requests)
+                    <span>รายการใบขอซื้อ (My Purchase Requests)</span>
                 </h6>
                 <small class="text-muted ms-4 ps-2">รายการเอกสารที่คุณสร้างและสถานะปัจจุบัน</small>
             </div>
@@ -81,7 +94,7 @@
                 key: "id",
                 loadUrl: CONFIG.API_URL,
                 onBeforeSend: function(method, ajaxOptions) {
-                    ajaxOptions.xhrFields = { withCredentials: true }; // สำคัญ: ส่ง Cookie/Auth ไปด้วย
+                    ajaxOptions.xhrFields = { withCredentials: true };
                 }
             });
 
@@ -89,18 +102,23 @@
             $("#requestsGrid").dxDataGrid({
                 dataSource: store,
                 showBorders: true,
+                showRowLines: true,
                 columnAutoWidth: true,
                 hoverStateEnabled: true,
                 rowAlternationEnabled: true,
                 searchPanel: { visible: true, width: 250, placeholder: "ค้นหาเอกสาร..." },
                 filterRow: { visible: true },
                 paging: { pageSize: 10 },
-                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+                pager: {
+                    showPageSizeSelector: true,
+                    allowedPageSizes: [10, 20, 50],
+                    showInfo: true
+                },
                 selection: { mode: "single" },
                 // คลิกแถวเพื่อไปหน้า Detail
                 onRowClick: function(e) {
                     if(e.rowType === "data") {
-                        window.location.href = `${CONFIG.DETAIL_URL}/${e.data.id}`;
+                        goToDetail(e.data.id);
                     }
                 },
                 columns: [
@@ -108,9 +126,17 @@
                         dataField: "code",
                         caption: "เลขที่เอกสาร",
                         width: 160,
+                        alignment: "center",
                         cellTemplate: function(container, options) {
                             // แสดงเป็น Link สีน้ำเงิน
-                            $("<span>").addClass("doc-no-link").text(options.value).appendTo(container);
+                            $("<span>")
+                                .addClass("doc-no-link")
+                                .text(options.value)
+                                .on("click", function(e) {
+                                    e.stopPropagation(); // ป้องกัน row click ซ้ำซ้อน
+                                    goToDetail(options.data.id);
+                                })
+                                .appendTo(container);
                         }
                     },
                     {
@@ -119,7 +145,7 @@
                         minWidth: 200
                     },
                     {
-                        dataField: "vendorName", // เพิ่มคอลัมน์ Vendor ตาม Model ใหม่
+                        dataField: "vendorName",
                         caption: "ผู้ขาย (Vendor)",
                         width: 200
                     },
@@ -137,39 +163,44 @@
                         width: 150,
                         alignment: "center",
                         cellTemplate: function (container, options) {
-                            const statusText = options.value || "Draft";
-                            const cssClass = getStatusClass(statusText);
-
+                            // ใช้ Helper Map Status (Int -> Text/Class)
+                            const s = mapStatus(options.value);
                             $("<span>")
-                                .addClass("status-badge " + cssClass)
-                                .text(statusText)
+                                .addClass("status-badge " + s.cls)
+                                .text(s.text)
                                 .appendTo(container);
                         }
                     },
                     {
                         type: "buttons",
-                        width: 60,
+                        width: 80,
                         buttons: [{
                             hint: "ดูรายละเอียด",
                             icon: "find",
                             onClick: function(e) {
-                                window.location.href = `${CONFIG.DETAIL_URL}/${e.row.data.id}`;
+                                goToDetail(e.row.data.id);
                             }
                         }]
                     }
                 ]
             });
 
-            // Helper: แปลงข้อความสถานะเป็นชื่อ CSS Class
-            function getStatusClass(status) {
-                if (!status) return "status-draft";
-                const s = status.toLowerCase();
+            // === HELPER FUNCTIONS ===
 
-                if (s.includes('pending')) return "status-pending";
-                if (s === 'approved') return "status-approved";
-                if (s === 'rejected') return "status-rejected";
+            function goToDetail(id) {
+                window.location.href = `${CONFIG.DETAIL_URL}/${id}`;
+            }
 
-                return "status-draft";
+            // แปลง Status ID (Int) เป็น Text และ CSS Class
+            function mapStatus(status) {
+                // 0=Draft, 1=Pending, 2=Approved, 9=Rejected
+                if (status == 0) return { text: 'Draft', cls: 'status-draft' };
+                if (status == 1) return { text: 'Pending', cls: 'status-pending' };
+                if (status == 2) return { text: 'Approved', cls: 'status-approved' };
+                if (status == 9) return { text: 'Rejected', cls: 'status-rejected' };
+
+                // กรณีไม่ตรงเงื่อนไข (หรือ Status เป็น null)
+                return { text: 'Unknown', cls: 'status-draft' };
             }
         });
     </script>

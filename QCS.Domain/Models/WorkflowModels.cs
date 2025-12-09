@@ -10,6 +10,7 @@ namespace QCS.Domain.Models
     {
         public int Id { get; set; }
         public string RouteName { get; set; }
+        public bool CanInitiate { get; set; }
         public List<WorkflowStepDto> Steps { get; set; }
     }
 

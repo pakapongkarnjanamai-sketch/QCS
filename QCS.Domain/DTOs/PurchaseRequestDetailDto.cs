@@ -1,4 +1,5 @@
-﻿using System;
+﻿using QCS.Domain.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,7 +24,19 @@ namespace QCS.Domain.DTOs
         public DateTime? ValidUntil { get; set; }
         public string Comment { get; set; }
 
+        public PurchaseRequestPermissionsDto Permissions { get; set; } = new();
+
+        // === [NEW] เพิ่มส่วนนี้ครับ ===
+        public WorkflowRouteDetailDto WorkflowRoute { get; set; }
+        // ==========================
+
         public List<QuotationDetailDto> Quotations { get; set; }
+    }
+
+    public class PurchaseRequestPermissionsDto
+    {
+        public bool CanApprove { get; set; }
+        public bool CanReject { get; set; }
     }
     public class QuotationDetailDto
     {

@@ -18,7 +18,7 @@
             margin-top: 20px;
         }
 
-        /* --- Attachments (Updated to match Integration Page) --- */
+        /* --- Attachments --- */
         .file-info {
             display: flex;
             align-items: center;
@@ -26,7 +26,7 @@
         }
 
             .file-info i {
-                color: #f05b41; /* สีส้มแดงตามต้นแบบ */
+                color: #f05b41;
                 font-size: 1.2em;
             }
 
@@ -112,8 +112,7 @@
                 API_BASE_URL: "https://localhost:7127/api",
                 API_GET_DETAIL: `/PurchaseRequest/Detail/${PR_ID}`,
                 API_APPROVE: `/Approval/Approve`,
-                API_REJECT: `/Approval/Reject`,
-                API_WORKFLOW_ROUTE: `/Workflow/route/1` // Workflow Route ID
+                API_REJECT: `/Approval/Reject`
             };
 
             const documentTypes = [
@@ -133,14 +132,13 @@
             }).dxLoadPanel("instance");
 
             let toolbarInstance = null;
-            let prData = null; // เก็บข้อมูล PR เพื่อใช้ใน Popup ประวัติ
+            let prData = null; // เก็บข้อมูล PR ทั้งหมดที่ได้จาก API
 
-            // === 2. INIT ===
+            // === 2. INITIALIZATION ===
             initToolbar();
-            loadData();
-            loadWorkflowRoute();
+            loadData(); // เรียกฟังก์ชันเดียว จบทุกอย่าง
 
-            // === 3. RENDER FUNCTIONS ===
+            // === 3. MAIN FUNCTIONS ===
 
             function initToolbar() {
                 toolbarInstance = $("#actionButtons").dxToolbar({
@@ -165,7 +163,7 @@
                                 onClick: () => window.location.href = '@Url.Action("Index", "PurchaseRequest")'
                             }
                         },
-                        // Action Buttons (Visible: False by default)
+                        // Action Buttons (เริ่มต้นซ่อนไว้ - ควบคุมด้วย API Response)
                         {
                             location: 'after',
                             visible: false,
@@ -197,20 +195,33 @@
             async function loadData() {
                 loadingIndicator.show();
                 try {
+                    // ยิง API ครั้งเดียว ได้ข้อมูลครบ (Detail + Permissions + Workflow)
                     const response = await fetch(CONFIG.API_BASE_URL + CONFIG.API_GET_DETAIL, {
                         credentials: 'include'
                     });
-
                     if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
 
                     const data = await response.json();
                     prData = data;
 
+                    // 1. Render Form (แสดงข้อมูลทั่วไปและไฟล์แนบ)
                     renderPageContent(data);
-                    checkApprovalPermission(data);
+
+                    // 2. Render Workflow Grid (ใช้ข้อมูล workflowRoute จาก JSON)
+                    if (data.workflowRoute) {
+                        renderWorkflowRouteGrid(data.workflowRoute);
+                    } else {
+                        // กรณีไม่มีข้อมูล ส่งค่าว่างไปสร้าง Grid เปล่าๆ
+                        renderWorkflowRouteGrid({ steps: [] });
+                    }
+
+                    // 3. Update Permission Buttons (จัดการปุ่มตาม permissions)
+                    if (data.permissions) {
+                        updateToolbarPermissions(data.permissions);
+                    }
 
                 } catch (err) {
-                    console.error(err);
+                    console.error("Load Error:", err);
                     DevExpress.ui.notify(err.message, "error", 3000);
                 } finally {
                     loadingIndicator.hide();
@@ -219,7 +230,7 @@
 
             function renderPageContent(data) {
                 // Header
-                $("#lblDocNo").text(data.docNo || data.code || "-");
+                $("#lblDocNo").text(data.docNo || data.documentNo || "-");
 
                 // Form
                 $("#quotationForm").dxForm({
@@ -264,7 +275,6 @@
                 });
             }
 
-            // === UPDATED FUNCTION: Render Attachment Grid ===
             function renderAttachmentsGrid(files, itemElement) {
                 const $container = $("<div>").addClass("attachments-container");
 
@@ -277,7 +287,7 @@
                     noDataText: "No attachments (ไม่มีเอกสารแนบ)",
                     columns: [
                         {
-                            dataField: "fileName",
+                            dataField: "originalFileName", // ใช้ชื่อ field ตาม DTO ใหม่
                             caption: "ชื่อไฟล์ (File Name)",
                             cellTemplate: function (container, options) {
                                 $("<div>").addClass("file-info")
@@ -285,13 +295,6 @@
                                     .append($("<span>").text(options.value))
                                     .appendTo(container);
                             }
-                        },
-                        {
-                            dataField: "fileSize", // ถ้า API ไม่มี field นี้ จะแสดง 0 Bytes
-                            caption: "ขนาด (Size)",
-                            width: 120,
-                            alignment: "right",
-                            customizeText: (cellInfo) => formatFileSize(cellInfo.value)
                         },
                         {
                             dataField: "documentTypeId",
@@ -309,9 +312,11 @@
                                 onClick: (e) => {
                                     const fileData = e.row.data;
                                     if (fileData.filePath) {
+                                        // แปลง path ให้เป็น url ที่ถูกต้อง
                                         let cleanPath = fileData.filePath.replace(/\\/g, "/");
-                                        // ปรับ URL ตามที่ Backend เสิร์ฟ Static Files
-                                        const url = `https://localhost:7127/${cleanPath}`;
+                                        // ตัด /api ออกจาก Base URL เพื่อชี้ไปที่ root
+                                        const rootUrl = CONFIG.API_BASE_URL.replace('/api', '');
+                                        const url = `${rootUrl}/${cleanPath}`;
                                         window.open(url, '_blank');
                                     } else {
                                         DevExpress.ui.notify("ไม่พบที่อยู่ไฟล์ (File Path missing)", "warning", 2000);
@@ -321,19 +326,27 @@
                         }
                     ]
                 }).appendTo($container);
-
                 $container.appendTo(itemElement);
             }
 
-            // === Function: โหลด Workflow Route Grid ===
-            function loadWorkflowRoute() {
-                const routeGrid = $("#workflowRouteGrid").dxDataGrid({
-                    dataSource: [],
+            // === Function: แสดงตาราง Workflow (ไม่ต้อง Ajax แล้ว) ===
+            function renderWorkflowRouteGrid(routeData) {
+                // เตรียมข้อมูลสำหรับ Grid
+                const gridData = (routeData && routeData.steps) ? routeData.steps.map(step => {
+                    return {
+                        sequenceNo: step.sequenceNo,
+                        stepName: step.stepName,
+                        rawAssignments: step.assignments
+                    };
+                }) : [];
+
+                $("#workflowRouteGrid").dxDataGrid({
+                    dataSource: gridData,
                     showBorders: true,
                     showRowLines: true,
                     columnAutoWidth: true,
                     paging: { enabled: false },
-                    noDataText: "กำลังโหลดข้อมูลเส้นทาง...",
+                    noDataText: "ไม่มีข้อมูลเส้นทางอนุมัติ",
                     columns: [
                         {
                             dataField: "sequenceNo", caption: "ลำดับ (Seq)",
@@ -353,6 +366,7 @@
                                 assignments.forEach(a => {
                                     const name = a.employeeName || a.nId;
                                     const $div = $("<div>");
+                                    // Highlight หากเป็น User ปัจจุบัน
                                     if (a.isCurrentUser) {
                                         $div.addClass("current-user-row")
                                             .html(`<i class="fas fa-user-circle me-1"></i>${name} (You)`);
@@ -364,29 +378,23 @@
                             }
                         }
                     ]
-                }).dxDataGrid("instance");
-
-                $.ajax({
-                    url: CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE,
-                    type: 'GET',
-                    xhrFields: { withCredentials: true },
-                    success: function (data) {
-                        if (data && data.steps) {
-                            const gridData = data.steps.map(step => {
-                                return {
-                                    sequenceNo: step.sequenceNo,
-                                    stepName: step.stepName,
-                                    rawAssignments: step.assignments
-                                };
-                            });
-                            routeGrid.option("dataSource", gridData);
-                        }
-                    },
-                    error: function (err) {
-                        console.error("Workflow Load Error", err);
-                        routeGrid.option("noDataText", "ไม่สามารถโหลดข้อมูลเส้นทางได้");
-                    }
                 });
+            }
+
+            // === Logic: อัปเดตปุ่มตามสิทธิ์จาก Backend ===
+            function updateToolbarPermissions(perms) {
+                const items = toolbarInstance.option("items");
+                const btnReject = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnReject");
+                const btnApprove = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnApprove");
+
+                if (btnReject) btnReject.visible = perms.canReject;
+                if (btnApprove) btnApprove.visible = perms.canApprove;
+
+                toolbarInstance.option("items", items);
+
+                if (perms.canApprove) {
+                    DevExpress.ui.notify("คุณมีสิทธิ์อนุมัติเอกสารนี้ (Authorized)", "info", 4000);
+                }
             }
 
             // === Function: แสดง Popup ประวัติ ===
@@ -442,24 +450,6 @@
                 popup.show();
             }
 
-            // === Logic: ตรวจสอบสิทธิ์การอนุมัติ ===
-            function checkApprovalPermission(data) {
-                if (data.status === 2 || data.status === 9) return;
-
-                const pendingStep = (data.approvalSteps || []).find(step => step.status === 1);
-                if (pendingStep && pendingStep.isCurrentUser === true) {
-                    const items = toolbarInstance.option("items");
-                    const btnReject = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnReject");
-                    const btnApprove = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnApprove");
-
-                    if (btnReject) btnReject.visible = true;
-                    if (btnApprove) btnApprove.visible = true;
-
-                    toolbarInstance.option("items", items);
-                    DevExpress.ui.notify("คุณมีสิทธิ์อนุมัติเอกสารนี้ (Authorized)", "info", 4000);
-                }
-            }
-
             // === Action Handlers ===
             function handleApprove() {
                 DevExpress.ui.dialog.confirm("ยืนยันการอนุมัติ?", "ยืนยัน (Confirm)").done((res) => {
@@ -481,7 +471,6 @@
                         }, 100);
                     }
                 });
-
                 result.show().done((dialogResult) => {
                     if (dialogResult === "confirm") {
                         const reason = $("#rejectReasonBox .dx-textarea").dxTextArea("instance").option("value");
@@ -496,19 +485,16 @@
                 try {
                     const endpoint = (action === 'Approve') ? CONFIG.API_APPROVE : CONFIG.API_REJECT;
                     const payload = { purchaseRequestId: PR_ID, comment: comment };
-
                     const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
                         credentials: 'include'
                     });
-
                     if (!res.ok) throw new Error(await res.text());
 
                     DevExpress.ui.notify(`ดำเนินการสำเร็จ`, "success", 2000);
                     setTimeout(() => location.reload(), 1500);
-
                 } catch (err) {
                     DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 3000);
                 } finally {
