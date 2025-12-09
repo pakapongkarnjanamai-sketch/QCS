@@ -18,7 +18,7 @@
             margin-top: 20px;
         }
 
-        /* --- Attachments --- */
+        /* --- Attachments (Updated to match Integration Page) --- */
         .file-info {
             display: flex;
             align-items: center;
@@ -26,15 +26,15 @@
         }
 
             .file-info i {
-                color: #d9534f;
-                font-size: 1.4em;
+                color: #f05b41; /* สีส้มแดงตามต้นแบบ */
+                font-size: 1.2em;
             }
 
         .attachments-container {
             padding: 15px;
             background: #f8f9fa;
             border-radius: 6px;
-            border: 1px dashed #dee2e6;
+            border: 1px solid #dee2e6;
         }
 
         /* --- Status Badge --- */
@@ -68,7 +68,6 @@
         .current-user-row {
             font-weight: bold;
             color: #007bff;
-            background-color: #f0f8ff;
         }
     </style>
 }
@@ -80,7 +79,6 @@
             <h6 class="page-title d-flex align-items-center text-nowrap">
                 <i class="fas fa-file-invoice text-primary me-2"></i>
                 <span id="lblDocNo" class="me-2">Loading...</span>
-                <span id="statusBadge"></span>
             </h6>
             <div id="actionButtons"></div>
         </div>
@@ -103,7 +101,6 @@
 </div>
 
 <div id="historyPopup"></div>
-
 <div id="loadingIndicator"></div>
 
 @section Scripts {
@@ -116,7 +113,7 @@
                 API_GET_DETAIL: `/PurchaseRequest/Detail/${PR_ID}`,
                 API_APPROVE: `/Approval/Approve`,
                 API_REJECT: `/Approval/Reject`,
-                API_WORKFLOW_ROUTE: `/Workflow/route/1` // Workflow Route
+                API_WORKFLOW_ROUTE: `/Workflow/route/1` // Workflow Route ID
             };
 
             const documentTypes = [
@@ -141,7 +138,7 @@
             // === 2. INIT ===
             initToolbar();
             loadData();
-            loadWorkflowRoute(); // โหลด Route แบบตาราง
+            loadWorkflowRoute();
 
             // === 3. RENDER FUNCTIONS ===
 
@@ -168,8 +165,7 @@
                                 onClick: () => window.location.href = '@Url.Action("Index", "PurchaseRequest")'
                             }
                         },
-                        // Action Buttons (เริ่มต้นซ่อนไว้ - Visible: False)
-                        // จะแสดงก็ต่อเมื่อ Check Permission ผ่าน
+                        // Action Buttons (Visible: False by default)
                         {
                             location: 'after',
                             visible: false,
@@ -211,7 +207,7 @@
                     prData = data;
 
                     renderPageContent(data);
-                    checkApprovalPermission(data); // ตรวจสิทธิ์เพื่อแสดงปุ่ม
+                    checkApprovalPermission(data);
 
                 } catch (err) {
                     console.error(err);
@@ -221,141 +217,9 @@
                 }
             }
 
-            // --- Function: โหลดและแสดง Approval Route (Table Grid) ---
-            function loadWorkflowRoute() {
-                const routeGrid = $("#workflowRouteGrid").dxDataGrid({
-                    dataSource: [],
-                    showBorders: true,
-                    showRowLines: true,
-                    columnAutoWidth: true,
-                    paging: { enabled: false },
-                    noDataText: "กำลังโหลดข้อมูลเส้นทาง...",
-                    columns: [
-                        {
-                            dataField: "sequenceNo",
-                            caption: "ลำดับ (Seq)",
-                            width: 80,
-                            alignment: "center",
-                            sortOrder: "asc"
-                        },
-                        {
-                            dataField: "stepName",
-                            caption: "ขั้นตอน (Step Name)",
-                            width: 250
-                        },
-                        {
-                            dataField: "assignees",
-                            caption: "รายชื่อผู้อนุมัติ (Approvers)",
-                            cellTemplate: function(container, options) {
-                                const assignments = options.data.rawAssignments || [];
-
-                                if(assignments.length === 0) {
-                                    $("<span>").text("Any").appendTo(container);
-                                    return;
-                                }
-
-                                assignments.forEach(a => {
-                                    const name = a.employeeName || a.nId;
-                                    const $div = $("<div>");
-
-                                    // Highlight Current User (เหมือนหน้า Create)
-                                    if (a.isCurrentUser) {
-                                        $div.addClass("current-user-row")
-                                            .html(`<i class="fas fa-user-circle me-1"></i>${name} (You)`);
-                                    } else {
-                                        $div.html(`<i class="fas fa-user text-muted me-1"></i>${name}`);
-                                    }
-
-                                    $div.appendTo(container);
-                                });
-                            }
-                        }
-                    ]
-                }).dxDataGrid("instance");
-
-                // Call API to get Workflow Route structure and highlight current user
-                $.ajax({
-                    url: CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE,
-                    type: 'GET',
-                    xhrFields: { withCredentials: true },
-                    success: function (data) {
-                        if(data && data.steps) {
-                            const gridData = data.steps.map(step => {
-                                return {
-                                    sequenceNo: step.sequenceNo,
-                                    stepName: step.stepName,
-                                    rawAssignments: step.assignments
-                                };
-                            });
-                            routeGrid.option("dataSource", gridData);
-                        }
-                    },
-                    error: function (err) {
-                        console.error("Workflow Load Error", err);
-                        routeGrid.option("noDataText", "ไม่สามารถโหลดข้อมูลเส้นทางได้");
-                    }
-                });
-            }
-
-            // --- Function: แสดง Popup ประวัติ ---
-            function showHistoryPopup() {
-                const historyData = prData ? (prData.approvalSteps || []) : [];
-
-                const popup = $("#historyPopup").dxPopup({
-                    title: "ประวัติการอนุมัติ (Approval History)",
-                    width: 800,
-                    height: 500,
-                    visible: true,
-                    dragEnabled: true,
-                    hideOnOutsideClick: true,
-                    showCloseButton: true,
-                    contentTemplate: function(contentElement) {
-                        $("<div>").dxDataGrid({
-                            dataSource: historyData,
-                            showBorders: true,
-                            showRowLines: true,
-                            columnAutoWidth: true,
-                            paging: { enabled: false },
-                            columns: [
-                                {
-                                    caption: "#",
-                                    cellTemplate: (container, options) => container.text(options.rowIndex + 1),
-                                    width: 50, alignment: "center"
-                                },
-                                { dataField: "role", caption: "ขั้นตอน (Role)" },
-                                {
-                                    dataField: "approverName", caption: "ผู้ดำเนินการ",
-                                    cellTemplate: (container, options) => {
-                                        const txt = options.data.approverName || options.data.approverNId || "-";
-                                        $("<span>").text(txt).appendTo(container);
-                                    }
-                                },
-                                {
-                                    dataField: "actionDate", caption: "วันที่",
-                                    alignment: "center", width: 140,
-                                    customizeText: (cell) => formatDate(cell.value)
-                                },
-                                {
-                                    dataField: "status", caption: "ผลการพิจารณา",
-                                    alignment: "center", width: 120,
-                                    cellTemplate: (container, options) => {
-                                        const s = mapStatus(options.value);
-                                        $("<span>").addClass("status-badge " + s.cls).text(s.text).appendTo(container);
-                                    }
-                                },
-                                { dataField: "comment", caption: "เหตุผล/ความเห็น" }
-                            ]
-                        }).appendTo(contentElement);
-                    }
-                }).dxPopup("instance");
-
-                popup.show();
-            }
-
             function renderPageContent(data) {
                 // Header
                 $("#lblDocNo").text(data.docNo || data.code || "-");
-                renderStatusBadge(data.status);
 
                 // Form
                 $("#quotationForm").dxForm({
@@ -400,16 +264,21 @@
                 });
             }
 
+            // === UPDATED FUNCTION: Render Attachment Grid ===
             function renderAttachmentsGrid(files, itemElement) {
                 const $container = $("<div>").addClass("attachments-container");
+
                 $("<div>").dxDataGrid({
                     dataSource: files,
                     showBorders: true,
+                    showRowLines: true,
                     columnAutoWidth: true,
                     paging: { pageSize: 5 },
+                    noDataText: "No attachments (ไม่มีเอกสารแนบ)",
                     columns: [
                         {
-                            dataField: "fileName", caption: "ชื่อไฟล์",
+                            dataField: "fileName",
+                            caption: "ชื่อไฟล์ (File Name)",
                             cellTemplate: function (container, options) {
                                 $("<div>").addClass("file-info")
                                     .append($("<i>").addClass("fas fa-file-pdf"))
@@ -418,54 +287,177 @@
                             }
                         },
                         {
-                            dataField: "documentTypeId", caption: "ประเภท", width: 200,
+                            dataField: "fileSize", // ถ้า API ไม่มี field นี้ จะแสดง 0 Bytes
+                            caption: "ขนาด (Size)",
+                            width: 120,
+                            alignment: "right",
+                            customizeText: (cellInfo) => formatFileSize(cellInfo.value)
+                        },
+                        {
+                            dataField: "documentTypeId",
+                            caption: "ประเภท (Type)",
+                            width: 200,
                             lookup: { dataSource: documentTypes, valueExpr: "id", displayExpr: "name" }
                         },
                         {
-                            caption: "ดาวน์โหลด", width: 100, alignment: "center",
-                            cellTemplate: function(container, options) {
-                                $("<button>").addClass("btn btn-sm btn-outline-primary")
-                                    .html('<i class="fas fa-download"></i>')
-                                    .on("click", () => {
-                                        if(options.data.filePath) {
-                                            // ปรับ Path ให้ถูกต้อง
-                                            let cleanPath = options.data.filePath.replace(/\\/g, "/");
-                                            const url = `https://localhost:7127/${cleanPath}`; // หรือดึงจาก CONFIG.API_BASE_URL แต่ตัด /api ออก
-                                            window.open(url, '_blank');
-                                        }
-                                    })
-                                    .appendTo(container);
-                            }
+                            type: "buttons",
+                            width: 80,
+                            caption: "เปิดดู",
+                            buttons: [{
+                                hint: "Preview / Download",
+                                icon: "eyeopen",
+                                onClick: (e) => {
+                                    const fileData = e.row.data;
+                                    if (fileData.filePath) {
+                                        let cleanPath = fileData.filePath.replace(/\\/g, "/");
+                                        // ปรับ URL ตามที่ Backend เสิร์ฟ Static Files
+                                        const url = `https://localhost:7127/${cleanPath}`;
+                                        window.open(url, '_blank');
+                                    } else {
+                                        DevExpress.ui.notify("ไม่พบที่อยู่ไฟล์ (File Path missing)", "warning", 2000);
+                                    }
+                                }
+                            }]
                         }
                     ]
                 }).appendTo($container);
+
                 $container.appendTo(itemElement);
+            }
+
+            // === Function: โหลด Workflow Route Grid ===
+            function loadWorkflowRoute() {
+                const routeGrid = $("#workflowRouteGrid").dxDataGrid({
+                    dataSource: [],
+                    showBorders: true,
+                    showRowLines: true,
+                    columnAutoWidth: true,
+                    paging: { enabled: false },
+                    noDataText: "กำลังโหลดข้อมูลเส้นทาง...",
+                    columns: [
+                        {
+                            dataField: "sequenceNo", caption: "ลำดับ (Seq)",
+                            width: 80, alignment: "center", sortOrder: "asc"
+                        },
+                        {
+                            dataField: "stepName", caption: "ขั้นตอน (Step Name)", width: 250
+                        },
+                        {
+                            dataField: "assignees", caption: "รายชื่อผู้อนุมัติ (Approvers)",
+                            cellTemplate: function (container, options) {
+                                const assignments = options.data.rawAssignments || [];
+                                if (assignments.length === 0) {
+                                    $("<span>").text("Any").appendTo(container);
+                                    return;
+                                }
+                                assignments.forEach(a => {
+                                    const name = a.employeeName || a.nId;
+                                    const $div = $("<div>");
+                                    if (a.isCurrentUser) {
+                                        $div.addClass("current-user-row")
+                                            .html(`<i class="fas fa-user-circle me-1"></i>${name} (You)`);
+                                    } else {
+                                        $div.html(`<i class="fas fa-user text-muted me-1"></i>${name}`);
+                                    }
+                                    $div.appendTo(container);
+                                });
+                            }
+                        }
+                    ]
+                }).dxDataGrid("instance");
+
+                $.ajax({
+                    url: CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE,
+                    type: 'GET',
+                    xhrFields: { withCredentials: true },
+                    success: function (data) {
+                        if (data && data.steps) {
+                            const gridData = data.steps.map(step => {
+                                return {
+                                    sequenceNo: step.sequenceNo,
+                                    stepName: step.stepName,
+                                    rawAssignments: step.assignments
+                                };
+                            });
+                            routeGrid.option("dataSource", gridData);
+                        }
+                    },
+                    error: function (err) {
+                        console.error("Workflow Load Error", err);
+                        routeGrid.option("noDataText", "ไม่สามารถโหลดข้อมูลเส้นทางได้");
+                    }
+                });
+            }
+
+            // === Function: แสดง Popup ประวัติ ===
+            function showHistoryPopup() {
+                const historyData = prData ? (prData.approvalSteps || []) : [];
+                const popup = $("#historyPopup").dxPopup({
+                    title: "ประวัติการอนุมัติ (Approval History)",
+                    width: 800,
+                    height: 500,
+                    visible: true,
+                    dragEnabled: true,
+                    hideOnOutsideClick: true,
+                    showCloseButton: true,
+                    contentTemplate: function (contentElement) {
+                        $("<div>").dxDataGrid({
+                            dataSource: historyData,
+                            showBorders: true,
+                            showRowLines: true,
+                            columnAutoWidth: true,
+                            paging: { enabled: false },
+                            columns: [
+                                {
+                                    caption: "#",
+                                    cellTemplate: (container, options) => container.text(options.rowIndex + 1),
+                                    width: 50, alignment: "center"
+                                },
+                                { dataField: "role", caption: "ขั้นตอน (Role)" },
+                                {
+                                    dataField: "approverName", caption: "ผู้ดำเนินการ",
+                                    cellTemplate: (container, options) => {
+                                        const txt = options.data.approverName || options.data.approverNId || "-";
+                                        $("<span>").text(txt).appendTo(container);
+                                    }
+                                },
+                                {
+                                    dataField: "actionDate", caption: "วันที่",
+                                    alignment: "center", width: 140,
+                                    customizeText: (cell) => formatDate(cell.value)
+                                },
+                                {
+                                    dataField: "status", caption: "ผลการพิจารณา",
+                                    alignment: "center", width: 120,
+                                    cellTemplate: (container, options) => {
+                                        const s = mapStatus(options.value);
+                                        $("<span>").addClass("status-badge " + s.cls).text(s.text).appendTo(container);
+                                    }
+                                },
+                                { dataField: "comment", caption: "เหตุผล/ความเห็น" }
+                            ]
+                        }).appendTo(contentElement);
+                    }
+                }).dxPopup("instance");
+                popup.show();
             }
 
             // === Logic: ตรวจสอบสิทธิ์การอนุมัติ ===
             function checkApprovalPermission(data) {
-                // 1. ถ้าเอกสารจบ Process แล้ว (สถานะ Approved/Rejected) ไม่ต้องทำอะไร
                 if (data.status === 2 || data.status === 9) return;
 
-                // 2. หา Step ที่สถานะเป็น Pending (1)
                 const pendingStep = (data.approvalSteps || []).find(step => step.status === 1);
-
-                // 3. ถ้าพบ Step ที่รออนุมัติ และ 'isCurrentUser' เป็นจริง (Backend ตรวจสอบมาให้แล้ว)
                 if (pendingStep && pendingStep.isCurrentUser === true) {
-
                     const items = toolbarInstance.option("items");
-
                     const btnReject = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnReject");
                     const btnApprove = items.find(i => i.options && i.options.elementAttr && i.options.elementAttr.id === "btnApprove");
 
-                    // 4. แสดงปุ่ม (Visible: True)
-                    if(btnReject) btnReject.visible = true;
-                    if(btnApprove) btnApprove.visible = true;
+                    if (btnReject) btnReject.visible = true;
+                    if (btnApprove) btnApprove.visible = true;
 
                     toolbarInstance.option("items", items);
                     DevExpress.ui.notify("คุณมีสิทธิ์อนุมัติเอกสารนี้ (Authorized)", "info", 4000);
                 }
-                // หากไม่ตรงเงื่อนไข ปุ่มจะยังคงซ่อนอยู่ตาม Default
             }
 
             // === Action Handlers ===
@@ -485,7 +477,7 @@
                     ],
                     onShowing: () => {
                         setTimeout(() => {
-                             $("#rejectReasonBox").dxTextArea({ height: 100, placeholder: "กรุณาระบุเหตุผล..." });
+                            $("#rejectReasonBox").dxTextArea({ height: 100, placeholder: "กรุณาระบุเหตุผล..." });
                         }, 100);
                     }
                 });
@@ -493,7 +485,7 @@
                 result.show().done((dialogResult) => {
                     if (dialogResult === "confirm") {
                         const reason = $("#rejectReasonBox .dx-textarea").dxTextArea("instance").option("value");
-                        if(!reason) { DevExpress.ui.notify("กรุณาระบุเหตุผล", "warning", 2000); return; }
+                        if (!reason) { DevExpress.ui.notify("กรุณาระบุเหตุผล", "warning", 2000); return; }
                         sendApprovalAction("Reject", reason);
                     }
                 });
@@ -524,12 +516,21 @@
                 }
             }
 
-            // Helpers
+            // === Helper Functions ===
+
+            function formatFileSize(bytes) {
+                if (!bytes || bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
             function formatDate(dateStr) {
                 if (!dateStr) return "-";
                 const d = new Date(dateStr);
                 return isNaN(d.getTime()) ? "-" : d.toLocaleDateString('th-TH', {
-                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit'
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
             }
 
@@ -541,10 +542,6 @@
                 return { text: '-', cls: 'status-draft' };
             }
 
-            function renderStatusBadge(status) {
-                const s = mapStatus(status);
-                $("#statusBadge").removeClass().addClass(`status-badge ${s.cls}`).text(s.text);
-            }
         });
     </script>
 }

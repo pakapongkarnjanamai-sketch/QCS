@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using QCS.Domain.DTOs; // อย่าลืมสร้าง DTOs ตามที่คุยกันไว้
-using QCS.Domain.Enum; // หรือ StatusConsts
+
+using QCS.Application.Services;
+using QCS.Domain.DTOs;
+using QCS.Domain.Enum; // ใช้ Enum/Const เพื่อความชัดเจน
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
 using System.Text.Json;
@@ -13,77 +15,84 @@ namespace QCS.API.Controllers
     public class PurchaseRequestController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _env; // เพิ่มเพื่อจัดการไฟล์บน Server
+        private readonly IWebHostEnvironment _env;
+        private readonly WorkflowIntegrationService _workflowService; // เพิ่ม Service นี้
 
-        public PurchaseRequestController(AppDbContext context, IWebHostEnvironment env)
+        public PurchaseRequestController(
+            AppDbContext context,
+            IWebHostEnvironment env,
+            WorkflowIntegrationService workflowService)
         {
             _context = context;
             _env = env;
+            _workflowService = workflowService;
         }
 
-        // GET: api/PurchaseRequest/MyRequests
-        [HttpGet("MyRequests")]
-        public async Task<IActionResult> GetMyRequests()
-        {
-            var requests = await _context.PurchaseRequests
-                .OrderByDescending(r => r.RequestDate)
-                .ToListAsync();
-
-            // Mapping DTO สำหรับรายการ (ปรับตามความเหมาะสม)
-            var result = requests.Select(r => new
-            {
-                Id = r.Id,
-                DocumentNo = r.Code, // Map จาก Code
-                Title = r.Title,
-                RequestDate = r.RequestDate,
-                Status = GetStatusString(r.Status),
-                VendorName = r.VendorName,
-                TotalAmount = 0 // ถ้ามี Field Amount ให้ใส่ตรงนี้
-            });
-
-            return Ok(result);
-        }
-
-        // GET: api/PurchaseRequest/{id}
+        // GET: api/PurchaseRequest/Detail/{id}
         [HttpGet("Detail/{id}")]
         public async Task<IActionResult> GetRequestDetail(int id)
         {
             try
             {
                 var request = await _context.PurchaseRequests
-                    // 1. ดึงข้อมูล Items (รายการสินค้า)
-                    // .Include(r => r.Items) 
-
-                    // 2. ดึงข้อมูล Quotations (เอกสารแนบ) -> สำคัญสำหรับการแสดงผลในตาราง
                     .Include(r => r.Quotations)
-
-                    // 3. ดึงข้อมูล Approval Steps (ประวัติการอนุมัติ)
-                    .Include(r => r.ApprovalSteps)
-
-                    // ❌ REMOVED: .Include(r => r.CreatedBy) 
-                    // เอาออกเพราะ CreatedBy เป็น string (UserId) ไม่ใช่ Object Navigation
-
+                    .Include(r => r.ApprovalSteps) // โหลด Step ที่สร้างไว้
                     .FirstOrDefaultAsync(r => r.Id == id);
 
-                if (request == null)
-                {
-                    return NotFound("ไม่พบข้อมูลเอกสาร");
-                }
-
-                // Optional: ถ้าคุณต้องการส่ง RequesterName ไปหน้าบ้านจริงๆ
-                // คุณอาจต้อง query user เพิ่มเติมที่นี่ (ถ้าใน DB เก็บแค่ ID)
-                // var user = _context.Users.Find(request.CreatedBy);
-                // request.RequesterName = user?.FullName; 
+                if (request == null) return NotFound("ไม่พบข้อมูลเอกสาร");
 
                 return Ok(request);
             }
             catch (Exception ex)
             {
-                // Log error เพื่อการตรวจสอบ
                 return StatusCode(500, $"Internal Server Error: {ex.Message}");
             }
         }
+        // GET: api/PurchaseRequest/MyRequests
+        [HttpGet("MyRequests")]
+        public async Task<IActionResult> GetMyRequests()
+        {
+            try
+            {
+                // 1. ระบุตัวตน User ปัจจุบัน
+                // สมมติว่า User.Identity.Name เก็บ User ID หรือ Username ที่ใช้ใน field CreatedBy
+                // หรือถ้าใช้ JWT Claims ให้ดึงจาก ClaimTypes.NameIdentifier
+                var currentUserId = User.Identity?.Name;
 
+                if (string.IsNullOrEmpty(currentUserId))
+                {
+                    // กรณี Test Local อาจจะยังไม่มี Auth ให้ Return ทั้งหมดไปก่อน หรือ Return 401
+                    // return Unauthorized("User not authenticated."); 
+
+                    // *สำหรับการทดสอบช่วงแรก ถ้ายังไม่ Login:*
+                    // สามารถ comment 2 บรรทัดบน แล้ว hardcode ค่าไปก่อนได้ เช่น:
+                    // currentUserId = "h8197"; 
+                }
+
+                // 2. Query ข้อมูลเฉพาะของ User นั้น
+                var requests = await _context.PurchaseRequests
+                    .Where(r => r.CreatedBy == currentUserId) // กรองด้วย CreatedBy
+                    .OrderByDescending(r => r.RequestDate)
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Code = r.Code,
+                        Title = r.Title,
+                        RequestDate = r.RequestDate,
+                        Status = r.Status,
+                        VendorName = r.VendorName,
+                        CurrentStepId = r.CurrentStepId
+                        // Map fields อื่นๆ ตามต้องการ
+                    })
+                    .ToListAsync();
+
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+            }
+        }
         // POST: api/PurchaseRequest/Create
         [HttpPost("Create")]
         public async Task<IActionResult> Create([FromForm] CreatePurchaseRequestDto input)
@@ -91,7 +100,16 @@ namespace QCS.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. สร้าง Running Number (Format: PR-yyyyMMdd-XXX)
+                // 1. ดึงข้อมูล Workflow Route (ID 1) เพื่อมาสร้าง Step ใน Database
+                // (ถ้าอนาคตมีหลาย Route ต้องรับ RouteId มาจาก input)
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+
+                if (routeData == null || routeData.Steps == null)
+                {
+                    return BadRequest("ไม่สามารถดึงข้อมูล Workflow Route ได้");
+                }
+
+                // 2. สร้าง Running Number (Format: PR-yyyyMMdd-XXX)
                 var todayStr = DateTime.Now.ToString("yyyyMMdd");
                 var prefix = $"PR-{todayStr}-";
                 var countToday = await _context.PurchaseRequests
@@ -100,70 +118,74 @@ namespace QCS.API.Controllers
 
                 var newDocNo = $"{prefix}{(countToday + 1):D3}";
 
-                // 2. สร้าง Header (PurchaseRequest)
+                // 3. สร้าง Header (PurchaseRequest)
                 var pr = new PurchaseRequest
                 {
                     Code = newDocNo,
                     Title = input.Title,
                     RequestDate = DateTime.Now,
-                    Status = 1, // 1 = Pending
 
-                    // รับค่า Header จาก Form
+                    // สถานะเริ่มต้น
+                    Status = StatusConsts.PR_Pending,
+
+                    // ข้อมูลจาก Form
                     VendorId = input.VendorId,
                     VendorName = input.VendorName,
                     ValidFrom = input.ValidFrom,
                     ValidUntil = input.ValidUntil,
                     Comment = input.Comment,
 
-                    // TODO: ใส่ User ID ผู้สร้างจาก Token (User.Identity.Name หรือ Claim)
-                    // CreatedById = ... 
+                    // Initialize Collections
+                    ApprovalSteps = new List<ApprovalStep>(),
+                    Quotations = new List<Quotation>()
                 };
 
-                // 3. จัดการไฟล์แนบ (Save to Disk)
-                // path: wwwroot/uploads/YYYYMM/
-                var uploadPath = Path.Combine(_env.WebRootPath, "uploads", DateTime.Now.ToString("yyyyMM"));
-                if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
+                // 4. *** สำคัญ *** สร้าง ApprovalSteps จาก Workflow API ลง Database
+                // เพื่อให้ ApprovalController ทำงานต่อได้
+                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
 
-                if (input.Attachments != null && input.Attachments.Count > 0)
+                foreach (var step in sortedSteps)
                 {
-                    // แปลง JSON metadata กลับเป็น Object (ต้องเรียงลำดับให้ตรงกับไฟล์ที่ส่งมา)
-                    var metaDataList = JsonSerializer.Deserialize<List<QuotationItemDto>>(
-                        input.QuotationsJson ?? "[]",
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                    );
+                    var isFirstStep = step.SequenceNo == sortedSteps.First().SequenceNo;
 
-                    for (int i = 0; i < input.Attachments.Count; i++)
+                    var approvalStep = new ApprovalStep
                     {
-                        var file = input.Attachments[i];
-                        if (file.Length > 0)
-                        {
-                            // Gen ชื่อไฟล์ใหม่กันซ้ำ
-                            var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
-                            var fullPath = Path.Combine(uploadPath, uniqueFileName);
+                        Sequence = step.SequenceNo, // 1, 2, 3...
+                        Role = step.StepName,       // Purchaser, Manager...
+             
+                        // Step แรกสถานะเป็น Pending (รออนุมัติ) ส่วน Step อื่นๆ รอ (Draft/Waiting)
+                        Status = isFirstStep ? StatusConsts.Step_Pending : StatusConsts.Step_Draft,
 
-                            // บันทึกไฟล์ลง Disk
-                            using (var stream = new FileStream(fullPath, FileMode.Create))
-                            {
-                                await file.CopyToAsync(stream);
-                            }
+                        // บันทึกวันที่เริ่มต้นเฉพาะ Step แรก
+                        ActionDate = null
+                    };
 
-                            // หา Metadata ที่คู่กัน (ถ้าใช้ index หรือ match ด้วยชื่อไฟล์)
-                            // ในที่นี้สมมติว่า Frontend ส่งมาลำดับตรงกัน หรือ match ด้วยชื่อ
-                            var meta = metaDataList?.FirstOrDefault(m => m.FileName == file.FileName)
-                                       ?? new QuotationItemDto { DocumentTypeId = 10 }; // Default
+                    // (Optional) ถ้าต้องการบันทึกชื่อผู้อนุมัติลงไปเลย (snapshot) ทำตรงนี้ได้
+                    // string assigneeNames = string.Join(",", step.Assignments.Select(a => a.EmployeeName));
+                    // approvalStep.ApproverName = assigneeNames;
 
-                            pr.Quotations.Add(new Quotation
-                            {
-                                FileName = file.FileName,
-                                FilePath = Path.Combine("uploads", DateTime.Now.ToString("yyyyMM"), uniqueFileName), // เก็บ Relative Path
-                                ContentType = file.ContentType,
-                                FileSize = file.Length,
-                                DocumentTypeId = meta.DocumentTypeId
-                            });
-                        }
+                    pr.ApprovalSteps.Add(approvalStep);
+                }
+
+                // 5. กำหนด Current Step ของ Header ให้ตรงกับ Step แรก
+                if (sortedSteps.Any())
+                {
+                    var firstSeq = sortedSteps.First().SequenceNo;
+                    // แปลง Sequence เป็น Enum (ถ้าตรงกัน) หรือเก็บเป็น Int
+                    if (Enum.IsDefined(typeof(WorkflowStep), firstSeq))
+                    {
+                        pr.CurrentStep = (WorkflowStep)firstSeq;
+                    }
+                    else
+                    {
+                        pr.CurrentStepId = firstSeq;
                     }
                 }
 
+                // 6. จัดการไฟล์แนบ
+                await HandleFileUploads(input, pr);
+
+                // 7. บันทึกข้อมูล
                 _context.PurchaseRequests.Add(pr);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -177,40 +199,44 @@ namespace QCS.API.Controllers
             }
         }
 
-        // GET: api/PurchaseRequest/DownloadAttachment/5
-        [HttpGet("DownloadAttachment/{id}")]
-        public async Task<IActionResult> DownloadAttachment(int id)
+        // แยก Logic Upload File ออกมาเพื่อให้อ่านง่าย
+        private async Task HandleFileUploads(CreatePurchaseRequestDto input, PurchaseRequest pr)
         {
-            var quotation = await _context.Quotations.FindAsync(id);
-            if (quotation == null) return NotFound("File record not found.");
+            if (input.Attachments == null || input.Attachments.Count == 0) return;
 
-            // สร้าง Full Path จาก wwwroot
-            var filePath = Path.Combine(_env.WebRootPath, quotation.FilePath);
+            var uploadPath = Path.Combine(_env.WebRootPath, "uploads", DateTime.Now.ToString("yyyyMM"));
+            if (!Directory.Exists(uploadPath)) Directory.CreateDirectory(uploadPath);
 
-            if (!System.IO.File.Exists(filePath))
-                return NotFound("Physical file not found on server.");
+            var metaDataList = JsonSerializer.Deserialize<List<QuotationItemDto>>(
+                input.QuotationsJson ?? "[]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
 
-            var memory = new MemoryStream();
-            using (var stream = new FileStream(filePath, FileMode.Open))
+            foreach (var file in input.Attachments)
             {
-                await stream.CopyToAsync(memory);
+                if (file.Length > 0)
+                {
+                    var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
+                    var fullPath = Path.Combine(uploadPath, uniqueFileName);
+
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    var meta = metaDataList?.FirstOrDefault(m => m.FileName == file.FileName)
+                               ?? new QuotationItemDto { DocumentTypeId = 10 };
+
+                    pr.Quotations.Add(new Quotation
+                    {
+                        FileName = file.FileName,
+                        FilePath = Path.Combine("uploads", DateTime.Now.ToString("yyyyMM"), uniqueFileName),
+                        ContentType = file.ContentType,
+                        FileSize = file.Length,
+                        DocumentTypeId = meta.DocumentTypeId
+                    });
+                }
             }
-            memory.Position = 0;
-
-            return File(memory, quotation.ContentType ?? "application/octet-stream", quotation.FileName);
-        }
-
-        // Helper Method
-        private string GetStatusString(int status)
-        {
-            return status switch
-            {
-                0 => "Draft",
-                1 => "Pending",
-                2 => "Approved",
-                9 => "Rejected",
-                _ => "Unknown"
-            };
         }
     }
 }

@@ -9,7 +9,7 @@ namespace QCS.Domain.Models
         public virtual PurchaseRequest PurchaseRequest { get; set; }
 
         public int Sequence { get; set; }
-        public string ApproverName { get; set; } // หรือ ApproverId
+        //public string ApproverName { get; set; } // หรือ ApproverId
         public string Role { get; set; }
 
         public int Status { get; set; } // <--- ต้องเป็น int ให้ตรงกับ Consts ใหม่

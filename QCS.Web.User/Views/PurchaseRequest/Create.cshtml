@@ -43,6 +43,11 @@
             opacity: 0.6;
             pointer-events: none;
         }
+
+        .current-user-row {
+            font-weight: bold;
+            color: #007bff;
+        }
     </style>
 }
 
@@ -367,6 +372,12 @@
                     noDataText: "ยังไม่มีไฟล์แนบ",
                     columnAutoWidth: true,
                     hoverStateEnabled: true,
+                       editing: {
+                        mode: "cell",
+                        allowUpdating: true,
+                        allowDeleting: true,
+                        useIcons: true
+                    },
                     columns: [
                         {
                             dataField: "fileName",

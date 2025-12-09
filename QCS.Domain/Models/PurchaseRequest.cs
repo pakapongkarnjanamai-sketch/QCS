@@ -1,4 +1,5 @@
-﻿using System;
+﻿using QCS.Domain.Enum;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -11,7 +12,12 @@ namespace QCS.Domain.Models
         public DateTime RequestDate { get; set; }
         public int Status { get; set; }
         public int CurrentStepId { get; set; }
-
+        [NotMapped]
+        public WorkflowStep CurrentStep
+        {
+            get => (WorkflowStep)CurrentStepId;
+            set => CurrentStepId = (int)value;
+        }
         public int VendorId { get; set; }
         public string VendorName { get; set; }
 
