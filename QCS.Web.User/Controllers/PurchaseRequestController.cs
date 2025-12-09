@@ -26,5 +26,11 @@ namespace QCS.Web.User.Controllers
             // ส่ง id ไปให้ View เพื่อให้ JS เอาไปยิง API ต่อ
             return View(id);
         }
+
+        [Route("PurchaseRequest/Form/{id?}")]
+        public IActionResult Form(int? id)
+        {
+            return View(id);
+        }
     }
 }

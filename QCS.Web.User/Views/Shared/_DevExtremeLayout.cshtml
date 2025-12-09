@@ -170,13 +170,8 @@
             $("#menu").dxMenu({
                 dataSource: [
                     { text: "หน้าหลัก (Dashboard)", icon: "home", path: "@Url.Action("Index", "Home")" },
-                    {
-                        text: "ใบขอซื้อ (My Requests)", icon: "file",
-                        items: [
-                            { text: "สร้างใบขอซื้อใหม่ (New Request)", icon: "add", path: "@Url.Action("Create", "PurchaseRequest")" },
-                            { text: "ประวัติการขอซื้อ (History)", icon: "clock", path: "@Url.Action("Index", "PurchaseRequest")" }
-                        ]
-                    },
+                    { text: "ใบขอซื้อ (My Requests)", icon: "file", path: "@Url.Action("Index", "PurchaseRequest")"  },
+                  
                     { text: "การอนุมัติ (Approvals)", icon: "check", path: "@Url.Action("Index", "Approval")" }
                 ],
                 displayExpr: "text",

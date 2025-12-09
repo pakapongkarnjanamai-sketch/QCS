@@ -1,53 +1,10 @@
 ﻿@{
-    ViewData["Title"] = "รายการใบขอซื้อ (My Requests)";
+    ViewData["Title"] = "รายการใบขอซื้อ (Purchase Request List)";
 }
 
 @section Styles {
     <style>
-        /* --- Link Styling --- */
-        .doc-no-link {
-            color: #0d6efd;
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-            .doc-no-link:hover {
-                text-decoration: underline;
-                color: #0a58ca;
-            }
-
-        /* --- Status Badge (Theme เดียวกับหน้า Detail) --- */
-        .status-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 500;
-            color: white;
-            display: inline-block;
-            min-width: 90px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .status-draft {
-            background-color: #6c757d;
-        }
-
-        .status-pending {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .status-approved {
-            background-color: #28a745;
-        }
-
-        .status-rejected {
-            background-color: #dc3545;
-        }
-
-        /* --- Card & Layout --- */
+        /* --- Layout & Card --- */
         .qcs-card {
             background: #fff;
             border-radius: 8px;
@@ -55,103 +12,146 @@
             padding: 20px;
             border: 1px solid #eaeaea;
         }
+
+        /* --- Status Badges --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+            display: inline-block;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .status-draft {
+            background-color: #6c757d;
+        }
+        /* 0: Waiting */
+        .status-pending {
+            background-color: #ffc107;
+            color: #000;
+        }
+        /* 1: Pending */
+        .status-approved {
+            background-color: #28a745;
+        }
+        /* 2: Approved */
+        .status-rejected {
+            background-color: #dc3545;
+        }
+        /* 9: Rejected */
+
+        /* --- Grid Tweaks --- */
+        .dx-datagrid-header-panel {
+            padding-bottom: 10px;
+        }
+
+        .doc-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+            .doc-link:hover {
+                text-decoration: underline;
+            }
     </style>
 }
 
 <div class="container mt-4">
     <div class="qcs-card mb-3">
-        <div class="page-header-row d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h6 class="page-title mb-1 d-flex align-items-center">
-                    <i class="fas fa-list-alt text-primary me-2"></i>
-                    <span>รายการใบขอซื้อ (My Purchase Requests)</span>
-                </h6>
-                <small class="text-muted ms-4 ps-2">รายการเอกสารที่คุณสร้างและสถานะปัจจุบัน</small>
+                <h5 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-list-alt me-2"></i> @ViewData["Title"]
+                </h5>
+                <small class="text-muted">จัดการรายการใบขอซื้อทั้งหมดของคุณ</small>
             </div>
-
-            <a href="@Url.Action("Create", "PurchaseRequest")" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> สร้างใบขอซื้อใหม่
-            </a>
+            <div id="btnCreateNew"></div>
         </div>
     </div>
 
     <div class="qcs-card">
-        <div id="requestsGrid"></div>
+        <div id="gridContainer"></div>
     </div>
 </div>
 
 @section Scripts {
     <script>
         $(function () {
-            // === 1. CONFIGURATION ===
+            // === CONFIGURATION ===
             const CONFIG = {
-                API_URL: "https://localhost:7127/api/PurchaseRequest/MyRequests",
-                DETAIL_URL: '@Url.Action("Detail", "PurchaseRequest")'
+                API_BASE_URL: "https://localhost:7127/api",
+                API_LOAD_URL: "/PurchaseRequest/MyRequests",
+                FORM_URL: '@Url.Action("Form", "PurchaseRequest")'
             };
 
-            // === 2. DATA STORE ===
+            // === STORE ===
             const store = DevExpress.data.AspNet.createStore({
                 key: "id",
-                loadUrl: CONFIG.API_URL,
-                onBeforeSend: function(method, ajaxOptions) {
+                loadUrl: CONFIG.API_BASE_URL + CONFIG.API_LOAD_URL,
+                onBeforeSend: function (method, ajaxOptions) {
                     ajaxOptions.xhrFields = { withCredentials: true };
                 }
             });
 
-            // === 3. RENDER GRID ===
-            $("#requestsGrid").dxDataGrid({
+            // === INIT UI ===
+            $("#btnCreateNew").dxButton({
+                text: "สร้างใบขอซื้อใหม่ (New Request)",
+                icon: "plus",
+                type: "default",
+                stylingMode: "contained",
+                onClick: function () {
+                    window.location.href = CONFIG.FORM_URL;
+                }
+            });
+
+            $("#gridContainer").dxDataGrid({
                 dataSource: store,
                 showBorders: true,
                 showRowLines: true,
+                rowAlternationEnabled: true,
                 columnAutoWidth: true,
                 hoverStateEnabled: true,
-                rowAlternationEnabled: true,
-                searchPanel: { visible: true, width: 250, placeholder: "ค้นหาเอกสาร..." },
-                filterRow: { visible: true },
+
+                // Features
+                searchPanel: { visible: true, width: 250, placeholder: "ค้นหา (Search)..." },
+                filterRow: { visible: true, applyFilter: "auto" },
+                headerFilter: { visible: true },
                 paging: { pageSize: 10 },
-                pager: {
-                    showPageSizeSelector: true,
-                    allowedPageSizes: [10, 20, 50],
-                    showInfo: true
-                },
-                selection: { mode: "single" },
-                // คลิกแถวเพื่อไปหน้า Detail
-                onRowClick: function(e) {
-                    if(e.rowType === "data") {
-                        goToDetail(e.data.id);
-                    }
-                },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+
+                // Columns Configuration (แก้ไขชื่อ DataField ให้ตรงกับ JSON)
                 columns: [
                     {
-                        dataField: "code",
+                        dataField: "code", // [แก้ไข] จาก docNo เป็น code
                         caption: "เลขที่เอกสาร",
                         width: 160,
-                        alignment: "center",
                         cellTemplate: function(container, options) {
-                            // แสดงเป็น Link สีน้ำเงิน
-                            $("<span>")
-                                .addClass("doc-no-link")
-                                .text(options.value)
-                                .on("click", function(e) {
-                                    e.stopPropagation(); // ป้องกัน row click ซ้ำซ้อน
-                                    goToDetail(options.data.id);
-                                })
+                            const docNo = options.value || "(Draft)";
+                            $("<a>")
+                                .addClass("doc-link")
+                                .text(docNo)
+                                .attr("href", `${CONFIG.FORM_URL}/${options.data.id}`)
                                 .appendTo(container);
                         }
                     },
                     {
                         dataField: "title",
-                        caption: "หัวข้อการจัดซื้อ (Title)",
+                        caption: "หัวข้อ (Title)",
                         minWidth: 200
                     },
                     {
                         dataField: "vendorName",
                         caption: "ผู้ขาย (Vendor)",
-                        width: 200
+                        width: 250
                     },
                     {
-                        dataField: "requestDate",
-                        caption: "วันที่สร้าง",
+                        dataField: "requestDate", // [แก้ไข] จาก createdDate เป็น requestDate
+                        caption: "วันที่ขอซื้อ",
                         dataType: "date",
                         format: "dd/MM/yyyy",
                         width: 120,
@@ -160,48 +160,36 @@
                     {
                         dataField: "status",
                         caption: "สถานะ",
-                        width: 150,
+                        width: 120,
                         alignment: "center",
                         cellTemplate: function (container, options) {
-                            // ใช้ Helper Map Status (Int -> Text/Class)
-                            const s = mapStatus(options.value);
-                            $("<span>")
-                                .addClass("status-badge " + s.cls)
-                                .text(s.text)
-                                .appendTo(container);
+                            const status = options.value;
+                            let text = "Waiting";
+                            let cls = "status-draft";
+
+                            // Logic Mapping Status
+                            if (status === 1) { text = "Pending"; cls = "status-pending"; }
+                            else if (status === 2) { text = "Approved"; cls = "status-approved"; }
+                            else if (status === 9) { text = "Rejected"; cls = "status-rejected"; }
+
+                            $("<span>").addClass("status-badge " + cls).text(text).appendTo(container);
                         }
                     },
                     {
                         type: "buttons",
-                        width: 80,
-                        buttons: [{
-                            hint: "ดูรายละเอียด",
-                            icon: "find",
-                            onClick: function(e) {
-                                goToDetail(e.row.data.id);
+                        width: 70,
+                        buttons: [
+                            {
+                                hint: "ดูรายละเอียด / แก้ไข",
+                                icon: "edit",
+                                onClick: function (e) {
+                                    window.location.href = `${CONFIG.FORM_URL}/${e.row.data.id}`;
+                                }
                             }
-                        }]
+                        ]
                     }
                 ]
             });
-
-            // === HELPER FUNCTIONS ===
-
-            function goToDetail(id) {
-                window.location.href = `${CONFIG.DETAIL_URL}/${id}`;
-            }
-
-            // แปลง Status ID (Int) เป็น Text และ CSS Class
-            function mapStatus(status) {
-                // 0=Draft, 1=Pending, 2=Approved, 9=Rejected
-                if (status == 0) return { text: 'Draft', cls: 'status-draft' };
-                if (status == 1) return { text: 'Pending', cls: 'status-pending' };
-                if (status == 2) return { text: 'Approved', cls: 'status-approved' };
-                if (status == 9) return { text: 'Rejected', cls: 'status-rejected' };
-
-                // กรณีไม่ตรงเงื่อนไข (หรือ Status เป็น null)
-                return { text: 'Unknown', cls: 'status-draft' };
-            }
         });
     </script>
 }
