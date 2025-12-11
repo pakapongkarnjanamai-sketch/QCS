@@ -35,9 +35,9 @@ namespace QCS.API.Controllers
 
             // 2. คำนวณตัวเลขสรุป (ใช้ CountAsync เพื่อประสิทธิภาพ)
             var total = await query.CountAsync();
-            var pending = await query.CountAsync(x => x.Status == StatusConsts.PR_Pending);
-            var approved = await query.CountAsync(x => x.Status == StatusConsts.PR_Approved || x.Status == StatusConsts.PR_Completed);
-            var rejected = await query.CountAsync(x => x.Status == StatusConsts.PR_Rejected);
+            var pending = await query.CountAsync(x => x.Status == (int)RequestStatus.Pending);
+            var approved = await query.CountAsync(x => x.Status == (int)RequestStatus.Approved || x.Status == (int)RequestStatus.Completed);
+            var rejected = await query.CountAsync(x => x.Status == (int)RequestStatus.Rejected);
 
             // 3. ดึงรายการล่าสุด 10 รายการ
             var recent = await query.OrderByDescending(x => x.Id) // หรือ CreatedDate

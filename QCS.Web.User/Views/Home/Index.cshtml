@@ -208,11 +208,11 @@
                             var colorClass = "";
 
                             // ใช้ตัวเลข Magic Number หรือสร้าง Object Map เพื่อให้อ่านง่าย
-                            if (status == @StatusConsts.PR_Draft) { text = "แบบร่าง"; colorClass = "badge bg-secondary"; }
-                            else if (status == @StatusConsts.PR_Pending) { text = "รออนุมัติ"; colorClass = "badge bg-warning text-dark"; }
-                            else if (status == @StatusConsts.PR_Approved) { text = "อนุมัติ"; colorClass = "badge bg-success"; }
-                            else if (status == @StatusConsts.PR_Completed) { text = "เสร็จสมบูรณ์"; colorClass = "badge bg-success"; }
-                            else if (status == @StatusConsts.PR_Rejected) { text = "ไม่อนุมัติ"; colorClass = "badge bg-danger"; }
+                            if (status == @RequestStatus.Draft) { text = "แบบร่าง"; colorClass = "badge bg-secondary"; }
+                            else if (status == @RequestStatus.Pending) { text = "รออนุมัติ"; colorClass = "badge bg-warning text-dark"; }
+                            else if (status == @RequestStatus.Approved) { text = "อนุมัติ"; colorClass = "badge bg-success"; }
+                            else if (status == @RequestStatus.Completed) { text = "เสร็จสมบูรณ์"; colorClass = "badge bg-success"; }
+                            else if (status == @RequestStatus.Rejected) { text = "ไม่อนุมัติ"; colorClass = "badge bg-danger"; }
                             else { text = "อื่นๆ"; colorClass = "badge bg-light text-dark"; }
 
                             $("<span class='" + colorClass + "'>" + text + "</span>").appendTo(container);

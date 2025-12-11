@@ -34,7 +34,7 @@ namespace QCS.API.Controllers
                 // เพื่อความชัวร์ หาจาก ApprovalSteps ที่สถานะ Pending และ Sequence ต่ำสุด
                 var currentStepObj = request.ApprovalSteps
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Status == StatusConsts.Step_Pending);
+                    .FirstOrDefault(s => s.Status != (int)RequestStatus.Approved);
 
                 if (currentStepObj == null)
                     return BadRequest("เอกสารนี้ไม่มีขั้นตอนที่รออนุมัติ หรือสิ้นสุดกระบวนการแล้ว");
@@ -45,7 +45,7 @@ namespace QCS.API.Controllers
                 // ---------------------------------------------
 
                 // 3. อัปเดตสถานะของ Step นี้
-                currentStepObj.Status = StatusConsts.Step_Approved; // 2
+                currentStepObj.Status = (int)RequestStatus.Approved; // 2
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
 
@@ -57,7 +57,7 @@ namespace QCS.API.Controllers
                 if (nextStepObj == null)
                 {
                     // === กรณี: ไม่มี Step ต่อไปแล้ว (จบ Process) ===
-                    request.Status = StatusConsts.PR_Approved; // 2
+                    request.Status = (int)RequestStatus.Approved;  // 2
                     request.CurrentStep = WorkflowStep.Completed; // Enum 99
                 }
                 else
@@ -82,7 +82,7 @@ namespace QCS.API.Controllers
                     }
 
                     // สถานะ PR ยังคงเป็น Pending (1)
-                    request.Status = StatusConsts.PR_Pending;
+                    request.Status = (int)RequestStatus.Pending;
                 }
 
                 _context.Update(request);
@@ -112,18 +112,18 @@ namespace QCS.API.Controllers
 
                 var currentStepObj = request.ApprovalSteps
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Status == StatusConsts.Step_Pending);
+                    .FirstOrDefault(s => s.Status == (int)RequestStatus.Pending);
 
                 if (currentStepObj == null)
                     return BadRequest("No pending approval step found.");
 
                 // 1. อัปเดต Step เป็น Rejected
-                currentStepObj.Status = StatusConsts.Step_Rejected; // 9
+                currentStepObj.Status = (int)RequestStatus.Rejected; // 9
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
 
                 // 2. อัปเดต Header PR
-                request.Status = StatusConsts.PR_Rejected; // 9
+                request.Status = (int)RequestStatus.Rejected; // 9
                 request.CurrentStep = WorkflowStep.Rejected; // Enum -1
 
                 _context.Update(request);

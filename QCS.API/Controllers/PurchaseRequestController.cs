@@ -85,11 +85,11 @@ namespace QCS.API.Controllers
                 bool canApprove = false;
                 bool canEdit = false;
                 var currentUserId = User.Identity?.Name;
-                if (request.Status == StatusConsts.PR_Draft && request.CreatedBy == currentUserId)
+                if (request.Status == (int)RequestStatus.Draft && request.CreatedBy == currentUserId)
                 {
                     canEdit = true;
                 }
-                if (request.Status == StatusConsts.PR_Pending && workflowRoute != null)
+                if (request.Status == (int)RequestStatus.Pending && workflowRoute != null)
                 {
                     var currentStepConfig = workflowRoute.Steps
                         .FirstOrDefault(s => s.SequenceNo == (int)request.CurrentStep); // หรือ request.CurrentStepId
@@ -317,11 +317,11 @@ namespace QCS.API.Controllers
                 // 6. Workflow Logic (เหมือนเดิม)
                 if (isSubmit)
                 {
-                    pr.Status = StatusConsts.PR_Pending;
+                    pr.Status = (int)RequestStatus.Pending;
                     var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
-                    if (step1 != null) { step1.Status = StatusConsts.Step_Approved; step1.ActionDate = DateTime.Now; }
+                    if (step1 != null) { step1.Status = (int)RequestStatus.Approved; step1.ActionDate = DateTime.Now; }
                     var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
-                    if (step2 != null) { step2.Status = StatusConsts.Step_Pending; pr.CurrentStepId = 2; }
+                    if (step2 != null) { step2.Status = (int)RequestStatus.Pending; pr.CurrentStepId = 2; }
                 }
 
                 await _context.SaveChangesAsync();
@@ -373,13 +373,13 @@ namespace QCS.API.Controllers
                     if (nextStep != null)
                     {
                         currentStepId = nextStep.SequenceNo; // ไป Step 2
-                        docStatus = StatusConsts.PR_Pending; // สถานะเอกสาร: รออนุมัติ
+                        docStatus = (int)RequestStatus.Pending; // สถานะเอกสาร: รออนุมัติ
                     }
                     else
                     {
                         // ถ้า Workflow มีแค่ Step เดียว -> จบกระบวนการเลย
                         currentStepId = 99; // Completed sequence
-                        docStatus = StatusConsts.PR_Completed;
+                        docStatus = (int)RequestStatus.Completed;
                     }
                 }
                 else
@@ -387,7 +387,7 @@ namespace QCS.API.Controllers
                     // กรณี Save (บันทึกร่าง):
                     // งานยังอยู่ที่ Step 1 (Purchaser)
                     currentStepId = 1;
-                    docStatus = StatusConsts.PR_Draft; // สถานะเอกสาร: ร่าง
+                    docStatus = (int)RequestStatus.Draft; // สถานะเอกสาร: ร่าง
                 }
 
                 // 4. สร้าง Header (PurchaseRequest)
@@ -413,7 +413,7 @@ namespace QCS.API.Controllers
                 // 5. สร้าง Approval Steps (รายการอนุมัติย่อย)
                 foreach (var step in sortedSteps)
                 {
-                    int stepStatus = StatusConsts.Step_Draft; // Default: ยังมาไม่ถึง
+                    int stepStatus = (int)RequestStatus.Draft; // Default: ยังมาไม่ถึง
                     DateTime? actionDate = null;
 
                     if (step.SequenceNo == 1) // Step 1: Purchaser
@@ -421,13 +421,13 @@ namespace QCS.API.Controllers
                         if (isSubmit)
                         {
                             // ถ้ากด Create แสดงว่า Step 1 ทำเสร็จแล้ว -> Approved
-                            stepStatus = StatusConsts.Step_Approved;
+                            stepStatus = (int)RequestStatus.Approved;
                             actionDate = DateTime.Now;
                         }
                         else
                         {
                             // ถ้ากด Save แสดงว่ากำลังทำอยู่ -> Pending
-                            stepStatus = StatusConsts.Step_Pending;
+                            stepStatus = (int)RequestStatus.Pending;
                         }
                     }
                     else if (step.SequenceNo == 2) // Step 2: Verifier
@@ -435,12 +435,12 @@ namespace QCS.API.Controllers
                         if (isSubmit)
                         {
                             // ถ้าส่งงานมาแล้ว -> มารอที่ Step 2
-                            stepStatus = StatusConsts.Step_Pending;
+                            stepStatus = (int)RequestStatus.Pending;
                         }
                         else
                         {
                             // ถ้ายังเป็น Draft -> ยังมาไม่ถึง
-                            stepStatus = StatusConsts.Step_Draft;
+                            stepStatus = (int)RequestStatus.Draft;
                         }
                     }
                     // Step 3+ เป็น Draft/Waiting ทั้งหมด
