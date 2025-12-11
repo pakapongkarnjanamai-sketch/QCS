@@ -39,18 +39,6 @@ namespace QCS.Domain.DTOs
         public bool CanReject { get; set; }
         public bool CanEdit { get; set; }
     }
-    public class QuotationDetailDto
-    {
-        public int Id { get; set; }
-        public int DocumentTypeId { get; set; }
-        public string OriginalFileName { get; set; }
-        public string FilePath { get; set; } // URL สำหรับ Download
-    }
-    public class QuotationDetailItemDto
-    {
-        public int Id { get; set; }
-        public int DocumentTypeId { get; set; }
-        public string OriginalFileName { get; set; }
-        public string FilePath { get; set; } // ลิงก์สำหรับ Download
-    }
+
+   
 }

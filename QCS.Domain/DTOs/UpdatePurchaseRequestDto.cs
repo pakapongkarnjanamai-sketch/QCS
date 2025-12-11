@@ -22,10 +22,5 @@ namespace QCS.Domain.DTOs
         public string? UpdatedQuotationsJson { get; set; }
     }
 
-    // Class สำหรับรับข้อมูลไฟล์เดิมที่จะแก้
-    public class UpdateQuotationItemDto
-    {
-        public int Id { get; set; }
-        public int DocumentTypeId { get; set; }
-    }
+
 }

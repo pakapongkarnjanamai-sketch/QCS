@@ -30,13 +30,24 @@ namespace QCS.API.Controllers
             _workflowService = workflowService;
         }
 
-        // Helper: ดึง User ID (nId) ของคนที่ Login อยู่
-        private string CurrentUserNId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                                         ?? User.FindFirst("nId")?.Value
-                                         ?? "SYSTEM";
+        // ==========================================================
+        // 🔑 HELPER: CURRENT USER
+        // ==========================================================
+        private string CurrentUserNId
+        {
+            get
+            {
+                var fullIdentityName = User.Identity?.Name; // เช่น "DOMAIN\n4734"
+                if (string.IsNullOrEmpty(fullIdentityName)) return "SYSTEM";
+
+                var parts = fullIdentityName.Split('\\');
+                // เอาส่วนข้างหลัง \ ถ้ามี หรือเอาทั้งหมดถ้าไม่มี
+                return parts.Length > 1 ? parts[1] : parts[0];
+            }
+        }
 
         // ==========================================================
-        // 🔍 GET DETAIL (Main Endpoint)
+        // 🔍 GET DETAIL
         // ==========================================================
         [HttpGet("Detail/{id}")]
         public async Task<IActionResult> GetRequestDetail(int id)
@@ -45,15 +56,14 @@ namespace QCS.API.Controllers
             {
                 // 1. ดึงข้อมูล PR และ History
                 var request = await _context.PurchaseRequests
-                    .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile) // Include เพื่อเช็คว่ามีไฟล์ไหม
+                    .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == id);
 
                 if (request == null) return NotFound("ไม่พบข้อมูลเอกสาร");
 
-                // 2. ดึง Workflow Route Template (จาก API)
-                // เพื่อเอาโครงสร้างว่า Step 1, 2, 3 คือใคร (Plan)
-                var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1);
+                // 2. ดึง Workflow Template (Plan)
+                var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1); // ID 1
 
                 // 3. Merge ข้อมูล: เอา History (Actual) ไปแปะทับ Route (Plan)
                 if (workflowRoute != null && workflowRoute.Steps != null)
@@ -70,14 +80,19 @@ namespace QCS.API.Controllers
                             routeStep.ActionDate = actualStep.ActionDate;
                             routeStep.Comment = actualStep.Comment;
 
-                            // Map ชื่อคนอนุมัติจริง (ถ้ามี)
+                            // Map ข้อมูลผู้กระทำ (Actual Approver)
                             if (!string.IsNullOrEmpty(actualStep.ApproverName))
                             {
                                 routeStep.ApproverName = actualStep.ApproverName;
                             }
+                            // ส่ง NId ของคนทำจริงไปด้วย
+                            if (!string.IsNullOrEmpty(actualStep.ApproverNId))
+                            {
+                                routeStep.ApproverNId = actualStep.ApproverNId;
+                            }
                         }
 
-                        // Map Flag 'IsCurrentUser' สำหรับ Assignments
+                        // Map Flag 'IsCurrentUser' สำหรับ Assignments (เพื่อ Highlight ว่าตาใคร)
                         if (routeStep.Assignments != null)
                         {
                             foreach (var assign in routeStep.Assignments)
@@ -91,20 +106,18 @@ namespace QCS.API.Controllers
                     }
                 }
 
-                // 4. คำนวณ Permission (สำหรับปุ่มกด)
+                // 4. คำนวณ Permission
                 bool canApprove = false;
                 bool canReject = false;
                 bool canEdit = false;
 
-                // Logic Edit: แก้ได้ถ้าเป็น Draft หรือ Rejected และเป็นคนสร้าง
-                // (สมมติว่าไม่มี field CreatedBy ใน Model ให้ใช้ Logic อื่นแทน หรือเพิ่ม field)
-                // ในที่นี้สมมติว่าใครสร้างก็ได้แก้ได้ถ้ายังไม่ส่ง (ปรับตาม Business Logic จริง)
-                if (request.Status == (int)RequestStatus.Draft || request.Status == (int)RequestStatus.Rejected)
+                // Edit: แก้ได้ถ้าเป็น Draft เท่านั้น (Rejected หรือ Completed แก้ไม่ได้)
+                if (request.Status == (int)RequestStatus.Draft)
                 {
                     canEdit = true;
                 }
 
-                // Logic Approve: ต้องเป็น Pending + งานอยู่ที่ Step ปัจจุบัน + User ตรงกับ Assignment
+                // Approve: ต้องเป็น Pending + งานอยู่ที่ Step นี้ + User ตรงกับ Assignment ใน Workflow Plan
                 if (request.Status == (int)RequestStatus.Pending && workflowRoute != null)
                 {
                     var currentStepConfig = workflowRoute.Steps
@@ -112,8 +125,7 @@ namespace QCS.API.Controllers
 
                     if (currentStepConfig != null && currentStepConfig.Assignments != null)
                     {
-                        // เช็คว่า User ปัจจุบันอยู่ในรายการผู้รับผิดชอบหรือไม่
-                        if (currentStepConfig.Assignments.Any(a => a.IsCurrentUser))
+                        if (currentStepConfig.Assignments.Any(a => a.IsCurrentUser)) // ใช้ IsCurrentUser ที่ Set ไว้ข้างบน
                         {
                             canApprove = true;
                             canReject = true;
@@ -125,7 +137,7 @@ namespace QCS.API.Controllers
                 var dto = new PurchaseRequestDetailDto
                 {
                     PurchaseRequestId = request.Id,
-                    DocumentNo = request.Code, // หรือ request.DocumentNo
+                    DocumentNo = request.Code,
                     Title = request.Title,
                     RequestDate = request.RequestDate,
                     Status = request.Status.ToString(),
@@ -140,7 +152,7 @@ namespace QCS.API.Controllers
                     {
                         Id = q.Id,
                         DocumentTypeId = q.DocumentTypeId,
-                        OriginalFileName = q.FileName, // หรือ q.OriginalFileName
+                        OriginalFileName = q.FileName,
                         FilePath = q.FilePath
                     }).ToList(),
 
@@ -151,7 +163,7 @@ namespace QCS.API.Controllers
                         CanEdit = canEdit
                     },
 
-                    WorkflowRoute = workflowRoute // ส่ง Route ที่ Merge แล้วกลับไป
+                    WorkflowRoute = workflowRoute
                 };
 
                 return Ok(dto);
@@ -163,37 +175,58 @@ namespace QCS.API.Controllers
         }
 
         // ==========================================================
-        // 💾 SAVE & SUBMIT (Create)
+        // 📋 LIST MY REQUESTS
+        // ==========================================================
+        [HttpGet("MyRequests")]
+        public async Task<IActionResult> GetMyRequests()
+        {
+            try
+            {
+                // ถ้ามี field CreatedBy ให้ Uncomment
+                var requests = await _context.PurchaseRequests
+                    // .Where(r => r.CreatedBy == CurrentUserNId) 
+                    .OrderByDescending(r => r.RequestDate)
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Code = r.Code,
+                        Title = r.Title,
+                        RequestDate = r.RequestDate,
+                        Status = r.Status,
+                        VendorName = r.VendorName,
+                        CurrentStepId = r.CurrentStepId
+                    })
+                    .ToListAsync();
+
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        // ==========================================================
+        // 💾 ACTIONS
         // ==========================================================
         [HttpPost("Save")]
         public async Task<IActionResult> Save([FromForm] CreatePurchaseRequestDto input)
-        {
-            return await ProcessCreation(input, isSubmit: false);
-        }
+            => await ProcessCreation(input, isSubmit: false);
 
         [HttpPost("Submit")]
         public async Task<IActionResult> Submit([FromForm] CreatePurchaseRequestDto input)
-        {
-            return await ProcessCreation(input, isSubmit: true);
-        }
+            => await ProcessCreation(input, isSubmit: true);
 
-        // ==========================================================
-        // 📝 UPDATE & SUBMIT (Edit)
-        // ==========================================================
         [HttpPost("Update")]
         public async Task<IActionResult> Update([FromForm] UpdatePurchaseRequestDto input)
-        {
-            return await ProcessUpdate(input, isSubmit: false);
-        }
+            => await ProcessUpdate(input, isSubmit: false);
 
         [HttpPost("SubmitUpdate")]
         public async Task<IActionResult> SubmitUpdate([FromForm] UpdatePurchaseRequestDto input)
-        {
-            return await ProcessUpdate(input, isSubmit: true);
-        }
+            => await ProcessUpdate(input, isSubmit: true);
 
         // ==========================================================
-        // 🛠 CORE LOGIC: PROCESS CREATION
+        // 🛠 CORE LOGIC: PROCESS CREATION (Submit = Approve Step 1)
         // ==========================================================
         private async Task<IActionResult> ProcessCreation(CreatePurchaseRequestDto input, bool isSubmit)
         {
@@ -201,7 +234,7 @@ namespace QCS.API.Controllers
             try
             {
                 // 1. ดึง Workflow Template
-                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1); // ID=1 (Fixed or from Input)
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
                 if (routeData == null || routeData.Steps == null)
                     return BadRequest("ไม่สามารถดึงข้อมูล Workflow Route ได้");
 
@@ -217,7 +250,6 @@ namespace QCS.API.Controllers
                 int currentStepId = 1;
                 int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
 
-                // กรณี Submit: Step 1 (Purchaser) เสร็จเลย -> ไป Step 2
                 if (isSubmit)
                 {
                     var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
@@ -242,7 +274,7 @@ namespace QCS.API.Controllers
                     Quotations = new List<Quotation>()
                 };
 
-                // 5. Create Approval Steps & Assign Approvers
+                // 5. Create Approval Steps
                 foreach (var step in sortedSteps)
                 {
                     int stepStatus = (int)RequestStatus.Draft;
@@ -250,36 +282,36 @@ namespace QCS.API.Controllers
                     string? approverNId = null;
                     string? approverName = null;
 
-                    // Logic Status
-                    if (step.SequenceNo == 1) // Purchaser (คนสร้าง)
+                    if (step.SequenceNo == 1) // Step 1: Purchaser (User ปัจจุบัน)
                     {
-                        if (isSubmit) { stepStatus = (int)RequestStatus.Approved; actionDate = DateTime.Now; }
-                        else { stepStatus = (int)RequestStatus.Pending; }
+                        if (isSubmit)
+                        {
+                            // === Submit คือการ Approve Step 1 ===
+                            stepStatus = (int)RequestStatus.Approved;
+                            actionDate = DateTime.Now;
 
-                        // Step 1 คือคนปัจจุบันเสมอ
-                        approverNId = CurrentUserNId;
+                            // บันทึกตัวตนผู้กระทำทันที
+                            approverNId = CurrentUserNId;
+
+                            // ไปดึงชื่อจริงจาก Workflow API มาบันทึก
+                            var fetchedName = await _workflowService.GetEmployeeNameFromWorkflowAsync(1, CurrentUserNId);
+                            approverName = !string.IsNullOrEmpty(fetchedName) ? fetchedName : CurrentUserNId;
+                        }
+                        else
+                        {
+                            stepStatus = (int)RequestStatus.Pending; // Save Draft
+                        }
                     }
                     else if (step.SequenceNo == 2 && isSubmit)
                     {
-                        stepStatus = (int)RequestStatus.Pending; // มารอที่คนนี้
-                    }
-
-                    // Logic Assignment (ดึงจาก Template มาใส่ DB เพื่อให้ ApprovalController เช็คได้)
-                    if (step.Assignments != null && step.Assignments.Any())
-                    {
-                        // สมมติเอาคนแรกมาเป็น Assignee หลัก (หรือจะเก็บเป็น List แยกก็ได้ แต่ Model ApprovalStep รับ 1 คน)
-                        var assignee = step.Assignments.FirstOrDefault();
-                        if (assignee != null && step.SequenceNo != 1) // Step 1 ใช้ CurrentUser
-                        {
-                            approverNId = assignee.NId;
-                            approverName = assignee.EmployeeName;
-                        }
+                        stepStatus = (int)RequestStatus.Pending; // มารอที่ Step 2
+                        // Approver ว่างไว้ เพราะยังไม่มีคนกด
                     }
 
                     pr.ApprovalSteps.Add(new ApprovalStep
                     {
                         Sequence = step.SequenceNo,
-                        StepName = step.StepName, // ใช้ StepName แทน Role
+                        StepName = step.StepName,
                         Status = stepStatus,
                         ActionDate = actionDate,
                         ApproverNId = approverNId,
@@ -287,7 +319,7 @@ namespace QCS.API.Controllers
                     });
                 }
 
-                // 6. Upload Files
+                // 6. Handle Files
                 await HandleFileUploads(input, pr);
 
                 _context.PurchaseRequests.Add(pr);
@@ -304,7 +336,7 @@ namespace QCS.API.Controllers
         }
 
         // ==========================================================
-        // 🛠 CORE LOGIC: PROCESS UPDATE
+        // 🛠 CORE LOGIC: PROCESS UPDATE (Submit = Approve Step 1)
         // ==========================================================
         private async Task<IActionResult> ProcessUpdate(UpdatePurchaseRequestDto input, bool isSubmit)
         {
@@ -318,6 +350,12 @@ namespace QCS.API.Controllers
 
                 if (pr == null) return NotFound("ไม่พบข้อมูล");
 
+                // 🔒 VALIDATION: อนุญาตให้แก้ไขเฉพาะตอน Draft เท่านั้น
+                if (pr.Status != (int)RequestStatus.Draft)
+                {
+                    return BadRequest("ไม่สามารถแก้ไขเอกสารได้ เนื่องจากสถานะปัจจุบันไม่ใช่ Draft (เอกสารอยู่ระหว่างการอนุมัติ หรือจบกระบวนการแล้ว)");
+                }
+
                 // Update Header
                 pr.Title = input.Title;
                 pr.VendorId = input.VendorId;
@@ -326,25 +364,30 @@ namespace QCS.API.Controllers
                 pr.ValidUntil = input.ValidUntil;
                 pr.Remark = input.Remark;
 
-                // Update Workflow Status
                 if (isSubmit)
                 {
                     pr.Status = (int)RequestStatus.Pending;
 
-                    // Step 1 -> Approved
+                    // Step 1: Update เป็น Approved + บันทึกผู้กระทำ
                     var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
                     if (step1 != null)
                     {
                         step1.Status = (int)RequestStatus.Approved;
                         step1.ActionDate = DateTime.Now;
-                        step1.ApproverNId = CurrentUserNId; // อัปเดตคนกด Submit ล่าสุด
+
+                        // บันทึกคนกด Submit ล่าสุด
+                        step1.ApproverNId = CurrentUserNId;
+                        var fetchedName = await _workflowService.GetEmployeeNameFromWorkflowAsync(1, CurrentUserNId);
+                        step1.ApproverName = !string.IsNullOrEmpty(fetchedName) ? fetchedName : CurrentUserNId;
                     }
 
-                    // Step 2 -> Pending
+                    // Step 2: เปิด Status Pending (เคลียร์คนทำเก่าออก กรณีถูก Reject กลับมา)
                     var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
                     if (step2 != null)
                     {
                         step2.Status = (int)RequestStatus.Pending;
+                        step2.ApproverNId = null;
+                        step2.ApproverName = null;
                         pr.CurrentStepId = 2;
                     }
                 }
@@ -387,13 +430,10 @@ namespace QCS.API.Controllers
         }
 
         // ==========================================================
-        // 📂 FILE UTILS
+        // 📂 FILE HELPER
         // ==========================================================
         private async Task HandleFileUploads(dynamic input, PurchaseRequest pr)
         {
-            // dynamic input รองรับทั้ง CreateDto และ UpdateDto
-            // โดยต้องมี Property: Attachments (หรือ NewAttachments) และ QuotationsJson
-
             var files = (input.GetType().GetProperty("Attachments")?.GetValue(input) as List<IFormFile>)
                         ?? (input.GetType().GetProperty("NewAttachments")?.GetValue(input) as List<IFormFile>);
 
@@ -408,7 +448,6 @@ namespace QCS.API.Controllers
             {
                 if (file.Length > 0)
                 {
-                    // 1. อ่านไฟล์เป็น Byte
                     byte[] fileData;
                     using (var ms = new MemoryStream())
                     {
@@ -416,7 +455,6 @@ namespace QCS.API.Controllers
                         fileData = ms.ToArray();
                     }
 
-                    // 2. สร้าง AttachmentFile (เก็บเนื้อไฟล์)
                     var attachment = new AttachmentFile
                     {
                         FileName = file.FileName,
@@ -425,18 +463,16 @@ namespace QCS.API.Controllers
                         Data = fileData
                     };
 
-                    // 3. หา DocumentType
                     var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
                     int typeId = meta != null ? meta.DocumentTypeId : 10;
 
-                    // 4. สร้าง Quotation (เก็บ Metadata)
                     var quotation = new Quotation
                     {
                         FileName = file.FileName,
                         ContentType = file.ContentType,
                         FileSize = file.Length,
                         DocumentTypeId = typeId,
-                        FilePath = "Database", // Mark ว่าเก็บใน DB
+                        FilePath = "Database",
                         AttachmentFile = attachment
                     };
 
@@ -445,6 +481,9 @@ namespace QCS.API.Controllers
             }
         }
 
+        // ==========================================================
+        // 📥 VIEW FILE
+        // ==========================================================
         [HttpGet("ViewFile/{id}")]
         public async Task<IActionResult> ViewFile(int id)
         {
@@ -456,7 +495,6 @@ namespace QCS.API.Controllers
                 return File(q.AttachmentFile.Data, q.AttachmentFile.ContentType ?? "application/pdf");
             }
 
-            // Fallback for old system files (if any)
             if (!string.IsNullOrEmpty(q.FilePath) && q.FilePath != "Database")
             {
                 var path = Path.Combine(_env.WebRootPath, q.FilePath);
