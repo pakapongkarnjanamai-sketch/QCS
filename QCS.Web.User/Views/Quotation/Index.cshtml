@@ -97,7 +97,7 @@
                 icon: "find",
                 onClick: function (e) {
                     // === แก้ไขตรงนี้ให้ไปที่ Action Detail ===
-                    window.location.href = '@Url.Action("Detail", "Quotation")/' + e.row.data.id;
+                    window.location.href = '@Url.Action("Detail", "Quotation")/' + e.row.data.code;
                 }
             }]
         }

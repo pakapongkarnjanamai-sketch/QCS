@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using DevExtreme.AspNet.Data;
+using DevExtreme.AspNet.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
@@ -296,6 +298,21 @@ namespace QCS.API.Controllers
             {
                 return StatusCode(500, ex.Message);
             }
+        }
+        // ==========================================================
+        // 🔍 GET BY CODE (สำหรับหน้า Detail)
+        // ==========================================================
+        [HttpGet("ByCode")]
+        public object GetByCode(string code, DataSourceLoadOptions loadOptions)
+        {
+            var query = _context.PurchaseRequests
+                .AsNoTracking()
+                .Include(x => x.Quotations)      // [เพิ่ม] ดึงข้อมูลไฟล์แนบ (Attachments) มาด้วยเสมอ
+                .Include(x => x.ApprovalSteps)   // [แนะนำเพิ่ม] ดึงประวัติการอนุมัติมาด้วย (เผื่อใช้แสดงผล)
+                .Where(x => x.Code == code);
+
+            // DataSourceLoader จะจัดการแปลงข้อมูลเป็น JSON ให้
+            return DataSourceLoader.Load(query, loadOptions);
         }
         // ==========================================================
         // 💾 ACTIONS

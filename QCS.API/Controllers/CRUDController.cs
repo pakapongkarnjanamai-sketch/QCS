@@ -21,4 +21,5 @@ namespace QCS.Api.Controllers
         public CRUDQuotationsController(IRepository<Quotation> repository, ILogger<GenericController<Quotation>> logger)
            : base(repository, logger) { }
     }
+
 }
