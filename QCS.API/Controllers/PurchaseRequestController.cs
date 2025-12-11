@@ -281,7 +281,7 @@ namespace QCS.API.Controllers
                     DateTime? actionDate = null;
                     string? approverNId = null;
                     string? approverName = null;
-
+                    string? comment = null;
                     if (step.SequenceNo == 1) // Step 1: Purchaser (User ปัจจุบัน)
                     {
                         if (isSubmit)
@@ -296,6 +296,7 @@ namespace QCS.API.Controllers
                             // ไปดึงชื่อจริงจาก Workflow API มาบันทึก
                             var fetchedName = await _workflowService.GetEmployeeNameFromWorkflowAsync(1, CurrentUserNId);
                             approverName = !string.IsNullOrEmpty(fetchedName) ? fetchedName : CurrentUserNId;
+                            comment = input.Remark;
                         }
                         else
                         {
@@ -315,7 +316,8 @@ namespace QCS.API.Controllers
                         Status = stepStatus,
                         ActionDate = actionDate,
                         ApproverNId = approverNId,
-                        ApproverName = approverName
+                        ApproverName = approverName,
+                        Comment = comment
                     });
                 }
 
@@ -379,6 +381,7 @@ namespace QCS.API.Controllers
                         step1.ApproverNId = CurrentUserNId;
                         var fetchedName = await _workflowService.GetEmployeeNameFromWorkflowAsync(1, CurrentUserNId);
                         step1.ApproverName = !string.IsNullOrEmpty(fetchedName) ? fetchedName : CurrentUserNId;
+                        step1.Comment = input.Remark;
                     }
 
                     // Step 2: เปิด Status Pending (เคลียร์คนทำเก่าออก กรณีถูก Reject กลับมา)
