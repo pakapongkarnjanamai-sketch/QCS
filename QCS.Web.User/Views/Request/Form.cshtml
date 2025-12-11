@@ -173,7 +173,7 @@
             // UI Instances
             let formInstance, toolbarInstance, attachmentGridInstance, actionPopupInstance;
             const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
-                shadingColor: "rgba(0,0,0,0.4)", position: { of: "body" }, visible: false,
+                shadingColor: "rgba(0,0,0,0.4)", position: { of: "window" }, visible: false,
                 showIndicator: true, showPane: true, shading: true, message: "กำลังประมวลผล..."
             }).dxLoadPanel("instance");
 
@@ -208,7 +208,7 @@
                     },
                     {
                         location: 'after', widget: 'dxButton',
-                        options: { text: 'กลับ (Back)', stylingMode: 'outlined', icon: 'arrowleft', onClick: () => window.location.href = '@Url.Action("Index", "Request")' }
+                        options: { text: 'กลับ (Back)', stylingMode: 'outlined', icon: 'arrowleft', onClick: () => window.location.href = '@Url.Action("Index", "Home")' }
                     },
                     // Create / Edit Buttons (ซ่อนไว้ก่อน เปิดด้วย Permissions)
                     {
@@ -689,7 +689,7 @@
                     console.log("Action Success:", isSubmit ? "Submited" : "Saved");
 
                     // Redirect without notify
-                    setTimeout(() => window.location.href = '@Url.Action("Index", "Request")', 500);
+                    setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 500);
 
                 } catch (err) {
                     console.error("Execute Save/Submit Error:", err.message);

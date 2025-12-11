@@ -1,201 +1,176 @@
-﻿@using QCS.Domain.Enum
-@{
-    ViewData["Title"] = "Dashboard";
+﻿@{
+    ViewData["Title"] = "รายการใบเสนอราคา (Quotation Comparison List)";
 }
 
 @section Styles {
-    <link href="~/css/devextreme/dx.light.css" rel="stylesheet" />
     <style>
-        .card-counter {
-            box-shadow: 2px 2px 10px #DADADA;
-            margin: 5px;
-            padding: 20px 10px;
-            background-color: #fff;
-            height: 100px;
-            border-radius: 5px;
-            transition: .3s linear all;
-            position: relative;
+        /* --- Shared Styles (Matched with Form.cshtml) --- */
+        .qcs-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            border: 1px solid #eaeaea;
         }
 
-            .card-counter:hover {
-                box-shadow: 4px 4px 20px #DADADA;
-                transform: translateY(-2px);
+        .mt-card {
+            margin-top: 20px;
+        }
+
+        /* --- Status Badges --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+            display: inline-block;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .status-draft {
+            background-color: #6c757d;
+        }
+
+        .status-pending {
+            background-color: #ffc107;
+            color: #000;
+        }
+
+        .status-approved {
+            background-color: #28a745;
+        }
+
+        .status-rejected {
+            background-color: #dc3545;
+        }
+
+        /* --- Grid Tweaks --- */
+        .dx-datagrid-header-panel {
+            padding-bottom: 10px;
+        }
+
+        .doc-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+            .doc-link:hover {
+                text-decoration: underline;
             }
-
-            .card-counter i {
-                font-size: 5em;
-                opacity: 0.2;
-            }
-
-            .card-counter .count-numbers {
-                position: absolute;
-                right: 35px;
-                top: 20px;
-                font-size: 32px;
-                display: block;
-                font-weight: bold;
-            }
-
-            .card-counter .count-name {
-                position: absolute;
-                right: 35px;
-                top: 65px;
-                font-style: italic;
-                text-transform: capitalize;
-                opacity: 0.7;
-                display: block;
-                font-size: 16px;
-            }
-        /* Custom Colors */
-        .bg-primary-light {
-            background-color: #e3f2fd;
-            color: #0d6efd;
-        }
-
-        .bg-warning-light {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        .bg-success-light {
-            background-color: #d1e7dd;
-            color: #0f5132;
-        }
-
-        .bg-danger-light {
-            background-color: #f8d7da;
-            color: #842029;
-        }
     </style>
 }
 
-<div class="container-xxl bd-gutter mt-3 my-md-4 bd-layout">
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3><i class="dx-icon-home"></i> ภาพรวมของฉัน</h3>
-        <button id="btnRefresh" class="btn btn-sm btn-outline-secondary"><i class="dx-icon-refresh"></i> รีเฟรชข้อมูล</button>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card-counter bg-primary-light">
-                <i class="dx-icon-doc"></i>
-                <span class="count-numbers" id="lblTotal">...</span>
-                <span class="count-name">ทั้งหมด</span>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card-counter bg-warning-light">
-                <i class="dx-icon-clock"></i>
-                <span class="count-numbers" id="lblPending">...</span>
-                <span class="count-name">รออนุมัติ</span>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card-counter bg-success-light">
-                <i class="dx-icon-check"></i>
-                <span class="count-numbers" id="lblApproved">...</span>
-                <span class="count-name">อนุมัติแล้ว</span>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card-counter bg-danger-light">
-                <i class="dx-icon-close"></i>
-                <span class="count-numbers" id="lblRejected">...</span>
-                <span class="count-name">ไม่อนุมัติ</span>
-            </div>
+<div class="container mt-4">
+    <div class="qcs-card mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 d-flex align-items-center text-nowrap">
+                <i class="fas fa-list-alt text-primary me-2"></i>
+                <span class="fw-bold">@ViewData["Title"]</span>
+            </h6>
+            <div id="actionButtons"></div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">รายการขอซื้อล่าสุด</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div id="recentRequestsGrid"></div>
-                </div>
-            </div>
+    <div class="qcs-card">
+        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+            <h6 class="m-0 text-secondary font-weight-bold">
+                <i class="fas fa-table me-2"></i>
+                รายการเอกสาร (Document List)
+            </h6>
         </div>
+        <div id="gridContainer"></div>
     </div>
-
 </div>
 
 @section Scripts {
-    <script src="~/js/devextreme/dx.all.js"></script>
     <script>
         $(function () {
-            // รับ API URL มาจาก Controller (หรือ Hardcode ถ้าจำเป็น)
-            const API_URL = 'https://localhost:7127/api/dashboard/my-summary';
-            // const USER_ID = 1; // ถ้ามีการส่ง user id
+            // === CONFIGURATION ===
+            const CONFIG = {
+                API_BASE_URL: "https://localhost:7127/api",
+                API_LOAD_URL: "/PurchaseRequest/MyRequests",
+                FORM_URL: '@Url.Action("Form", "Request")'
+            };
 
-            // ฟังก์ชันโหลดข้อมูล
-            function loadDashboardData() {
-                // แสดง Loading State (ถ้าต้องการ)
-                // $('#lblTotal').text('...');
+            // === STORE ===
+            const store = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: CONFIG.API_BASE_URL + CONFIG.API_LOAD_URL,
+                onBeforeSend: function (method, ajaxOptions) {
+                    ajaxOptions.xhrFields = { withCredentials: true };
+                }
+            });
 
-                $.ajax({
-                    url: API_URL,
-                    type: 'GET',
-                    xhrFields: { withCredentials: true },
-                    dataType: 'json',
-                    // data: { userId: USER_ID },
-                    success: function (data) {
-                        // 1. อัปเดตตัวเลขใน Card
-                        updateCounter('#lblTotal', data.totalRequests);
-                        updateCounter('#lblPending', data.pendingRequests);
-                        updateCounter('#lblApproved', data.approvedRequests);
-                        updateCounter('#lblRejected', data.rejectedRequests);
-
-                        // 2. อัปเดตข้อมูลใน DataGrid
-                        var grid = $("#recentRequestsGrid").dxDataGrid("instance");
-                        grid.option("dataSource", data.recentRequests);
-                    },
-                    error: function (xhr, status, error) {
-                        console.error("Error loading dashboard:", error);
-                        DevExpress.ui.notify("ไม่สามารถโหลดข้อมูล Dashboard ได้", "error", 3000);
+            // === INIT UI ===
+            const toolbarItems = [
+                {
+                    location: 'after',
+                    widget: 'dxButton',
+                    options: {
+                        text: 'สร้างใบเสนอราคาใหม่ (New Request)',
+                        icon: 'plus',
+                        type: 'default',
+                        stylingMode: 'contained',
+                        onClick: function () {
+                            window.location.href = CONFIG.FORM_URL;
+                        }
                     }
-                });
-            }
+                }
+            ];
 
-            // ฟังก์ชัน Animation ตัวเลขวิ่งๆ (เพื่อความสวยงาม)
-            function updateCounter(selector, value) {
-                $(selector).prop('Counter', 0).animate({
-                    Counter: value
-                }, {
-                    duration: 1000,
-                    easing: 'swing',
-                    step: function (now) {
-                        $(this).text(Math.ceil(now));
-                    },
-                    complete: function() {
-                        $(this).text(value); // Ensure final value is exact
-                    }
-                });
-            }
+            $("#actionButtons").dxToolbar({ items: toolbarItems });
 
-            // เริ่มต้นสร้าง DataGrid (โครงเปล่าๆ รอรับข้อมูล)
-            $("#recentRequestsGrid").dxDataGrid({
-                dataSource: [], // เริ่มต้นเป็นว่าง
-                keyExpr: "id",
-                showBorders: false,
+            $("#gridContainer").dxDataGrid({
+                dataSource: store,
+                showBorders: true,
+                showRowLines: true,
+                rowAlternationEnabled: true,
                 columnAutoWidth: true,
                 hoverStateEnabled: true,
-                loadPanel: { enabled: true },
-                noDataText: "กำลังโหลดข้อมูล...",
+
+                // Features
+                searchPanel: { visible: true, width: 250, placeholder: "ค้นหา (Search)..." },
+                filterRow: { visible: true, applyFilter: "auto" },
+                headerFilter: { visible: true },
+                paging: { pageSize: 10 },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+
+                // Columns Configuration (แก้ไขชื่อ DataField ให้ตรงกับ JSON)
                 columns: [
-                    { dataField: "code", caption: "เลขที่เอกสาร", width: 150 },
-                    { dataField: "title", caption: "เรื่อง" },
-                    { dataField: "vendorName", caption: "ผู้ขาย" },
                     {
-                        dataField: "requestDate",
-                        caption: "วันที่ขอ",
+                        dataField: "code", // [แก้ไข] จาก docNo เป็น code
+                        caption: "เลขที่เอกสาร",
+                        width: 160,
+                        cellTemplate: function(container, options) {
+                            const docNo = options.value || "(Draft)";
+                            $("<a>")
+                                .addClass("doc-link")
+                                .text(docNo)
+                                .attr("href", `${CONFIG.FORM_URL}/${options.data.id}`)
+                                .appendTo(container);
+                        }
+                    },
+                    {
+                        dataField: "title",
+                        caption: "หัวข้อ (Title)",
+                        minWidth: 200
+                    },
+                    {
+                        dataField: "vendorName",
+                        caption: "ผู้ขาย (Vendor)",
+                        width: 250
+                    },
+                    {
+                        dataField: "requestDate", // [แก้ไข] จาก createdDate เป็น requestDate
+                        caption: "วันที่ขอซื้อ",
                         dataType: "date",
-                        format: "dd/MM/yyyy"
+                        format: "dd/MM/yyyy",
+                        width: 120,
+                        alignment: "center"
                     },
                     {
                         dataField: "status",
@@ -203,44 +178,33 @@
                         width: 120,
                         alignment: "center",
                         cellTemplate: function (container, options) {
-                            var status = options.value;
-                            var text = "";
-                            var colorClass = "";
+                            const status = options.value;
+                            let text = "Waiting";
+                            let cls = "status-draft";
 
-                            // ใช้ตัวเลข Magic Number หรือสร้าง Object Map เพื่อให้อ่านง่าย
-                            if (status == @RequestStatus.Draft) { text = "แบบร่าง"; colorClass = "badge bg-secondary"; }
-                            else if (status == @RequestStatus.Pending) { text = "รออนุมัติ"; colorClass = "badge bg-warning text-dark"; }
-                            else if (status == @RequestStatus.Approved) { text = "อนุมัติ"; colorClass = "badge bg-success"; }
-                            else if (status == @RequestStatus.Completed) { text = "เสร็จสมบูรณ์"; colorClass = "badge bg-success"; }
-                            else if (status == @RequestStatus.Rejected) { text = "ไม่อนุมัติ"; colorClass = "badge bg-danger"; }
-                            else { text = "อื่นๆ"; colorClass = "badge bg-light text-dark"; }
+                            // Logic Mapping Status
+                            if (status === 1) { text = "Pending"; cls = "status-pending"; }
+                            else if (status === 2) { text = "Approved"; cls = "status-approved"; }
+                            else if (status === 9) { text = "Rejected"; cls = "status-rejected"; }
 
-                            $("<span class='" + colorClass + "'>" + text + "</span>").appendTo(container);
+                            $("<span>").addClass("status-badge " + cls).text(text).appendTo(container);
                         }
                     },
                     {
                         type: "buttons",
-                        width: 80,
-                        buttons: [{
-                            hint: "ดูรายละเอียด",
-                            icon: "find",
-                            onClick: function (e) {
-                                var id = e.row.data.id;
-                                // เปลี่ยน URL ไปยังหน้า Detail
-                                window.location.href = '@Url.Action("Form", "Request")?id=' + id;
+                        width: 70,
+                        buttons: [
+                            {
+                                hint: "ดูรายละเอียด / แก้ไข",
+                                icon: "edit",
+                                onClick: function (e) {
+                                    window.location.href = `${CONFIG.FORM_URL}/${e.row.data.id}`;
+                                }
                             }
-                        }]
+                        ]
                     }
                 ]
             });
-
-            // ปุ่ม Refresh
-            $("#btnRefresh").click(function() {
-                loadDashboardData();
-            });
-
-            // เรียกโหลดข้อมูลครั้งแรก
-            loadDashboardData();
         });
     </script>
 }

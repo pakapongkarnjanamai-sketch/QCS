@@ -14,11 +14,7 @@ namespace QCS.Web.User.Controllers
 
       
 
-        public IActionResult Index()
-        {
-            return View();
-        }
-   
+
 
         [Route("Request/Form/{id?}")]
         public IActionResult Form(int? id)
