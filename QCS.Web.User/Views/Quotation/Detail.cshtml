@@ -1,0 +1,606 @@
+﻿@model int
+
+@{
+    ViewData["Title"] = "Quotation Details";
+}
+
+@section Styles {
+    <style>
+        /* --- Layout & Grid --- */
+        .quotation-details-container {
+            width: 1400px;
+            min-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px; /* Left: Flexible, Right: Fixed */
+            gap: 20px;
+            height: calc(100vh - 140px); /* Adjust based on your header height */
+            min-height: 600px;
+        }
+
+        /* --- Left Side: PDF Viewer --- */
+        .pdf-viewer-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .document-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .document-title {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .control-button {
+            padding: 6px 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #555;
+            transition: 0.2s;
+        }
+
+            .control-button:hover {
+                background: #e9ecef;
+            }
+
+        .pdf-viewer {
+            flex: 1;
+            width: 100%;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #525659; /* Standard PDF reader bg color */
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- Right Side: Info & Lists --- */
+        .info-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .card-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        /* --- Document List --- */
+        .document-list-container {
+            flex: 1; /* Fill remaining space in right column */
+            overflow-y: auto;
+        }
+
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fff;
+        }
+
+            .document-item:hover {
+                background-color: #f8f9fa;
+                border-color: #2190F7;
+            }
+
+            .document-item.active {
+                background-color: #e3f2fd;
+                border-color: #2190F7;
+            }
+
+        .document-icon {
+            font-size: 24px;
+            color: #2190F7;
+            margin-right: 15px;
+            width: 30px;
+            text-align: center;
+        }
+
+        .document-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .document-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .document-meta {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        /* --- Action Tiles --- */
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* Stack vertically on right side */
+            gap: 10px;
+        }
+
+        .tile {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+            .tile:hover:not(.disabled) {
+                border-color: #2190F7;
+                background-color: #2190F7;
+            }
+
+                .tile:hover:not(.disabled) * {
+                    color: white !important;
+                }
+
+            .tile.disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                background: #f5f5f5;
+            }
+
+        .tile-icon {
+            font-size: 24px;
+            color: #2190F7;
+            margin-right: 15px;
+        }
+
+        .tile-texts {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tile-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .tile-desc {
+            font-size: 11px;
+            color: #666;
+        }
+
+        /* --- Utilities --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background-color: #e6f7e6;
+            color: #28a745;
+        }
+
+        .status-expired {
+            background-color: #f8d7da;
+            color: #dc3545;
+        }
+
+        .error-message {
+            color: #dc3545;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .loading-placeholder {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #999;
+        }
+
+        /* Mobile */
+        @@media screen and (max-width: 1024px) {
+            .quotation-details-container {
+                width: 100%;
+                min-width: auto;
+                padding: 10px;
+            }
+
+            .details-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+                display: block;
+            }
+
+            .pdf-viewer-section {
+                height: 500px;
+                margin-bottom: 20px;
+            }
+
+            .info-section {
+                height: auto;
+            }
+        }
+    </style>
+}
+
+<div class="quotation-details-container">
+    <div class="details-grid">
+
+        <div class="pdf-viewer-section">
+            <div class="document-controls">
+                <div class="document-title">
+                    <i class="fas fa-file-alt"></i> <span id="docTitleLabel">Document Viewer</span>
+                </div>
+                <button class="control-button" id="btnFullscreen" title="Fullscreen">
+                    <i class="fas fa-expand"></i> Fullscreen
+                </button>
+            </div>
+            <div id="pdfViewer" class="pdf-viewer">
+                <div class="loading-placeholder">Select a document to view</div>
+            </div>
+        </div>
+
+        <div class="info-section">
+
+            <div class="card-box">
+                <div id="quotationForm"></div>
+            </div>
+
+            <div class="card-box document-list-container">
+                <h4 style="font-size:16px; margin-bottom:15px; font-weight:600;">Attachments</h4>
+                <div id="documentList"></div>
+            </div>
+
+            <div class="card-box">
+                <div id="actionButtons" class="tiles-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // ==========================================
+        // 1. CONFIGURATION & CONSTANTS
+        // ==========================================
+        const CONFIG = {
+            quotationId: @Model,
+            // กำหนด Base URL ตรงนี้ (แก้ไขได้ง่าย)
+            baseUrl: "https://ap-ntc2138-qawb/iChaSue",
+            endpoints: {
+                quotation: "/Service/Quotation/api",
+                vendor: "/Service/Vendor/api"
+            }
+        };
+
+        // Helper to get full API URL
+        const getApiUrl = (service, path) => `${CONFIG.baseUrl}${CONFIG.endpoints[service]}${path}`;
+
+        // ==========================================
+        // 2. MAIN LOGIC (Page Init)
+        // ==========================================
+        $(function() {
+            initPage();
+        });
+
+        async function initPage() {
+            const loader = createLoadingIndicator("Loading Quotation...");
+
+            try {
+                // Load Quotation Data
+                const quotation = await fetchQuotationData(CONFIG.quotationId);
+
+                // Render UI Components
+                renderForm(quotation);
+                renderDocumentList(quotation.documents);
+                renderActions(quotation);
+
+                // Auto-load first document
+                if (quotation.documents && quotation.documents.length > 0) {
+                    loadDocumentToViewer(quotation.documents[0]);
+                }
+
+                // Setup Events
+                $("#btnFullscreen").on("click", () => toggleFullscreen("pdfViewer"));
+
+            } catch (err) {
+                console.error("Init Error:", err);
+                showError("Unable to load data: " + err.message);
+            } finally {
+                loader.hide();
+            }
+        }
+
+        // ==========================================
+        // 3. DATA FETCHING
+        // ==========================================
+        async function fetchQuotationData(id) {
+            // Fetch main data
+            const url = getApiUrl('quotation', `/DxQuotation/${id}`);
+            const response = await fetchJSON(url);
+            const data = response.data || response;
+
+            if (!data) throw new Error("Quotation not found");
+
+            // Enhance data (Vendor Name, Status, etc.)
+            let vendorName = "Unknown";
+            if (data.vendorId) {
+                try {
+                    const vUrl = getApiUrl('vendor', `/Vendors/GetById/${data.vendorId}`);
+                    const vRes = await fetchJSON(vUrl);
+                    const vendor = vRes.data || vRes;
+                    vendorName = vendor.name || vendorName;
+                } catch (e) { console.warn("Vendor load failed", e); }
+            }
+
+            // Ensure documents array exists
+            let documents = data.documents || [];
+            if (!documents.length) {
+                try {
+                    const dUrl = getApiUrl('quotation', `/Document/ByQuotation/${id}`);
+                    const dRes = await fetchJSON(dUrl);
+                    documents = dRes.data || dRes || [];
+                } catch (e) { console.warn("Docs load failed", e); }
+            }
+
+            // Determine Status
+            const validUntil = data.validUntil ? new Date(data.validUntil) : null;
+            const status = (!validUntil || validUntil < new Date()) ? "Expired" : "Active";
+
+            return {
+                ...data,
+                vendorName,
+                documents,
+                status,
+                validFrom: data.validFrom ? new Date(data.validFrom) : null,
+                validUntil: validUntil
+            };
+        }
+
+        // ==========================================
+        // 4. RENDERING UI
+        // ==========================================
+        function renderForm(data) {
+            $("#quotationForm").dxForm({
+                formData: data,
+                readOnly: true,
+                labelLocation: "top",
+                colCount: 2,
+                items: [
+                    { dataField: "code", label: { text: "Quotation No" } },
+                    { dataField: "requestCode", label: { text: "Request No" } },
+                    { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
+                    {
+                        dataField: "validUntil",
+                        editorType: "dxDateBox",
+                        editorOptions: { displayFormat: "d MMM yyyy" }
+                    },
+                    {
+                        dataField: "status",
+                        template: (d, item) => {
+                            const isActive = d.editorOptions.value === "Active";
+                            $("<span>")
+                                .addClass(`status-badge ${isActive ? 'status-active' : 'status-expired'}`)
+                                .text(d.editorOptions.value)
+                                .appendTo(item);
+                        }
+                    }
+                ]
+            });
+        }
+
+        function renderDocumentList(docs) {
+            const container = $("#documentList").empty();
+
+            if (!docs || docs.length === 0) {
+                container.html('<div style="text-align:center; color:#999; padding:20px;">No attachments</div>');
+                return;
+            }
+
+            docs.forEach(doc => {
+                const iconClass = getDocumentIcon(doc.type || doc.contentType);
+                const sizeStr = formatFileSize(doc.size);
+
+                const item = $(`
+                    <div class="document-item" data-id="${doc.id}">
+                        <i class="fas ${iconClass} document-icon"></i>
+                        <div class="document-info">
+                            <div class="document-name" title="${doc.name}">${doc.name}</div>
+                            <div class="document-meta">${sizeStr}</div>
+                        </div>
+                    </div>
+                `);
+
+                item.on("click", () => loadDocumentToViewer(doc));
+                container.append(item);
+            });
+        }
+
+        function renderActions(data) {
+            const container = $("#actionButtons").empty();
+
+            // Example Button: Create Product
+            const isExpired = data.status === "Expired";
+            const btn = $(`
+                <div class="tile ${isExpired ? 'disabled' : ''}">
+                    <div class="tile-icon"><i class="fas fa-box-open"></i></div>
+                    <div class="tile-texts">
+                        <div class="tile-title">Create Product</div>
+                        <div class="tile-desc">Add items to catalog</div>
+                    </div>
+                </div>
+            `);
+
+            if (!isExpired) {
+                btn.on("click", () => {
+                    // Logic for button click
+                    alert("Action: Create Product for " + data.code);
+                });
+            }
+
+            container.append(btn);
+        }
+
+        // ==========================================
+        // 5. DOCUMENT VIEWER LOGIC
+        // ==========================================
+        async function loadDocumentToViewer(doc) {
+            if (!doc || !doc.id) return;
+
+            // UI Updates
+            $(".document-item").removeClass("active");
+            $(`.document-item[data-id="${doc.id}"]`).addClass("active");
+            $("#docTitleLabel").text(doc.name);
+
+            const viewer = $("#pdfViewer");
+            const loader = createLoadingIndicator("Fetching file...");
+
+            try {
+                const fileUrl = getApiUrl('quotation', `/Document/GetFile/${doc.id}`);
+                const response = await fetch(fileUrl);
+
+                if (!response.ok) throw new Error("Download failed");
+
+                const blob = await response.blob();
+                const base64 = await blobToBase64(blob);
+                const isImage = blob.type.startsWith("image/");
+
+                viewer.empty();
+
+                if (isImage) {
+                    $("<img>")
+                        .attr("src", base64)
+                        .css({ width: "100%", height: "100%", objectFit: "contain" })
+                        .appendTo(viewer);
+                } else {
+                    $("<embed>")
+                        .attr({
+                            src: base64,
+                            type: "application/pdf",
+                            width: "100%",
+                            height: "100%"
+                        })
+                        .appendTo(viewer);
+                }
+
+            } catch (err) {
+                viewer.html(`<div class="error-message">Error: ${err.message}</div>`);
+            } finally {
+                loader.hide();
+            }
+        }
+
+        // ==========================================
+        // 6. UTILITY FUNCTIONS (Internal)
+        // ==========================================
+
+        async function fetchJSON(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.statusText);
+            return res.json();
+        }
+
+        function createLoadingIndicator(msg) {
+            // Check for DevExtreme
+            if (typeof DevExpress !== 'undefined' && DevExpress.ui && DevExpress.ui.dxLoadPanel) {
+                let panel = $("#globalLoader");
+                if (!panel.length) {
+                    panel = $("<div>").attr("id", "globalLoader").appendTo("body");
+                    panel.dxLoadPanel({
+                        shadingColor: "rgba(0,0,0,0.4)",
+                        position: { of: window },
+                        visible: false,
+                        showIndicator: true,
+                        showPane: true,
+                        shading: true,
+                        closeOnOutsideClick: false
+                    });
+                }
+                const instance = panel.dxLoadPanel("instance");
+                instance.option("message", msg);
+                instance.show();
+                return { hide: () => instance.hide() };
+            } else {
+                // Simple Fallback
+                console.log("Loading: " + msg);
+                return { hide: () => {} };
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function getDocumentIcon(type) {
+            if (!type) return 'fa-file';
+            type = type.toLowerCase();
+            if (type.includes('pdf')) return 'fa-file-pdf';
+            if (type.includes('image') || type.includes('jpg') || type.includes('png')) return 'fa-file-image';
+            if (type.includes('word') || type.includes('doc')) return 'fa-file-word';
+            if (type.includes('excel') || type.includes('sheet')) return 'fa-file-excel';
+            return 'fa-file';
+        }
+
+        function showError(msg) {
+            DevExpress.ui.notify(msg, "error", 3000);
+        }
+
+        function toggleFullscreen(elemId) {
+            const elem = document.getElementById(elemId);
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen?.() || elem.webkitRequestFullscreen?.();
+            } else {
+                document.exitFullscreen?.();
+            }
+        }
+    </script>
+}
