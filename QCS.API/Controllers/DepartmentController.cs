@@ -1,9 +1,7 @@
 ﻿using DevExtreme.AspNet.Data;
 using DevExtreme.AspNet.Mvc;
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using QCS.Api.Controllers;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
@@ -16,7 +14,7 @@ namespace QCS.Api.Controllers
         private readonly AppDbContext _context;
 
         public DepartmentController(IRepository<Department> repository, ILogger<GenericController<Department>> logger, AppDbContext context)
-           : base(repository, logger)
+            : base(repository, logger)
         {
             _context = context;
         }
@@ -26,9 +24,10 @@ namespace QCS.Api.Controllers
         {
             try
             {
+                // ใช้ IQueryable เพื่อให้ DataSourceLoader ทำงานที่ Database Level (Performance ดีกว่า)
                 var departments = _repository.GetAll()
-                    .Include(d => d.UserDepartments)
-                ;
+                    .Include(d => d.UserDepartments);
+
                 return DataSourceLoader.Load(departments, loadOptions);
             }
             catch (Exception ex)
@@ -39,15 +38,16 @@ namespace QCS.Api.Controllers
         }
 
         [HttpGet("{id}")]
-        public override IActionResult GetById(int id)
+        // แก้ไข: เปลี่ยน Return Type เป็น async Task<IActionResult> ให้ตรงกับ Base Class
+        public override async Task<IActionResult> GetById(int id)
         {
             try
             {
-                var department = _repository.GetAll()
+                var department = await _repository.GetAll()
                     .Include(d => d.UserDepartments)
                         .ThenInclude(ud => ud.User)
-                  
-                    .FirstOrDefault(d => d.Id == id);
+                    // แก้ไข: ใช้ FirstOrDefaultAsync เพื่อให้ทำงานแบบ Async จริงๆ
+                    .FirstOrDefaultAsync(d => d.Id == id);
 
                 if (department == null)
                     return NotFound();
@@ -60,19 +60,12 @@ namespace QCS.Api.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
-
-       
-
     }
-
-
-
-
 
     public class UserDepartmentController : GenericController<UserDepartment>
     {
         public UserDepartmentController(IRepository<UserDepartment> repository, ILogger<GenericController<UserDepartment>> logger)
-           : base(repository, logger)
+            : base(repository, logger)
         {
 
         }

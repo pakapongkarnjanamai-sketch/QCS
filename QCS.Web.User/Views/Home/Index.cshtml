@@ -1,10 +1,10 @@
 ﻿@{
-    ViewData["Title"] = "รายการใบเสนอราคา (Quotation Comparison List)";
+    ViewData["Title"] = "Dashboard & My Tasks";
 }
 
 @section Styles {
     <style>
-        /* --- Shared Styles (Matched with Form.cshtml) --- */
+        /* --- Styles เดิม --- */
         .qcs-card {
             background: #fff;
             border-radius: 8px;
@@ -13,197 +13,209 @@
             border: 1px solid #eaeaea;
         }
 
-        .mt-card {
-            margin-top: 20px;
-        }
-
-        /* --- Status Badges --- */
-        .status-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: white;
-            display: inline-block;
-            min-width: 80px;
-            text-align: center;
-        }
-
-        .status-draft {
-            background-color: #6c757d;
-        }
-
-        .status-pending {
-            background-color: #ffc107;
-            color: #000;
-        }
-
-        .status-approved {
-            background-color: #28a745;
-        }
-
-        .status-rejected {
-            background-color: #dc3545;
-        }
-
-        /* --- Grid Tweaks --- */
-        .dx-datagrid-header-panel {
-            padding-bottom: 10px;
-        }
-
         .doc-link {
             color: #007bff;
             text-decoration: none;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
         }
 
             .doc-link:hover {
                 text-decoration: underline;
             }
+
+        /* --- Status Badges (Updated) --- */
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: white;
+            display: inline-block;
+            min-width: 100px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .st-saved {
+            background-color: #6c757d;
+        }
+        /* Draft */
+        .st-verify {
+            background-color: #17a2b8;
+        }
+        /* Waiting for Verify */
+        .st-approve {
+            background-color: #ffc107;
+            color: #000;
+        }
+        /* Waiting for Approval */
+        .st-rejected {
+            background-color: #dc3545;
+        }
+        /* Rejected */
+        .st-completed {
+            background-color: #28a745;
+        }
+        /* Approved */
+
+        /* --- Tab Panel --- */
+        .dx-tabpanel .dx-tabs-wrapper {
+            border-bottom: 1px solid #ddd;
+        }
+
+        #tabPanel {
+            margin-top: -10px;
+        }
     </style>
 }
 
 <div class="container mt-4">
-    <div class="qcs-card mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <h6 class="m-0 d-flex align-items-center text-nowrap">
-                <i class="fas fa-list-alt text-primary me-2"></i>
-                <span class="fw-bold">@ViewData["Title"]</span>
-            </h6>
-            <div id="actionButtons"></div>
-        </div>
-    </div>
-
     <div class="qcs-card">
-        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-            <h6 class="m-0 text-secondary font-weight-bold">
-                <i class="fas fa-table me-2"></i>
-                รายการเอกสาร (Document List)
-            </h6>
-        </div>
-        <div id="gridContainer"></div>
+    <div class="d-flex justify-content-between align-items-center">
+        <h4 class="fw-bold text-dark">
+            <i class="fas fa-columns text-primary me-2"></i>@ViewData["Title"]
+        </h4>
+        <button id="btnCreate" class="btn btn-primary shadow-sm">
+            <i class="fas fa-plus me-2"></i>สร้างใบเสนอราคาใหม่
+        </button>
+    </div>
+    </div>
+    <div class="qcs-card">
+        <div id="tabPanel"></div>
     </div>
 </div>
 
 @section Scripts {
     <script>
         $(function () {
-            // === CONFIGURATION ===
-            const CONFIG = {
-                API_BASE_URL: "https://localhost:7127/api",
-                API_LOAD_URL: "/PurchaseRequest/MyRequests",
-                FORM_URL: '@Url.Action("Form", "Request")'
-            };
+            // === CONFIG ===
+            const API_URL = "https://localhost:7127/api/PurchaseRequest";
+            const FORM_URL = '@Url.Action("Form", "Request")';
 
-            // === STORE ===
-            const store = DevExpress.data.AspNet.createStore({
-                key: "id",
-                loadUrl: CONFIG.API_BASE_URL + CONFIG.API_LOAD_URL,
-                onBeforeSend: function (method, ajaxOptions) {
-                    ajaxOptions.xhrFields = { withCredentials: true };
+            // === STATUS HELPER ===
+            function getStatusInfo(status, stepId) {
+                // Status: 0=Draft, 1=Pending, 2=Approved, 9=Rejected
+                if (status === 0) return { text: "Saved", cls: "st-saved" };
+                if (status === 9) return { text: "Rejected", cls: "st-rejected" };
+                if (status === 2) return { text: "Approved", cls: "st-completed" };
+
+                if (status === 1) {
+                    if (stepId === 2) return { text: "Waiting for verify", cls: "st-verify" };
+                    if (stepId === 3) return { text: "Waiting for approval", cls: "st-approve" };
+                    return { text: "In Progress", cls: "st-verify" };
                 }
-            });
+                return { text: "Unknown", cls: "st-saved" };
+            }
 
-            // === INIT UI ===
-            const toolbarItems = [
+            // === COLUMN DEFINITIONS ===
+            const commonColumns = [
                 {
-                    location: 'after',
-                    widget: 'dxButton',
-                    options: {
-                        text: 'สร้างใบเสนอราคาใหม่ (New Request)',
-                        icon: 'plus',
-                        type: 'default',
-                        stylingMode: 'contained',
-                        onClick: function () {
-                            window.location.href = CONFIG.FORM_URL;
-                        }
+                    dataField: "code",
+                    caption: "เลขที่เอกสาร",
+                    width: 150,
+                    cellTemplate: function(container, options) {
+                        const docNo = options.value || "(Draft)";
+                        $("<a>").addClass("doc-link")
+                            .text(docNo)
+                            .attr("href", `${FORM_URL}/${options.data.id}`)
+                            .appendTo(container);
                     }
+                },
+                { dataField: "title", caption: "หัวข้อ (Title)", minWidth: 200 },
+                { dataField: "vendorName", caption: "ผู้ขาย (Vendor)", width: 200 },
+                {
+                    dataField: "requestDate",
+                    caption: "วันที่ขอซื้อ",
+                    dataType: "date",
+                    format: "dd/MM/yyyy",
+                    width: 120,
+                    alignment: "center"
+                },
+                {
+                    dataField: "status",
+                    caption: "สถานะ",
+                    width: 160,
+                    alignment: "center",
+                    cellTemplate: function (container, options) {
+                        const info = getStatusInfo(options.value, options.data.currentStepId);
+                        $("<span>")
+                            .addClass("status-badge " + info.cls)
+                            .text(info.text)
+                            .appendTo(container);
+                    }
+                },
+                {
+                    type: "buttons",
+                    width: 60,
+                    buttons: [{
+                        hint: "เปิดดู",
+                        icon: "arrowright",
+                        onClick: (e) => window.location.href = `${FORM_URL}/${e.row.data.id}`
+                    }]
                 }
             ];
 
-            $("#actionButtons").dxToolbar({ items: toolbarItems });
+            // === STORES ===
+            const myRequestsStore = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: `${API_URL}/MyRequests`,
+                onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
+            });
 
-            $("#gridContainer").dxDataGrid({
-                dataSource: store,
-                showBorders: true,
-                showRowLines: true,
-                rowAlternationEnabled: true,
-                columnAutoWidth: true,
-                hoverStateEnabled: true,
+            const myTasksStore = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: `${API_URL}/PendingApprovals`,
+                onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
+            });
 
-                // Features
-                searchPanel: { visible: true, width: 250, placeholder: "ค้นหา (Search)..." },
-                filterRow: { visible: true, applyFilter: "auto" },
-                headerFilter: { visible: true },
-                paging: { pageSize: 10 },
-                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+            // === UI COMPONENTS ===
 
-                // Columns Configuration (แก้ไขชื่อ DataField ให้ตรงกับ JSON)
-                columns: [
+            // 1. Create Button
+            $("#btnCreate").on("click", function() {
+                window.location.href = FORM_URL;
+            });
+
+            // 2. Tab Panel containing DataGrids
+            $("#tabPanel").dxTabPanel({
+                items: [
                     {
-                        dataField: "code", // [แก้ไข] จาก docNo เป็น code
-                        caption: "เลขที่เอกสาร",
-                        width: 160,
-                        cellTemplate: function(container, options) {
-                            const docNo = options.value || "(Draft)";
-                            $("<a>")
-                                .addClass("doc-link")
-                                .text(docNo)
-                                .attr("href", `${CONFIG.FORM_URL}/${options.data.id}`)
-                                .appendTo(container);
+                        title: "เอกสารของฉัน (My Requests)",
+                        icon: "file",
+                        template: function() {
+                            return $("<div>").attr("id", "gridMyRequests");
                         }
                     },
                     {
-                        dataField: "title",
-                        caption: "หัวข้อ (Title)",
-                        minWidth: 200
-                    },
-                    {
-                        dataField: "vendorName",
-                        caption: "ผู้ขาย (Vendor)",
-                        width: 250
-                    },
-                    {
-                        dataField: "requestDate", // [แก้ไข] จาก createdDate เป็น requestDate
-                        caption: "วันที่ขอซื้อ",
-                        dataType: "date",
-                        format: "dd/MM/yyyy",
-                        width: 120,
-                        alignment: "center"
-                    },
-                    {
-                        dataField: "status",
-                        caption: "สถานะ",
-                        width: 120,
-                        alignment: "center",
-                        cellTemplate: function (container, options) {
-                            const status = options.value;
-                            let text = "Waiting";
-                            let cls = "status-draft";
-
-                            // Logic Mapping Status
-                            if (status === 1) { text = "Pending"; cls = "status-pending"; }
-                            else if (status === 2) { text = "Approved"; cls = "status-approved"; }
-                            else if (status === 9) { text = "Rejected"; cls = "status-rejected"; }
-
-                            $("<span>").addClass("status-badge " + cls).text(text).appendTo(container);
+                        title: "งานรออนุมัติ (My Tasks)",
+                        icon: "check",
+                        badge: "!", // Option: ใส่เลข Count ได้ถ้า fetch แยก
+                        template: function() {
+                            return $("<div>").attr("id", "gridMyTasks");
                         }
-                    },
-                    {
-                        type: "buttons",
-                        width: 70,
-                        buttons: [
-                            {
-                                hint: "ดูรายละเอียด / แก้ไข",
-                                icon: "edit",
-                                onClick: function (e) {
-                                    window.location.href = `${CONFIG.FORM_URL}/${e.row.data.id}`;
-                                }
-                            }
-                        ]
                     }
-                ]
+                ],
+                height: "auto",
+                deferRendering: false, // Render all tabs immediately
+                onContentReady: function(e) {
+                    // Init Grids inside Tabs
+                    const renderGrid = (id, store) => {
+                        if (!$(id).data("dxDataGrid")) {
+                            $(id).dxDataGrid({
+                                dataSource: store,
+                                showBorders: false,
+                                rowAlternationEnabled: true,
+                                hoverStateEnabled: true,
+                                searchPanel: { visible: true, width: 250 },
+                                paging: { pageSize: 10 },
+                                columns: commonColumns
+                            });
+                        }
+                    };
+
+                    renderGrid("#gridMyRequests", myRequestsStore);
+                    renderGrid("#gridMyTasks", myTasksStore);
+                }
             });
         });
     </script>

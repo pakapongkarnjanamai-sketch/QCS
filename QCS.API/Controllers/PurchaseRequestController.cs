@@ -175,30 +175,85 @@ namespace QCS.API.Controllers
         }
 
         // ==========================================================
-        // 📋 LIST MY REQUESTS
+        // 📋 LIST 1: MY REQUESTS (เอกสารที่ฉันสร้าง)
         // ==========================================================
         [HttpGet("MyRequests")]
         public async Task<IActionResult> GetMyRequests()
         {
             try
             {
-                // ถ้ามี field CreatedBy ให้ Uncomment
+                // กรองเอกสารที่ CreatedBy ตรงกับ Current User
+                // (ถ้ายังไม่มี field CreatedBy ใน DB ให้ข้าม Where ไปก่อน หรือใช้ Owner Field อื่น)
                 var requests = await _context.PurchaseRequests
-                    // .Where(r => r.CreatedBy == CurrentUserNId) 
+                    //.Where(r => r.CreatedBy == CurrentUserNId) 
                     .OrderByDescending(r => r.RequestDate)
                     .Select(r => new
                     {
-                        Id = r.Id,
-                        Code = r.Code,
-                        Title = r.Title,
-                        RequestDate = r.RequestDate,
-                        Status = r.Status,
-                        VendorName = r.VendorName,
-                        CurrentStepId = r.CurrentStepId
+                        r.Id,
+                        r.Code,
+                        r.Title,
+                        r.RequestDate,
+                        r.Status,
+                        r.CurrentStepId, // จำเป็นสำหรับแยกแยะสถานะ
+                        r.VendorName,
+                        TotalAmount = r.Quotations.Sum(q => 0) // Placeholder ถ้ามี Amount
                     })
                     .ToListAsync();
 
                 return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        // ==========================================================
+        // 📋 LIST 2: PENDING APPROVALS (เอกสารที่รอฉันอนุมัติ)
+        // ==========================================================
+        [HttpGet("PendingApprovals")]
+        public async Task<IActionResult> GetPendingApprovals()
+        {
+            try
+            {
+                // 1. ดึง Workflow Definition เพื่อดูว่า User อยู่ Step ไหนบ้าง
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+                if (routeData == null || routeData.Steps == null)
+                    return Ok(new List<object>()); // ไม่พบ Workflow
+
+                // 2. หา SequenceNo ของ Step ที่ User คนนี้มีสิทธิ์อนุมัติ
+                var myStepSequences = new List<int>();
+                foreach (var step in routeData.Steps)
+                {
+                    if (step.Assignments != null &&
+                        step.Assignments.Any(a => string.Equals(a.NId, CurrentUserNId, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        myStepSequences.Add(step.SequenceNo);
+                    }
+                }
+
+                if (!myStepSequences.Any())
+                    return Ok(new List<object>()); // User ไม่ได้เป็น Approver ใน Step ใดเลย
+
+                // 3. Query เอกสารที่ Status = Pending และ CurrentStepId ตรงกับ Step ของ User
+                var tasks = await _context.PurchaseRequests
+                    .Where(r => r.Status == (int)RequestStatus.Pending &&
+                                myStepSequences.Contains(r.CurrentStepId))
+                    .OrderBy(r => r.RequestDate) // งานค้างเก่าสุดขึ้นก่อน
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.Code,
+                        r.Title,
+                        r.RequestDate,
+                        r.Status,
+                        r.CurrentStepId,
+                        r.VendorName,
+                        Requester = "System" // หรือ r.CreatedBy
+                    })
+                    .ToListAsync();
+
+                return Ok(tasks);
             }
             catch (Exception ex)
             {

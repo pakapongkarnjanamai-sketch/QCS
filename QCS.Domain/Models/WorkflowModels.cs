@@ -19,7 +19,7 @@ namespace QCS.Domain.Models
         public int Id { get; set; }
         public int SequenceNo { get; set; }
         public string StepName { get; set; }
-        public List<WorkflowAssignmentDto> Assignments { get; set; }
+        public List<AssignmentDto> Assignments { get; set; }
 
         // === [NEW] เพิ่มส่วนนี้เพื่อเก็บสถานะของแต่ละ Step ===
         public int? Status { get; set; }        // 0, 1, 2, 9
@@ -30,7 +30,7 @@ namespace QCS.Domain.Models
 
     }
 
-    public class WorkflowAssignmentDto
+    public class AssignmentDto
     {
         public string NId { get; set; }
         public string EmployeeName { get; set; }

@@ -8,6 +8,7 @@ using QCS.Infrastructure.Services;
 namespace QCS.Api.Controllers
 {
     [Route("api/[controller]")]
+    [ApiController] // เพิ่ม Attribute นี้ช่วยเรื่อง Model Validation อัตโนมัติ
     public abstract class GenericController<T> : Controller where T : BaseEntity
     {
         protected readonly IRepository<T> _repository;
@@ -22,39 +23,24 @@ namespace QCS.Api.Controllers
         [HttpGet]
         public virtual object Get(DataSourceLoadOptions loadOptions)
         {
-            try
-            {
-                var data = _repository.GetAll();
-                return DataSourceLoader.Load(data, loadOptions);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading data for {EntityType}", typeof(T).Name);
-                return BadRequest(new { Message = ex.Message });
-            }
+            // DataSourceLoader ทำงานกับ IQueryable ได้ดีที่สุด (filter ที่ DB)
+            return DataSourceLoader.Load(_repository.GetAll(), loadOptions);
         }
 
         [HttpGet("{id}")]
-        public virtual IActionResult GetById(int id)
+        public virtual async Task<IActionResult> GetById(int id)
         {
-            try
-            {
-                var entity = _repository.GetById(id);
-                if (entity == null)
-                    return NotFound();
+            var entity = await _repository.GetByIdAsync(id);
+            if (entity == null)
+                return NotFound();
 
-                return Ok(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting {EntityType} with id {Id}", typeof(T).Name, id);
-                return BadRequest(new { Message = ex.Message });
-            }
+            return Ok(entity);
         }
 
         [HttpPost]
-        public virtual IActionResult Post(string values)
+        public virtual async Task<IActionResult> Post([FromForm] string values)
         {
+            // Note: DevExtreme DataGrid มักส่ง values มาเป็น key-value string (form-data)
             try
             {
                 var model = _repository.New();
@@ -63,24 +49,24 @@ namespace QCS.Api.Controllers
                 if (!TryValidateModel(model))
                     return BadRequest(ModelState);
 
-                _repository.Add(model);
-                _repository.SaveChanges();
+                await _repository.AddAsync(model);
+                await _repository.SaveChangesAsync();
 
                 return Ok(model);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating {EntityType}", typeof(T).Name);
-                return BadRequest(new { Message = ex.Message });
+                return BadRequest(new { Message = "An error occurred while creating the record." });
             }
         }
 
         [HttpPut]
-        public virtual IActionResult Put(int key, string values)
+        public virtual async Task<IActionResult> Put(int key, [FromForm] string values)
         {
             try
             {
-                var model = _repository.GetById(key);
+                var model = await _repository.GetByIdAsync(key);
                 if (model == null)
                     return NotFound();
 
@@ -89,53 +75,45 @@ namespace QCS.Api.Controllers
                 if (!TryValidateModel(model))
                     return BadRequest(ModelState);
 
-                _repository.Update(model);
-                _repository.SaveChanges();
+                await _repository.UpdateAsync(model);
+                await _repository.SaveChangesAsync();
 
                 return Ok(model);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating {EntityType} with id {Id}", typeof(T).Name, key);
-                return BadRequest(new { Message = ex.Message });
+                return BadRequest(new { Message = "An error occurred while updating the record." });
             }
         }
 
-        // เปลี่ยนจาก public เป็น public virtual
         [HttpDelete]
-        public virtual IActionResult Delete(int key)
+        public virtual async Task<IActionResult> Delete(int key)
         {
             try
             {
-                var model = _repository.GetById(key);
+                var model = await _repository.GetByIdAsync(key);
                 if (model == null)
                     return NotFound();
 
-                // Check if entity can be deleted (override in specific controllers if needed)
                 if (!CanDelete(model))
                     return BadRequest(new { Message = GetDeleteErrorMessage() });
 
-                _repository.Remove(model);
-                _repository.SaveChanges();
+                await _repository.RemoveAsync(model);
+                await _repository.SaveChangesAsync();
 
                 return NoContent();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting {EntityType} with id {Id}", typeof(T).Name, key);
-                return BadRequest(new { Message = ex.Message });
+                return BadRequest(new { Message = "An error occurred while deleting the record." });
             }
         }
 
-        // Virtual methods that can be overridden in specific controllers
-        protected virtual bool CanDelete(T entity)
-        {
-            return true;
-        }
+        protected virtual bool CanDelete(T entity) => true;
 
-        protected virtual string GetDeleteErrorMessage()
-        {
-            return $"Cannot delete {typeof(T).Name} because it is being used by other records.";
-        }
+        protected virtual string GetDeleteErrorMessage() =>
+            $"Cannot delete {typeof(T).Name} because it is being used by other records.";
     }
 }

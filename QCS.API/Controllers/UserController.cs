@@ -45,119 +45,62 @@ namespace QCS.API.Controllers
         }
 
         [HttpPut]
-        public override IActionResult Put(int key, string values)
+        public override async Task<IActionResult> Put(int key, [FromForm] string values) // แก้ไข: เพิ่ม async Task และ [FromForm] ให้ตรง Base
         {
             try
             {
-                var user = _repository.GetAll()
+                var user = await _repository.GetAll()
                     .Include(u => u.UserRoles)
                     .Include(u => u.UserDepartments)
-                    .FirstOrDefault(u => u.Id == key);
+                    .FirstOrDefaultAsync(u => u.Id == key); // แก้ไข: ใช้ Async
 
                 if (user == null)
                     return NotFound();
 
-                // Parse the incoming data
                 var updateData = JsonConvert.DeserializeObject<Dictionary<string, object>>(values);
-
-                // Update basic user properties
                 JsonConvert.PopulateObject(values, user);
 
-                // Handle roleIds if present
+                // --- Handle Roles ---
                 if (updateData.ContainsKey("roleIds"))
                 {
                     var roleIdsJson = updateData["roleIds"]?.ToString();
-                    List<int> newRoleIds = new List<int>();
+                    List<int> newRoleIds = ParseIdsList(roleIdsJson);
 
-                    if (!string.IsNullOrEmpty(roleIdsJson))
-                    {
-                        try
-                        {
-                            newRoleIds = JsonConvert.DeserializeObject<List<int>>(roleIdsJson) ?? new List<int>();
-                        }
-                        catch
-                        {
-                            if (int.TryParse(roleIdsJson, out int singleRoleId))
-                            {
-                                newRoleIds = new List<int> { singleRoleId };
-                            }
-                        }
-                    }
-
-                    // Remove existing user roles
-                    var existingUserRoles = _context.UserRoles
-                        .Where(ur => ur.UserId == user.Id)
-                        .ToList();
-
+                    // Remove existing
+                    var existingUserRoles = _context.UserRoles.Where(ur => ur.UserId == user.Id);
                     _context.UserRoles.RemoveRange(existingUserRoles);
 
-                    // Add new user roles
+                    // Add new
                     foreach (var roleId in newRoleIds)
                     {
-                        var userRole = new UserRole
-                        {
-                            UserId = user.Id,
-                            RoleId = roleId,
-                            IsActive = true
-                        };
-                        _context.UserRoles.Add(userRole);
+                        await _context.UserRoles.AddAsync(new UserRole { UserId = user.Id, RoleId = roleId, IsActive = true });
                     }
                 }
 
-                // Handle departmentIds if present
+                // --- Handle Departments ---
                 if (updateData.ContainsKey("departmentIds"))
                 {
                     var departmentIdsJson = updateData["departmentIds"]?.ToString();
-                    List<int> newDepartmentIds = new List<int>();
+                    List<int> newDepartmentIds = ParseIdsList(departmentIdsJson);
 
-                    if (!string.IsNullOrEmpty(departmentIdsJson))
-                    {
-                        try
-                        {
-                            newDepartmentIds = JsonConvert.DeserializeObject<List<int>>(departmentIdsJson) ?? new List<int>();
-                        }
-                        catch
-                        {
-                            if (int.TryParse(departmentIdsJson, out int singleDepartmentId))
-                            {
-                                newDepartmentIds = new List<int> { singleDepartmentId };
-                            }
-                        }
-                    }
-
-                    // Remove existing user departments
-                    var existingUserDepartments = _context.UserDepartments
-                        .Where(ud => ud.UserId == user.Id)
-                        .ToList();
-
+                    var existingUserDepartments = _context.UserDepartments.Where(ud => ud.UserId == user.Id);
                     _context.UserDepartments.RemoveRange(existingUserDepartments);
 
-                    // Add new user departments
-                    foreach (var departmentId in newDepartmentIds)
+                    foreach (var deptId in newDepartmentIds)
                     {
-                        var userDepartment = new UserDepartment
-                        {
-                            UserId = user.Id,
-                            DepartmentId = departmentId,
-                            IsActive = true
-                        };
-                        _context.UserDepartments.Add(userDepartment);
+                        await _context.UserDepartments.AddAsync(new UserDepartment { UserId = user.Id, DepartmentId = deptId, IsActive = true });
                     }
                 }
 
-                // Update user
-                _repository.Update(user);
+                // แก้ไข: ใช้ UpdateAsync แทน Update
+                await _repository.UpdateAsync(user);
+                await _context.SaveChangesAsync(); // แก้ไข: ใช้ SaveChangesAsync
 
-                // Save changes
-                _context.SaveChanges();
-
-                // Reload user with updated roles and departments
-                var updatedUser = _repository.GetAll()
-                    .Include(u => u.UserRoles)
-                        .ThenInclude(ur => ur.Role)
-                    .Include(u => u.UserDepartments)
-                        .ThenInclude(ud => ud.Department)
-                    .FirstOrDefault(u => u.Id == key);
+                // Reload data for response
+                var updatedUser = await _repository.GetAll()
+                    .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                    .Include(u => u.UserDepartments).ThenInclude(ud => ud.Department)
+                    .FirstOrDefaultAsync(u => u.Id == key);
 
                 return Ok(updatedUser);
             }
@@ -169,98 +112,52 @@ namespace QCS.API.Controllers
         }
 
         [HttpPost]
-        public override IActionResult Post(string values)
+        public override async Task<IActionResult> Post([FromForm] string values) // แก้ไข: เพิ่ม async Task และ [FromForm]
         {
             try
             {
                 var createData = JsonConvert.DeserializeObject<Dictionary<string, object>>(values);
                 var user = JsonConvert.DeserializeObject<User>(values);
 
-                // Set default values
                 user.CreatedAt = _dateTime.Now;
                 user.IsActive = true;
 
-                // Add user using DbContext
-                _context.Users.Add(user);
-                _context.SaveChanges(); // Save to get the ID
+                await _repository.AddAsync(user); // แก้ไข: ใช้ AddAsync ของ Repository
+                await _repository.SaveChangesAsync(); // Save เพื่อให้ได้ User.Id มาใช้ต่อ
 
-                // Handle roleIds if present
+                // --- Handle Roles ---
                 if (createData.ContainsKey("roleIds"))
                 {
                     var roleIdsJson = createData["roleIds"]?.ToString();
-                    List<int> roleIds = new List<int>();
+                    List<int> roleIds = ParseIdsList(roleIdsJson);
 
-                    if (!string.IsNullOrEmpty(roleIdsJson))
-                    {
-                        try
-                        {
-                            roleIds = JsonConvert.DeserializeObject<List<int>>(roleIdsJson) ?? new List<int>();
-                        }
-                        catch
-                        {
-                            if (int.TryParse(roleIdsJson, out int singleRoleId))
-                            {
-                                roleIds = new List<int> { singleRoleId };
-                            }
-                        }
-                    }
-
-                    // Add user roles
                     foreach (var roleId in roleIds)
                     {
-                        var userRole = new UserRole
-                        {
-                            UserId = user.Id,
-                            RoleId = roleId,
-                            IsActive = true
-                        };
-                        _context.UserRoles.Add(userRole);
+                        await _context.UserRoles.AddAsync(new UserRole { UserId = user.Id, RoleId = roleId, IsActive = true });
                     }
                 }
 
-                // Handle departmentIds if present
+                // --- Handle Departments ---
                 if (createData.ContainsKey("departmentIds"))
                 {
                     var departmentIdsJson = createData["departmentIds"]?.ToString();
-                    List<int> departmentIds = new List<int>();
+                    List<int> departmentIds = ParseIdsList(departmentIdsJson);
 
-                    if (!string.IsNullOrEmpty(departmentIdsJson))
+                    foreach (var deptId in departmentIds)
                     {
-                        try
-                        {
-                            departmentIds = JsonConvert.DeserializeObject<List<int>>(departmentIdsJson) ?? new List<int>();
-                        }
-                        catch
-                        {
-                            if (int.TryParse(departmentIdsJson, out int singleDepartmentId))
-                            {
-                                departmentIds = new List<int> { singleDepartmentId };
-                            }
-                        }
-                    }
-
-                    // Add user departments
-                    foreach (var departmentId in departmentIds)
-                    {
-                        var userDepartment = new UserDepartment
-                        {
-                            UserId = user.Id,
-                            DepartmentId = departmentId,
-                            IsActive = true
-                        };
-                        _context.UserDepartments.Add(userDepartment);
+                        await _context.UserDepartments.AddAsync(new UserDepartment { UserId = user.Id, DepartmentId = deptId, IsActive = true });
                     }
                 }
 
-                _context.SaveChanges();
+                if (createData.ContainsKey("roleIds") || createData.ContainsKey("departmentIds"))
+                {
+                    await _context.SaveChangesAsync();
+                }
 
-                // Reload user with roles and departments
-                var userWithRelations = _context.Users
-                    .Include(u => u.UserRoles)
-                        .ThenInclude(ur => ur.Role)
-                    .Include(u => u.UserDepartments)
-                        .ThenInclude(ud => ud.Department)
-                    .FirstOrDefault(u => u.Id == user.Id);
+                var userWithRelations = await _repository.GetAll()
+                    .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                    .Include(u => u.UserDepartments).ThenInclude(ud => ud.Department)
+                    .FirstOrDefaultAsync(u => u.Id == user.Id);
 
                 return Ok(userWithRelations);
             }
@@ -270,7 +167,20 @@ namespace QCS.API.Controllers
                 return BadRequest(new { Message = ex.Message });
             }
         }
-
+        // Helper Method เพื่อลดโค้ดซ้ำในการ Parse JSON List
+        private List<int> ParseIdsList(string? json)
+        {
+            if (string.IsNullOrEmpty(json)) return new List<int>();
+            try
+            {
+                return JsonConvert.DeserializeObject<List<int>>(json) ?? new List<int>();
+            }
+            catch
+            {
+                if (int.TryParse(json, out int singleId)) return new List<int> { singleId };
+                return new List<int>();
+            }
+        }
         [HttpPost("windows-auth")]
         public async Task<ActionResult<ApiResponse<UserDto>>> GetOrCreateUserFromWindows([FromBody] CreateUserRequest request)
         {
