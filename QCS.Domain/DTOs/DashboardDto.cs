@@ -5,10 +5,13 @@ namespace QCS.Domain.DTOs
 {
     public class DashboardDto
     {
-        public int TotalRequests { get; set; }
-        public int PendingRequests { get; set; }
-        public int ApprovedRequests { get; set; }
-        public int RejectedRequests { get; set; }
-        public List<PurchaseRequest> RecentRequests { get; set; }
+        // สำหรับ Widget ด้านบน
+        public int TotalCreated { get; set; }      // เอกสารที่ฉันสร้างทั้งหมด
+        public int TotalPending { get; set; }      // เอกสารที่ฉันสร้างและรออนุมัติ
+        public int TotalCompleted { get; set; }    // เอกสารที่จบแล้ว (อนุมัติ/ไม่อนุมัติ)
+
+        // สำหรับ Badge บน Tab
+        public int MyRequestCount { get; set; }    // จำนวนใน Tab "เอกสารของฉัน"
+        public int MyTaskCount { get; set; }       // จำนวนใน Tab "งานรออนุมัติ"
     }
 }

@@ -1,1 +1,1 @@
-﻿const apiBaseUrl = 'https://localhost:7081/';
+﻿const API_BASE = "https://localhost:7127/api";

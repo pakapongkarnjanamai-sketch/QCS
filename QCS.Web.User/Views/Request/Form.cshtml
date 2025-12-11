@@ -138,9 +138,9 @@
             // === 1. CONFIGURATION & STATE ===
             const PR_ID = @(Model.HasValue? Model.Value: "null"); // รับค่า ID จาก Server
             const MODE = PR_ID ? "EDIT" : "CREATE"; // ตรวจสอบโหมด
-
+     
             const CONFIG = {
-                API_BASE_URL: "https://localhost:7127/api",
+                API_BASE_URL: API_BASE,
                 // Endpoints
                 API_GET_DETAIL: `/PurchaseRequest/Detail/${PR_ID}`,
                 API_WORKFLOW_ROUTE_INIT: '/Workflow/route/1', // สำหรับ Create Mode

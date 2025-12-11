@@ -1,60 +1,80 @@
-﻿using Microsoft.AspNetCore.Authorization; // ถ้ามีการทำ Auth
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QCS.Application.Services;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Security.Claims;
 
 namespace QCS.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize] // เปิดใช้งานเมื่อระบบ Login สมบูรณ์
+    [Authorize]
     public class DashboardController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly WorkflowService _workflowService;
 
-        public DashboardController(AppDbContext context)
+        public DashboardController(AppDbContext context, WorkflowService workflowService)
         {
             _context = context;
+            _workflowService = workflowService;
         }
 
-        [HttpGet("my-summary")]
-        public async Task<ActionResult<DashboardDto>> GetMyDashboard([FromQuery] int? userId)
+        private string CurrentUserNId => User.Identity?.Name?.Split('\\').LastOrDefault() ?? "SYSTEM";
+
+        [HttpGet("Summary")]
+        public async Task<ActionResult<DashboardDto>> GetSummary()
         {
-            // 1. Base Query: ดึงข้อมูล PR (ถ้ามี userId ให้ filter)
-            var query = _context.Set<PurchaseRequest>().AsQueryable();
-
-            if (userId.HasValue && userId > 0)
+            try
             {
-                // query = query.Where(x => x.CreatedBy == userId); // ตัวอย่างถ้ามี field CreatedBy
+                var nId = CurrentUserNId;
+
+                // 1. My Requests Stats (เอกสารที่ฉันสร้าง)
+                // หมายเหตุ: ใช้ CreatedBy ถ้ามี หรือใช้ Logic อื่นตาม Database จริง
+                var myRequestsQuery = _context.PurchaseRequests.AsQueryable();
+                // .Where(r => r.CreatedBy == nId); // Uncomment เมื่อมี field CreatedBy
+
+                var totalCreated = await myRequestsQuery.CountAsync();
+                var totalPending = await myRequestsQuery.CountAsync(r => r.Status == (int)RequestStatus.Pending);
+                var totalCompleted = await myRequestsQuery.CountAsync(r => r.Status == (int)RequestStatus.Approved || r.Status == (int)RequestStatus.Rejected);
+
+                // 2. My Tasks Stats (งานที่รอฉันอนุมัติ)
+                var myTaskCount = 0;
+
+                // ดึง Workflow เพื่อดูว่า User อยู่ Step ไหน
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+                if (routeData?.Steps != null)
+                {
+                    var myStepSequences = routeData.Steps
+                        .Where(s => s.Assignments != null && s.Assignments.Any(a => a.NId == nId))
+                        .Select(s => s.SequenceNo)
+                        .ToList();
+
+                    if (myStepSequences.Any())
+                    {
+                        myTaskCount = await _context.PurchaseRequests
+                            .CountAsync(r => r.Status == (int)RequestStatus.Pending &&
+                                           myStepSequences.Contains(r.CurrentStepId));
+                    }
+                }
+
+                return Ok(new DashboardDto
+                {
+                    TotalCreated = totalCreated,
+                    TotalPending = totalPending,
+                    TotalCompleted = totalCompleted,
+                    MyRequestCount = totalCreated, // Badge tab 1 (แสดงทั้งหมด หรือเฉพาะ Active ก็ได้)
+                    MyTaskCount = myTaskCount      // Badge tab 2
+                });
             }
-
-            // 2. คำนวณตัวเลขสรุป (ใช้ CountAsync เพื่อประสิทธิภาพ)
-            var total = await query.CountAsync();
-            var pending = await query.CountAsync(x => x.Status == (int)RequestStatus.Pending);
-            var approved = await query.CountAsync(x => x.Status == (int)RequestStatus.Approved || x.Status == (int)RequestStatus.Completed);
-            var rejected = await query.CountAsync(x => x.Status == (int)RequestStatus.Rejected);
-
-            // 3. ดึงรายการล่าสุด 10 รายการ
-            var recent = await query.OrderByDescending(x => x.Id) // หรือ CreatedDate
-                                    .Take(10)
-                                    .ToListAsync();
-
-            // 4. ส่งกลับเป็น DTO
-            var result = new DashboardDto
+            catch (Exception ex)
             {
-                TotalRequests = total,
-                PendingRequests = pending,
-                ApprovedRequests = approved,
-                RejectedRequests = rejected,
-                RecentRequests = recent
-            };
-
-            return Ok(result);
+                return StatusCode(500, ex.Message);
+            }
         }
     }
 }

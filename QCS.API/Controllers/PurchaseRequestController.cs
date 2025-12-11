@@ -219,7 +219,7 @@ namespace QCS.API.Controllers
                 // 1. ดึง Workflow Definition เพื่อดูว่า User อยู่ Step ไหนบ้าง
                 var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
                 if (routeData == null || routeData.Steps == null)
-                    return Ok(new List<object>()); // ไม่พบ Workflow
+                    return Ok(new List<object>());
 
                 // 2. หา SequenceNo ของ Step ที่ User คนนี้มีสิทธิ์อนุมัติ
                 var myStepSequences = new List<int>();
@@ -235,11 +235,11 @@ namespace QCS.API.Controllers
                 if (!myStepSequences.Any())
                     return Ok(new List<object>()); // User ไม่ได้เป็น Approver ใน Step ใดเลย
 
-                // 3. Query เอกสารที่ Status = Pending และ CurrentStepId ตรงกับ Step ของ User
+                // 3. Query Data
                 var tasks = await _context.PurchaseRequests
                     .Where(r => r.Status == (int)RequestStatus.Pending &&
                                 myStepSequences.Contains(r.CurrentStepId))
-                    .OrderBy(r => r.RequestDate) // งานค้างเก่าสุดขึ้นก่อน
+                    .OrderBy(r => r.RequestDate)
                     .Select(r => new
                     {
                         r.Id,
@@ -249,7 +249,11 @@ namespace QCS.API.Controllers
                         r.Status,
                         r.CurrentStepId,
                         r.VendorName,
-                        Requester = "System" // หรือ r.CreatedBy
+                        // [แก้ไข] ดึงชื่อผู้ขอจาก ApproverName ของ ApprovalStep ที่ 1 (Purchaser)
+                        RequesterName = r.ApprovalSteps
+                            .Where(s => s.Sequence == 1)
+                            .Select(s => s.ApproverName)
+                            .FirstOrDefault() ?? "Unknown"
                     })
                     .ToListAsync();
 
