@@ -24,16 +24,16 @@ namespace QCS.Domain.DTOs
         public DateTime? ValidUntil { get; set; }
         public string? Remark { get; set; }
 
-        public PurchaseRequestPermissionsDto Permissions { get; set; } = new();
+        public PermissionDto Permissions { get; set; } = new();
 
         // === [NEW] เพิ่มส่วนนี้ครับ ===
         public WorkflowRouteDetailDto WorkflowRoute { get; set; }
         // ==========================
 
-        public List<QuotationDetailDto> Quotations { get; set; }
+        public List<QuotationItemDto> Quotations { get; set; }
     }
 
-    public class PurchaseRequestPermissionsDto
+    public class PermissionDto
     {
         public bool CanApprove { get; set; }
         public bool CanReject { get; set; }

@@ -1,21 +1,32 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QCS.Application.Services;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Infrastructure.Data;
+using System.Security.Claims;
 
 namespace QCS.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ApprovalController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly WorkflowService _workflowService;
 
-        public ApprovalController(AppDbContext context)
+        public ApprovalController(AppDbContext context, WorkflowService workflowService)
         {
             _context = context;
+            _workflowService = workflowService;
         }
+
+        // Helper: ดึง User ID (nId) ของคนที่ Login อยู่
+        private string CurrentUserNId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                         ?? User.FindFirst("nId")?.Value
+                                         ?? "SYSTEM";
 
         [HttpPost("Approve")]
         public async Task<IActionResult> Approve([FromBody] ApprovalActionDto input)
@@ -23,65 +34,78 @@ namespace QCS.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. ดึงข้อมูล PR พร้อม Steps
+                // 1. ดึงข้อมูล PR และ Steps
                 var request = await _context.PurchaseRequests
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
 
-                if (request == null) return NotFound("Purchase Request not found.");
+                if (request == null) return NotFound("ไม่พบเอกสาร Purchase Request");
 
-                // 2. หา Step ปัจจุบันที่กำลังรออนุมัติ (ใช้ CurrentStep หรือหาจาก Status ก็ได้)
-                // เพื่อความชัวร์ หาจาก ApprovalSteps ที่สถานะ Pending และ Sequence ต่ำสุด
+                // 2. หา Step ปัจจุบัน (ต้องเป็น Pending เท่านั้น สำหรับการอนุมัติ)
                 var currentStepObj = request.ApprovalSteps
+                    .Where(s => s.Status == (int)RequestStatus.Pending)
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Status != (int)RequestStatus.Approved);
+                    .FirstOrDefault();
 
                 if (currentStepObj == null)
-                    return BadRequest("เอกสารนี้ไม่มีขั้นตอนที่รออนุมัติ หรือสิ้นสุดกระบวนการแล้ว");
+                    return BadRequest("ไม่พบขั้นตอนที่รอการอนุมัติในขณะนี้");
 
-                // --- (Optional) ตรวจสอบสิทธิ์ผู้ใช้งานตรงนี้ ---
-                // var currentUserId = User.Identity.Name...;
-                // if (currentStepObj.ApproverNId != currentUserId) return Unauthorized();
-                // ---------------------------------------------
+                // ==========================================================
+                // 🔐 SECURITY CHECK: ตรวจสอบสิทธิ์คนกด
+                // ==========================================================
+                if (!string.IsNullOrEmpty(currentStepObj.ApproverNId) &&
+                    !currentStepObj.ApproverNId.Equals(CurrentUserNId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(403, new { message = $"คุณไม่มีสิทธิ์อนุมัติในขั้นตอนนี้ (Required: {currentStepObj.ApproverNId})" });
+                }
 
-                // 3. อัปเดตสถานะของ Step นี้
-                currentStepObj.Status = (int)RequestStatus.Approved; // 2
+                // ==========================================================
+                // 🌐 FETCH NAME: ดึงชื่อจาก Workflow API
+                // ==========================================================
+                // สมมติ RouteID = 1 (หรือดึงจาก request ถ้ามี field เก็บไว้)
+                int routeId = 1;
+                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, CurrentUserNId);
+
+                // Fallback: ถ้า API หาไม่เจอ ให้ใช้ NId หรือชื่อจาก DB (ถ้ามี) หรือค่าเดิม
+                if (string.IsNullOrEmpty(approverName))
+                {
+                    approverName = currentStepObj.ApproverName ?? CurrentUserNId;
+                }
+
+                // 3. อัปเดต Step ปัจจุบัน -> Approved
+                currentStepObj.Status = (int)RequestStatus.Approved;
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
+                currentStepObj.ApproverNId = CurrentUserNId; // บันทึกคนกดจริง
+                currentStepObj.ApproverName = approverName;  // บันทึกชื่อที่ได้จาก API
 
-                // 4. หา Step ถัดไป และอัปเดต CurrentStep ของ PR
+                // 4. หา Step ถัดไป
                 var nextStepObj = request.ApprovalSteps
+                    .Where(s => s.Sequence > currentStepObj.Sequence)
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Sequence > currentStepObj.Sequence);
+                    .FirstOrDefault();
 
                 if (nextStepObj == null)
                 {
-                    // === กรณี: ไม่มี Step ต่อไปแล้ว (จบ Process) ===
-                    request.Status = (int)RequestStatus.Approved;  // 2
-                    request.CurrentStep = WorkflowStep.Completed; // Enum 99
+                    // === จบกระบวนการ (Completed) ===
+                    request.Status = (int)RequestStatus.Approved;
+                    request.CurrentStep = WorkflowStep.Completed;
                 }
                 else
                 {
-                    // === กรณี: มี Step ต่อไป ===
-                    // อัปเดต CurrentStepId ให้ชี้ไปที่ Step ถัดไป (เพื่อให้ FE หรือ Query อื่นๆ รู้ว่าตอนนี้งานอยู่ที่ใคร)
+                    // === มี Step ถัดไป ===
+                    // ปลุก Step ถัดไป (Draft -> Pending)
+                    if (nextStepObj.Status == (int)RequestStatus.Draft)
+                    {
+                        nextStepObj.Status = (int)RequestStatus.Pending;
+                    }
 
-                    // หมายเหตุ: การ Map Sequence ไปหา Enum อาจต้องดูว่า Sequence ใน Database 
-                    // ตรงกับค่า Int ของ Enum หรือไม่ ถ้าตรงกันใช้ได้เลย
-                    // สมมติ: Seq 1 = Purchaser(1), Seq 2 = Verifier(2), Seq 3 = Manager(3)
-
+                    // อัปเดต Header
+                    request.CurrentStepId = nextStepObj.Sequence;
                     if (Enum.IsDefined(typeof(WorkflowStep), nextStepObj.Sequence))
                     {
                         request.CurrentStep = (WorkflowStep)nextStepObj.Sequence;
                     }
-                    else
-                    {
-                        // Fallback ถ้า Sequence ไม่ตรงกับ Enum เป๊ะๆ (เช่น Seq 10, 20)
-                        // อาจจะต้องเขียน Logic Map หรือเก็บค่า Sequence ไว้ใน Enum
-                        // ในที่นี้ขอสมมติว่า Sequence ตรงกับ Enum ID
-                        request.CurrentStepId = nextStepObj.Sequence;
-                    }
-
-                    // สถานะ PR ยังคงเป็น Pending (1)
                     request.Status = (int)RequestStatus.Pending;
                 }
 
@@ -89,12 +113,12 @@ namespace QCS.API.Controllers
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return Ok(new { message = "Approved successfully", newStatus = request.Status, currentStep = request.CurrentStep });
+                return Ok(new { message = "Approved successfully", newStatus = request.Status });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return StatusCode(500, $"Error: {ex.Message}");
+                return StatusCode(500, $"Internal Server Error: {ex.Message}");
             }
         }
 
@@ -108,23 +132,54 @@ namespace QCS.API.Controllers
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
 
-                if (request == null) return NotFound("Purchase Request not found.");
+                if (request == null) return NotFound("ไม่พบเอกสาร Purchase Request");
 
+                // 2. หา Step ที่จะ Reject (Pending หรือ Draft)
                 var currentStepObj = request.ApprovalSteps
+                    .Where(s => s.Status == (int)RequestStatus.Pending || s.Status == (int)RequestStatus.Draft)
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Status == (int)RequestStatus.Draft);
+                    .FirstOrDefault();
 
                 if (currentStepObj == null)
-                    return BadRequest("No pending approval step found.");
+                    return BadRequest("ไม่พบขั้นตอนที่สามารถปฏิเสธได้");
 
-                // 1. อัปเดต Step เป็น Rejected
-                currentStepObj.Status = (int)RequestStatus.Rejected; // 9
+                // 🔐 SECURITY CHECK
+                if (!string.IsNullOrEmpty(currentStepObj.ApproverNId) &&
+                    !currentStepObj.ApproverNId.Equals(CurrentUserNId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(403, new { message = "คุณไม่มีสิทธิ์ปฏิเสธในขั้นตอนนี้" });
+                }
+
+                // 🌐 FETCH NAME: ดึงชื่อจาก Workflow API
+                int routeId = 1;
+                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, CurrentUserNId);
+                if (string.IsNullOrEmpty(approverName)) approverName = currentStepObj.ApproverName ?? CurrentUserNId;
+
+                // 3. อัปเดต Step นี้ -> Rejected
+                currentStepObj.Status = (int)RequestStatus.Rejected;
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
+                currentStepObj.ApproverNId = CurrentUserNId;
+                currentStepObj.ApproverName = approverName;
 
-                // 2. อัปเดต Header PR
-                request.Status = (int)RequestStatus.Rejected; // 9
-                request.CurrentStep = WorkflowStep.Rejected; // Enum -1
+                // 4. อัปเดต Header -> Rejected (จบกระบวนการทันที)
+                request.Status = (int)RequestStatus.Rejected;
+                request.CurrentStep = WorkflowStep.Rejected;
+
+                // ==========================================================
+                // 🧹 CLEANUP: Reset ขั้นตอนที่เหลือเป็น Cancelled
+                // ==========================================================
+                var remainingSteps = request.ApprovalSteps
+                    .Where(s => s.Sequence > currentStepObj.Sequence)
+                    .ToList();
+
+                foreach (var step in remainingSteps)
+                {
+                    // ต้องมั่นใจว่าใน Enum RequestStatus มีค่า Cancelled (เช่น 8)
+                    // ถ้าไม่มี ให้ใช้ Draft หรือ Rejected ตามตกลง
+                    step.Status = (int)RequestStatus.Cancelled;
+                }
+                // ==========================================================
 
                 _context.Update(request);
                 await _context.SaveChangesAsync();

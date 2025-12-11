@@ -8,9 +8,9 @@ namespace QCS.API.Controllers
     [ApiController]
     public class WorkflowController : ControllerBase
     {
-        private readonly WorkflowIntegrationService _workflowService;
+        private readonly WorkflowService _workflowService;
 
-        public WorkflowController(WorkflowIntegrationService workflowService)
+        public WorkflowController(WorkflowService workflowService)
         {
             _workflowService = workflowService;
         }

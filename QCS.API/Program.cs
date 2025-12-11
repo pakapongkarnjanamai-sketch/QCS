@@ -31,7 +31,7 @@ builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddHttpClient<QCS.Application.Services.WorkflowIntegrationService>();
+builder.Services.AddHttpClient<QCS.Application.Services.WorkflowService>();
 builder.Services.Configure<IISOptions>(options =>
 {
     options.AutomaticAuthentication = true;

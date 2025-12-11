@@ -1,14 +1,19 @@
-﻿// File: QCS.Domain/DTOs/QuotationItemDto.cs
-using System;
+﻿using System;
 
 namespace QCS.Domain.DTOs
 {
     public class QuotationItemDto
     {
-        public string FileName { get; set; } // ใช้จับคู่กับไฟล์ใน Attachments
+        // เพิ่ม Id (Nullable เผื่อใช้กรณีไฟล์ใหม่ยังไม่มี ID)
+        public int Id { get; set; }
+
+        // ใช้รับชื่อไฟล์ (บางทีใช้ FileName บางทีใช้ OriginalFileName ก็ให้มีทั้งคู่)
+        public string FileName { get; set; }
+        public string OriginalFileName { get; set; }
+
         public int DocumentTypeId { get; set; }
 
-        // ข้อมูลอื่นๆ ที่อาจจะมีในแต่ละไฟล์ (ถ้ามี)
-        // public string Description { get; set; }
+        // เพิ่ม FilePath สำหรับส่ง URL ให้หน้าบ้าน Download
+        public string FilePath { get; set; }
     }
 }
