@@ -317,22 +317,49 @@
                     formInstance.option("formData", data);
                     formInstance.option("readOnly", !canEdit);
 
-                    // === [KEY FIX] อัปเดต Attachments โดยตรง ไม่ต้อง Repaint Form ===
-                    if (attachmentGridInstance) {
-                        // 1. ใส่ข้อมูลเข้า Grid
-                        const files = data.quotations || [];
-                        attachmentGridInstance.option("dataSource", files);
+                           // ภายในฟังก์ชัน loadEditModeData
+        if (attachmentGridInstance) {
+            // 1. ใส่ข้อมูลเข้า Grid
+            const files = data.quotations || [];
+            attachmentGridInstance.option("dataSource", files);
 
-                        // 2. ปรับสถานะปุ่มแก้ไขใน Grid
-                        attachmentGridInstance.option("editing.allowUpdating", canEdit);
+            // 2. ปรับสถานะปุ่มแก้ไขใน Grid
+            attachmentGridInstance.option("editing.allowUpdating", canEdit);
 
-                        // 3. ปรับการแสดงผลปุ่ม Delete ในแต่ละแถว (Workaround: ต้อง refresh คอลัมน์)
-                        attachmentGridInstance.columnOption("type:buttons", "visible", true); // Trigger update
-
-                        // 4. ซ่อน/แสดง ปุ่ม Upload
-                        if(canEdit) $("#uploaderSection").show();
-                        else $("#uploaderSection").hide();
+            // 3. [FIXED] อัปเดตปุ่มในคอลัมน์ที่ 3 (Index 2) ใหม่ เพื่อให้ visible เป็นไปตามสิทธิ์ canEdit
+            attachmentGridInstance.columnOption(2, "buttons", [
+                {
+                    hint: "View",
+                    icon: "eyeopen",
+                    onClick: (e) => {
+                        if (e.row.data.id) viewPdf(e.row.data.id);
+                        else console.warn("Cannot view unsaved file.");
                     }
+                },
+                {
+                    name: "delete",
+                    visible: canEdit, // ใช้ค่า canEdit ล่าสุดจาก API
+                    icon: "trash",
+                    onClick: (e) => {
+                        if (confirm("ยืนยันการลบไฟล์?")) {
+                            const row = e.row.data;
+                            if (row.id) deletedFileIds.push(row.id);
+                            else {
+                                const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName));
+                                if (idx > -1) fileList.splice(idx, 1);
+                            }
+                            const ds = attachmentGridInstance.option("dataSource");
+                            const index = ds.indexOf(row);
+                            if (index > -1) { ds.splice(index, 1); attachmentGridInstance.refresh(); }
+                        }
+                    }
+                }
+            ]);
+
+            // 4. ซ่อน/แสดง ปุ่ม Upload
+            if(canEdit) $("#uploaderSection").show();
+            else $("#uploaderSection").hide();
+        }
                     // ==========================================================
 
                     // Render Workflow
@@ -367,118 +394,185 @@
 
             // === 5. ATTACHMENTS & GRID ===
 
-           function renderAttachmentsSection(files, itemElement, canEdit) {
-                // เพิ่ม ID ให้ container เพื่อให้จัดการง่าย
-                const $container = $("<div>").addClass("attachments-container").attr("id", "attachmentsContainer");
+                  function renderAttachmentsSection(files, itemElement, canEdit) {
+            // เพิ่ม ID ให้ container
+            const $container = $("<div>").addClass("attachments-container").attr("id", "attachmentsContainer");
 
-                // สร้างส่วน Upload โดยมี ID กำกับ
-                const $uploaderDiv = $("<div>").attr("id", "uploaderSection").appendTo($container);
+            // สร้างส่วน Upload
+            const $uploaderDiv = $("<div>").attr("id", "uploaderSection").appendTo($container);
 
-                // Render FileUploader
-                $("<div>").dxFileUploader({
-                    multiple: true, accept: ".pdf", uploadMode: "useForm",
-                    labelText: "ลากไฟล์ PDF มาวางที่นี่", selectButtonText: "เพิ่มไฟล์",
-                    onValueChanged: (e) => {
-                        e.value.forEach(f => {
-                            if (f.type !== "application/pdf") {
-                                console.error("Invalid file type:", f.name);
-                                return;
-                            }
-                            fileList.push(f);
-                            const ds = attachmentGridInstance.option("dataSource");
-                            ds.push({
-                                originalFileName: f.name, fileName: f.name,
-                                isNew: true, fileSize: f.size, documentTypeId: 10
-                            });
+            // 1. Render FileUploader (แก้ไข: เพิ่ม Temp ID และเช็ค Data Type)
+            $("<div>").dxFileUploader({
+                multiple: true,
+                accept: ".pdf",
+                uploadMode: "useForm",
+                labelText: "ลากไฟล์ PDF มาวางที่นี่",
+                selectButtonText: "เพิ่มไฟล์",
+                onValueChanged: (e) => {
+                    if (!e.value || e.value.length === 0) return;
+
+                    let currentData = attachmentGridInstance.option("dataSource");
+                    if (!Array.isArray(currentData)) currentData = [];
+
+                    const filesToAdd = [];
+
+                    e.value.forEach(f => {
+                        if (f.type !== "application/pdf") {
+                            DevExpress.ui.notify(`ไฟล์ ${f.name} ไม่ใช่ PDF`, "error", 3000);
+                            return;
+                        }
+
+                        // เช็คไฟล์ซ้ำ
+                        const isDuplicate = currentData.some(row => (row.originalFileName || row.fileName) === f.name);
+                        if (isDuplicate) {
+                            DevExpress.ui.notify(`ไฟล์ ${f.name} มีอยู่แล้ว`, "warning", 2000);
+                            return;
+                        }
+
+                        // เพิ่มลง fileList (สำหรับส่งไป Server)
+                        fileList.push(f);
+
+                        // --- [จุดสำคัญที่แก้] สร้าง ID ชั่วคราว (ติดลบ) ---
+                        const tempId = -1 * (new Date().getTime() + Math.floor(Math.random() * 1000));
+
+                        filesToAdd.push({
+                            id: tempId, // <--- ต้องมี Key "id" เสมอ
+                            originalFileName: f.name,
+                            fileName: f.name,
+                            isNew: true, // Flag บอกว่าเป็นไฟล์ใหม่
+                            fileSize: f.size,
+                            documentTypeId: 10
                         });
-                        attachmentGridInstance.refresh();
-                        e.component.reset();
+                    });
+
+                    if (filesToAdd.length > 0) {
+                        // สร้าง Array ใหม่เพื่อกระตุ้น Grid Refresh
+                        attachmentGridInstance.option("dataSource", [...currentData, ...filesToAdd]);
                     }
-                }).appendTo($uploaderDiv);
 
-                // ซ่อน Uploader ถ้าไม่ได้อยู่ในโหมดแก้ไข (ใช้ CSS/jQuery แทนการสร้างแบบ Conditional)
-                if (!canEdit) $uploaderDiv.hide();
+                    // Reset Uploader
+                    setTimeout(() => { e.component.reset(); }, 100);
+                }
+            }).appendTo($uploaderDiv);
 
-                // Render DataGrid
-                attachmentGridInstance = $("<div>").dxDataGrid({
-                    dataSource: files,
-                    showBorders: true,
-                    columnAutoWidth: true,
-                    noDataText: "ไม่มีไฟล์แนบ",
-                    // Key สำคัญ: ต้องระบุ Key ให้ชัดเจน (API ส่ง id มา)
-                    keyExpr: "id",
-                    editing: { mode: "cell", allowUpdating: canEdit, allowDeleting: false },
-                    columns: [
-                        {
-                            dataField: "originalFileName", caption: "ชื่อไฟล์ (File Name)", allowEditing: false,
-                            calculateDisplayValue: (r) => r.originalFileName || r.fileName,
-                            cellTemplate: (c, o) => {
-                                const isNew = o.data.isNew ? ' <span class="badge bg-success">New</span>' : '';
-                                $("<div>").addClass("file-info").append($("<i>").addClass("fas fa-file-pdf")).append($("<span>").html(o.displayValue + isNew)).appendTo(c);
-                            }
-                        },
-                        {
-                            dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250,
-                            lookup: { dataSource: documentTypes, valueExpr: "id", displayExpr: "name" },
-                            validationRules: [{ type: "required" }]
-                        },
-                        {
-                            type: "buttons", width: 100,
-                            buttons: [
-                                {
-                                    hint: "View", icon: "eyeopen",
-                                    onClick: (e) => {
-                                        // ตรวจสอบทั้ง id (จาก DB) และ isNew (ไฟล์ใหม่)
-                                        if (e.row.data.id) viewPdf(e.row.data.id);
-                                        else console.warn("Cannot view unsaved file.");
-                                    }
-                                },
-                                {
-                                    name: "delete", visible: canEdit, icon: "trash",
-                                    onClick: (e) => {
-                                        if (confirm("ยืนยันการลบไฟล์?")) {
-                                            const row = e.row.data;
-                                            if (row.id) deletedFileIds.push(row.id);
-                                            else {
-                                                const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName));
-                                                if (idx > -1) fileList.splice(idx, 1);
-                                            }
-                                            const ds = attachmentGridInstance.option("dataSource");
-                                            const index = ds.indexOf(row);
-                                            if (index > -1) { ds.splice(index, 1); attachmentGridInstance.refresh(); }
+            if (!canEdit) $uploaderDiv.hide();
+
+            // 2. Render DataGrid (แก้ไข: Logic ปุ่ม Delete)
+            attachmentGridInstance = $("<div>").dxDataGrid({
+                dataSource: files,
+                showBorders: true,
+                columnAutoWidth: true,
+                noDataText: "ไม่มีไฟล์แนบ",
+                keyExpr: "id", // Grid ใช้ key นี้ ดังนั้นข้อมูลทุกแถวต้องมี id
+                editing: { mode: "cell", allowUpdating: canEdit, allowDeleting: false },
+                columns: [
+                    {
+                        dataField: "originalFileName",
+                        caption: "ชื่อไฟล์ (File Name)",
+                        allowEditing: false,
+                        calculateDisplayValue: (r) => r.originalFileName || r.fileName,
+                        cellTemplate: (c, o) => {
+                            const isNew = o.data.isNew ? ' <span class="badge bg-success">New</span>' : '';
+                            $("<div>").addClass("file-info")
+                                .append($("<i>").addClass("fas fa-file-pdf"))
+                                .append($("<span>").html(o.displayValue + isNew))
+                                .appendTo(c);
+                        }
+                    },
+                    {
+                        dataField: "documentTypeId",
+                        caption: "ประเภท (Type)",
+                        width: 250,
+                        lookup: { dataSource: documentTypes, valueExpr: "id", displayExpr: "name" },
+                        validationRules: [{ type: "required" }]
+                    },
+                    {
+                        type: "buttons",
+                        width: 100,
+                        buttons: [
+                            {
+                                hint: "View",
+                                icon: "eyeopen",
+                                onClick: (e) => {
+                                    // ดูได้เฉพาะไฟล์ที่มีบน Server แล้ว (ID เป็นบวก)
+                                    if (e.row.data.id && e.row.data.id > 0) viewPdf(e.row.data.id);
+                                    else DevExpress.ui.notify("ไฟล์ใหม่ยังไม่ถูกบันทึก (ดูไม่ได้)", "warning", 2000);
+                                }
+                            },
+                            {
+                                name: "delete",
+                                visible: canEdit,
+                                icon: "trash",
+                                onClick: (e) => {
+                                    if (confirm("ยืนยันการลบไฟล์?")) {
+                                        const row = e.row.data;
+
+                                        // --- [จุดสำคัญที่แก้] แยก ID จริง (ลบ DB) vs ID ชั่วคราว (ลบ Array) ---
+                                        if (row.id && row.id > 0) {
+                                            // ID เป็นบวก = ไฟล์เก่าใน DB
+                                            deletedFileIds.push(row.id);
+                                        } else {
+                                            // ID ติดลบ/ไม่มี = ไฟล์ใหม่ -> ลบออกจาก fileList
+                                            const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName));
+                                            if (idx > -1) fileList.splice(idx, 1);
+                                        }
+
+                                        // ลบออกจาก Grid DataSource
+                                        const ds = attachmentGridInstance.option("dataSource");
+                                        const index = ds.findIndex(r => r.id === row.id);
+                                        if (index > -1) {
+                                            ds.splice(index, 1);
+                                            attachmentGridInstance.refresh();
                                         }
                                     }
                                 }
-                            ]
-                        }
-                    ]
-                }).dxDataGrid("instance");
+                            }
+                        ]
+                    }
+                ]
+            }).dxDataGrid("instance");
 
-                attachmentGridInstance.element().appendTo($container);
-                $container.appendTo(itemElement);
-            }
+            attachmentGridInstance.element().appendTo($container);
+            $container.appendTo(itemElement);
+        }
 
             // === 6. ACTIONS (SAVE/SUBMIT/APPROVE) ===
 
-            async function handleSaveOrSubmit(isSubmit) {
-                if (!formInstance.validate().isValid) {
-                    console.warn("Validation failed: Form invalid.");
-                    return;
-                }
-
-                const ds = attachmentGridInstance.option("dataSource");
-                if (!ds || ds.length === 0) {
-                    console.error("Validation failed: No attachments.");
-                    alert("กรุณาแนบไฟล์อย่างน้อย 1 รายการ");
-                    return;
-                }
-
-                if (isSubmit) {
-                    openActionPopup('Submit');
-                } else {
-                    executeSaveOrSubmit(false, null);
-                }
+                  async function handleSaveOrSubmit(isSubmit) {
+            // 1. ตรวจสอบความถูกต้องของ Form หลัก (Validation Rules)
+            if (!formInstance.validate().isValid) {
+                console.warn("Validation failed: Form invalid.");
+                DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000);
+                return;
             }
+
+            // 2. ดึงข้อมูลไฟล์จาก Grid
+            const ds = attachmentGridInstance.option("dataSource");
+
+            // --- ส่วนที่เพิ่ม: บังคับให้ต้องแนบไฟล์ ---
+
+            // เงื่อนไขที่ 1: ต้องมีไฟล์อย่างน้อย 1 รายการ
+            if (!ds || ds.length === 0) {
+                DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารอย่างน้อย 1 รายการ", "error", 3000);
+                return; // หยุดการทำงานทันที
+            }
+
+            // เงื่อนไขที่ 2: (Optional) ต้องมีใบเสนอราคาหลัก (Main Quotation) เสมอ
+            // เช็คโดยดูว่าในรายการไฟล์ มีตัวไหนที่มี documentTypeId = 10 หรือไม่
+            const hasMainQuotation = ds.some(f => f.documentTypeId === 10);
+            if (!hasMainQuotation) {
+                DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)'", "error", 3000);
+                return; // หยุดการทำงานทันที
+            }
+
+            // ------------------------------------
+
+            if (isSubmit) {
+                openActionPopup('Submit');
+            } else {
+                executeSaveOrSubmit(false, null);
+            }
+        }
 
             function openActionPopup(action) {
                 currentActionType = action;

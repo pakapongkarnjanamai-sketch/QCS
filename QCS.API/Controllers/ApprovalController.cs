@@ -112,7 +112,7 @@ namespace QCS.API.Controllers
 
                 var currentStepObj = request.ApprovalSteps
                     .OrderBy(s => s.Sequence)
-                    .FirstOrDefault(s => s.Status == (int)RequestStatus.Pending);
+                    .FirstOrDefault(s => s.Status == (int)RequestStatus.Draft);
 
                 if (currentStepObj == null)
                     return BadRequest("No pending approval step found.");
