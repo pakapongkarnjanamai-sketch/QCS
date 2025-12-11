@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
-
 namespace QCS.Web.User.Controllers
 {
     public class RequestController : Controller
@@ -12,14 +11,13 @@ namespace QCS.Web.User.Controllers
             _logger = logger;
         }
 
-      
-
-
-
         [Route("Request/Form/{id?}")]
         public IActionResult Form(int? id)
         {
             return View(id);
         }
+
+   
+      
     }
 }

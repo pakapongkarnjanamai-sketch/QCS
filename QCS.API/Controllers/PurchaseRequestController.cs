@@ -264,7 +264,39 @@ namespace QCS.API.Controllers
                 return StatusCode(500, ex.Message);
             }
         }
+        // ==========================================================
+        // 📋 LIST 3: APPROVED/COMPLETED REQUESTS (เอกสารที่อนุมัติเสร็จสิ้นแล้ว)
+        // ==========================================================
+        [HttpGet("ApprovedList")]
+        public async Task<IActionResult> GetApprovedList()
+        {
+            try
+            {
+                // กรองเฉพาะสถานะ Approved (2) หรือ Completed (3)
+                var requests = await _context.PurchaseRequests
+                    .Where(r => r.Status == (int)RequestStatus.Approved ||
+                                r.Status == (int)RequestStatus.Completed)
+                    // .Where(r => r.CreatedBy == CurrentUserNId) // uncomment บรรทัดนี้ถ้าต้องการให้เห็นเฉพาะของตัวเอง
+                    .OrderByDescending(r => r.RequestDate)
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.Code,
+                        r.Title,
+                        r.RequestDate,
+                        r.Status,
+                        r.VendorName,
+                        r.Remark
+                    })
+                    .ToListAsync();
 
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
         // ==========================================================
         // 💾 ACTIONS
         // ==========================================================
