@@ -755,16 +755,19 @@
                                 `<span class="text-muted"><i class="fas fa-user"></i> ${a.employeeName}</span>`).appendTo(c));
                         }
                     },
-                    {
-                        dataField: "status", caption: "สถานะ", width: 100, alignment: "center",
-                        cellTemplate: (c, o) => {
-                            let cls = "status-draft", txt = "Waiting";
-                            if(o.value === 1) { cls = "status-pending"; txt = "Pending"; }
-                            if(o.value === 2) { cls = "status-approved"; txt = "Approved"; }
-                            if(o.value === 9) { cls = "status-rejected"; txt = "Rejected"; }
-                            $("<span>").addClass("status-badge " + cls).text(txt).appendTo(c);
-                        }
-                    },
+                           {
+            dataField: "status", caption: "สถานะ", width: 100, alignment: "center",
+            cellTemplate: (c, o) => {
+                let cls = "status-draft", txt = "Waiting";
+
+                if (o.value === 1) { cls = "status-pending"; txt = "Pending"; }
+                else if (o.value === 2) { cls = "status-approved"; txt = "Approved"; }
+                else if (o.value === 3) { cls = "status-draft"; txt = "Skipped"; } // กรณีข้าม
+                else if (o.value === 9) { cls = "status-rejected"; txt = "Rejected"; }
+
+                $("<span>").addClass("status-badge " + cls).text(txt).appendTo(c);
+            }
+        },
                     {
                         dataField: "approverName",
                         caption: "ผู้ดำเนินการ",
@@ -841,18 +844,20 @@
                                 alignment: "center",
                                 customizeText: (info) => info.value ? new Date(info.value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : "-"
                             },
-                            {
-                                dataField: "status",
-                                caption: "Status",
-                                width: 100,
-                                cellTemplate: (cnt, opt) => {
-                                    let txt = "Waiting", cls = "status-draft";
-                                    if (opt.value == 1) { txt = "Pending"; cls = "status-pending"; }
-                                    else if (opt.value == 2) { txt = "Approved"; cls = "status-approved"; }
-                                    else if (opt.value == 9) { txt = "Rejected"; cls = "status-rejected"; }
-                                    $("<span>").addClass("status-badge " + cls).text(txt).appendTo(cnt);
-                                }
-                            },
+                                   {
+            dataField: "status",
+            caption: "Status",
+            width: 100,
+            cellTemplate: (cnt, opt) => {
+                let txt = "Waiting", cls = "status-draft";
+
+                if (opt.value == 1) { txt = "Pending"; cls = "status-pending"; }
+                else if (opt.value == 2) { txt = "Approved"; cls = "status-approved"; }
+                else if (opt.value == 9) { txt = "Rejected"; cls = "status-rejected"; }
+
+                $("<span>").addClass("status-badge " + cls).text(txt).appendTo(cnt);
+            }
+        },
                             {
                                 dataField: "comment",
                                 caption: "Remark",
