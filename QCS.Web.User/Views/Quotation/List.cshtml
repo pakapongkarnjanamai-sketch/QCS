@@ -79,7 +79,7 @@
 @section Scripts {
     <script>
         $(function () {
-            const DETAIL_URL = '@Url.Action("Index", "Quotation")';
+            const DETAIL_URL = '@Url.Action("Code", "Quotation")';
 
             $("#gridContainer").dxDataGrid({
                 dataSource: DevExpress.data.AspNet.createStore({
@@ -109,6 +109,7 @@
                                 .addClass("doc-link")
                                 .text(options.value)
                                 .attr("href", `${DETAIL_URL}/${options.value}`) // ส่ง Code ไป
+                                .attr("target", "_blank")
                                 .appendTo(container);
                         }
                     },
@@ -138,7 +139,7 @@
                         allowSorting: false,
                         allowFiltering: false,
                         cellTemplate: function (container, options) {
-                            let text = "อนุมัติแล้ว";
+                            let text = "Approved";
                             let cls = "st-completed"; // สีเขียว
 
                             // เช็คสถานะ 3 = จบกระบวนการ
@@ -160,7 +161,7 @@
                             hint: "ดูรายละเอียด",
                             icon: "find", // หรือใช้ arrowright ให้เหมือน Dashboard ก็ได้
                             onClick: function (e) {
-                                window.location.href = `${DETAIL_URL}/${e.row.data.code}`;
+                              window.open(`${DETAIL_URL}/${e.row.data.code}`, '_blank');
                             }
                         }]
                     }

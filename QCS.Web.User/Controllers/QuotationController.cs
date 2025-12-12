@@ -9,10 +9,10 @@ namespace QCS.Web.User.Controllers
             return View();
         }
         // === เพิ่มส่วนนี้ ===
-        public IActionResult Index(string id)
+        public IActionResult Code(string id)
         {
             // ส่ง id (ที่เป็น String Code) ไปให้หน้า View
-            return View("Index", id);
+            return View("Code", id);
         }
     }
 }
