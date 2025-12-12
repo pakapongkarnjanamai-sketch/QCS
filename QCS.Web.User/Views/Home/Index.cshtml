@@ -22,7 +22,6 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* [สำคัญ] ใช้เป็นจุดอ้างอิงพิกัดให้กับปุ่ม Speed Dial */
             position: relative;
         }
 
@@ -105,43 +104,32 @@
             color: #2c3e50;
         }
 
-        /* Status Badge Styling (Optional Enhancement) */
+        /* Status Badge Styling */
         .status-badge {
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 0.85rem;
             font-weight: 500;
         }
-
-        .status-draft {
-            background-color: #e9ecef;
-            color: #495057;
-        }
-
-        .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        .status-approved {
-            background-color: #d1e7dd;
-            color: #0f5132;
-        }
-
-        .status-rejected {
-            background-color: #f8d7da;
-            color: #842029;
-        }
+        /* (คุณอาจต้องมี CSS หรือ Logic เพิ่มเติมสำหรับ class สีของ status แต่ละแบบ) */
+        .status-draft { background-color: #e9ecef; color: #495057; }
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d1e7dd; color: #0f5132; }
+        .status-rejected { background-color: #f8d7da; color: #842029; }
     </style>
 }
 
 <div class="container full-height-container mt-3">
     <div class="qcs-card-content" id="main-dashboard-card">
 
-        <div class="d-flex align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
+        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
             <h6 class="m-0 fw-bold text-header">
                 <i class="fas fa-clipboard-list text-primary me-2"></i> @ViewData["Title"]
             </h6>
+            
+            <button id="btnCreateHeader" class="btn btn-primary btn-sm px-3 shadow-sm">
+                <i class="fas fa-plus me-1"></i> สร้างใบเสนอราคาใหม่
+            </button>
         </div>
 
         <div id="tabPanel"></div>
@@ -156,8 +144,6 @@
             </button>
         </div>
 
-        <div id="action-add"></div>
-
     </div>
 </div>
 
@@ -166,28 +152,16 @@
         $(function () {
             // === CONFIG ===
             const FORM_URL = '@Url.Action("Form", "Request")';
-             
-            // === 1. SET POSITION RELATIVE TO CARD ===
-            DevExpress.config({
-                floatingActionButtonConfig: {
-                    position: {
-                        of: "body", // เกาะติดกับ Card สีขาว
-                        my: "right bottom",
-                        at: "right bottom",
-                        offset: "-50 -50"           // ระยะห่างจากมุมขวาล่างของ Card 25px
-                    }
-                }
+            
+            // === BUTTON EVENTS ===
+            // 1. ปุ่มบน Header
+            $("#btnCreateHeader").on("click", function() {
+                window.location.href = FORM_URL;
             });
 
-            // === 2. INITIALIZE SPEED DIAL ACTION ===
-            $("#action-add").dxSpeedDialAction({
-                icon: "plus",
-                label: "สร้างใบเสนอราคาใหม่",
-                hint: "Create New Request",
-                index: 1,
-                onClick: function() {
-                    window.location.href = FORM_URL;
-                }
+            // 2. ปุ่มใน Empty State
+            $("#btnCreateEmpty").on("click", function() {
+                window.location.href = FORM_URL;
             });
 
             // === MAIN LOGIC ===
@@ -203,6 +177,7 @@
                     },
                     error: function(err) {
                         console.error("Failed to load summary", err);
+                        // Fallback กรณี Error ให้แสดง 0
                         initTabPanel(0, 0, 0);
                     }
                 });
@@ -317,7 +292,18 @@
                     allowFiltering: false,
                     allowSearch: false,
                     cellTemplate: (container, options) => {
-                        const info = getStatusInfo(options.value, options.data.currentStepId);
+                        // หมายเหตุ: ตรวจสอบให้แน่ใจว่าฟังก์ชัน getStatusInfo มีอยู่ในโปรเจกต์ของคุณ
+                        // หรือถ้าไม่มี ให้เขียนฟังก์ชันนี้เพิ่ม
+                        let info = { cls: "status-draft", text: options.value };
+                        if(typeof getStatusInfo === 'function') {
+                             info = getStatusInfo(options.value, options.data.currentStepId);
+                        } else {
+                            // Basic Fallback if function missing
+                             if(options.value === 1) info = { cls: "status-pending", text: "Pending" };
+                             else if(options.value === 2) info = { cls: "status-approved", text: "Approved" };
+                             else if(options.value === 9) info = { cls: "status-rejected", text: "Rejected" };
+                        }
+
                         $("<span>")
                             .addClass("status-badge " + info.cls)
                             .text(info.text)
@@ -403,8 +389,6 @@
                     columns: baseColumns
                 });
             }
-
-            $("#btnCreateEmpty").on("click", function() { window.location.href = FORM_URL; });
         });
     </script>
 }

@@ -14,6 +14,7 @@
             padding: 25px;
             border: none;
             margin-bottom: 20px;
+            min-width:1200px;
         }
 
         .section-header {
@@ -175,10 +176,10 @@
             };
 
             const documentTypes = [
-                { id: 10, name: 'Main Quotation (ใบเสนอราคาหลัก)' },
-                { id: 20, name: 'Comparative Quotation (ใบเสนอราคาคู่เทียบ)' },
-                { id: 30, name: 'Specifications (รายละเอียดสเปค)' },
-                { id: 40, name: 'Terms & Conditions (เงื่อนไข)' }
+                { id: 10, name: 'ใบเสนอราคาหลัก (Main Quotation)' },
+                { id: 20, name: 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' },
+                { id: 30, name: 'รายละเอียดสเปค (Specifications)' },
+                { id: 40, name: 'เงื่อนไข (Terms & Conditions)' }
             ];
 
             // Local State
@@ -493,21 +494,39 @@
             // 6. ACTIONS (Save, Submit, Approve, Reject)
             // ==========================================
             async function handleSaveOrSubmit(isSubmit) {
+                // 1. ตรวจสอบ Form หลัก
                 if (!formInstance.validate().isValid) {
                     DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000);
                     return;
                 }
 
-                const ds = attachmentGridInstance.option("dataSource");
-                if (!ds || ds.length === 0) {
-                    DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารอย่างน้อย 1 รายการ", "error", 3000);
-                    return;
-                }
-                if (!ds.some(f => f.documentTypeId === 10)) {
-                    DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)'", "error", 3000);
+                // ดึงข้อมูลไฟล์จาก Grid
+                const ds = attachmentGridInstance.option("dataSource") || [];
+
+                // 2. ตรวจสอบว่ามีไฟล์แนบหรือไม่
+                if (ds.length === 0) {
+                    DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารประกอบ", "error", 3000);
                     return;
                 }
 
+                // --- ส่วนที่แก้ไข: เพิ่มเงื่อนไขตรวจสอบประเภทไฟล์ ---
+
+                // เช็คว่ามี "ใบเสนอราคาหลัก (10)" หรือยัง
+                const hasMainQuotation = ds.some(f => f.documentTypeId === 10);
+                if (!hasMainQuotation) {
+                    DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000);
+                    return;
+                }
+
+                // เช็คว่ามี "ใบเสนอราคาคู่เทียบ (20)" หรือยัง
+                const hasComparativeQuotation = ds.some(f => f.documentTypeId === 20);
+                if (!hasComparativeQuotation) {
+                    DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000);
+                    return;
+                }
+                // ------------------------------------------------
+
+                // ถ้าผ่านเงื่อนไขทั้งหมด ให้ดำเนินการต่อ
                 if (isSubmit) openActionPopup('Submit');
                 else executeSaveOrSubmit(false, null);
             }
@@ -654,7 +673,7 @@
                             }
                         },
                         {
-                            dataField: "status", caption: "สถานะ", width: 100, alignment: "center",
+                            dataField: "status", caption: "สถานะ", width: 110, alignment: "center",
                             cellTemplate: (c, o) => {
                                 const b = getStatusBadge(o.value);
                                 $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c);
