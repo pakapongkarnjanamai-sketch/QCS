@@ -1,0 +1,56 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QCS - Document Viewer</title>
+
+    <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+
+    <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
+    <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
+    <link href="~/css/site.css" rel="stylesheet" />
+
+    <script src="~/js/devextreme/jquery.js"></script>
+    <script src="~/js/devextreme/bootstrap.js"></script>
+    <script src="~/js/devextreme/dx.all.js"></script>
+    <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
+    <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
+    <script src="~/src/devextreme-license.js"></script>
+    <script src="~/js/site.js"></script>
+
+    <environment names="Development">
+        <script src="~/host/development.js"></script>
+    </environment>
+    <environment names="Staging,Production">
+        <script src="~/host/production.js"></script>
+    </environment>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #eef2f5; /* สีพื้นหลังต่างจาก Main Layout เล็กน้อยเพื่อให้ดูเป็น Viewer */
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden; /* ซ่อน Scrollbar ของ Body เพื่อให้จัดการ Scroll ใน Container เอง */
+        }
+
+        /* Global Utilities for Viewer */
+        .text-primary-theme {
+            color: #2c3e50;
+        }
+
+        .text-highlight {
+            color: #2190F7;
+        }
+    </style>
+
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
