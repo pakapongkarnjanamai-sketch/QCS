@@ -187,7 +187,8 @@ namespace QCS.API.Controllers
                 // กรองเอกสารที่ CreatedBy ตรงกับ Current User
                 // (ถ้ายังไม่มี field CreatedBy ใน DB ให้ข้าม Where ไปก่อน หรือใช้ Owner Field อื่น)
                 var requests = await _context.PurchaseRequests
-                    //.Where(r => r.CreatedBy == CurrentUserNId) 
+
+                     .Where(r => r.Status != (int)RequestStatus.Approved)
                     .OrderByDescending(r => r.RequestDate)
                     .Select(r => new
                     {
@@ -241,7 +242,7 @@ namespace QCS.API.Controllers
                 var tasks = await _context.PurchaseRequests
                     .Where(r => r.Status == (int)RequestStatus.Pending &&
                                 myStepSequences.Contains(r.CurrentStepId))
-                    .OrderBy(r => r.RequestDate)
+                    .OrderByDescending(r => r.RequestDate)
                     .Select(r => new
                     {
                         r.Id,

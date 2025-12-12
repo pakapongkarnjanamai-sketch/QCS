@@ -271,9 +271,9 @@
                         {
                             itemType: "group", colSpan: 2, colCount: 2,
                             items: [
-                                { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 2, validationRules: [{ type: "required" }] },
+                                { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 1, validationRules: [{ type: "required" }] },
                                 {
-                                    dataField: "vendorId", label: { text: "ผู้ขาย (Vendor)" }, colSpan: 2,
+                                    dataField: "vendorId", label: { text: "ผู้ขาย (Vendor)" }, colSpan: 1,
                                     editorType: "dxSelectBox",
                                     editorOptions: { dataSource: vendorStore, valueExpr: "Id", displayExpr: "Name", searchEnabled: true, placeholder: "เลือก Vendor..." },
                                     validationRules: [{ type: "required" }]

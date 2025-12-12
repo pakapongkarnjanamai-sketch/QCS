@@ -12,22 +12,24 @@
             padding-bottom: 20px;
         }
 
-        .qcs-card-dashboard {
+        .qcs-card-content {
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            padding: 25px;
+            padding: 20px;
             border: none;
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            /* [สำคัญ] ใช้เป็นจุดอ้างอิงพิกัดให้กับปุ่ม Speed Dial */
+            position: relative;
         }
 
         /* --- Grid Wrapper --- */
         .grid-wrapper {
             flex: 1;
-            margin-top: 20px;
+      
             display: flex;
             flex-direction: column;
             min-height: 0;
@@ -51,22 +53,20 @@
         /* Note: Global badges are available in _DevExtremeLayout,
                    but we keep specific logic here for 'Approved' vs 'Completed' */
         .status-badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            color: white;
-            display: inline-block;
-            min-width: 100px;
-            text-align: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
         .st-completed {
-            background-color: #28a745; /* Green for Approved */
+            background-color: #d1e7dd;
+            color: #0f5132; /* Green for Approved */
         }
 
         .st-verify {
             background-color: #17a2b8; /* Blue for Process Completed */
+            color: #0f5132;
         }
 
         /* --- Headers --- */
@@ -77,12 +77,12 @@
 }
 
 <div class="container full-height-container mt-3">
-    <div class="qcs-card-dashboard">
+    <div class="qcs-card-content">
 
         <div class="d-flex align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
-            <h4 class="m-0 fw-bold text-header">
+            <h6 class="m-0 fw-bold text-header">
                 <i class="fas fa-file-invoice-dollar text-primary me-2"></i> @ViewData["Title"]
-            </h4>
+            </h6>
         </div>
 
         <div class="grid-wrapper">
@@ -131,12 +131,12 @@
                     {
                         dataField: "title",
                         caption: "หัวข้อ/รายการ",
-                        minWidth: 220
+                        minWidth: 180
                     },
                     {
                         dataField: "vendorName",
                         caption: "ผู้ขาย (Vendor)",
-                        width: 220
+                        width: 300
                     },
                     {
                         dataField: "requestDate",

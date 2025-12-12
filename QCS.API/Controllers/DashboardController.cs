@@ -34,13 +34,20 @@ namespace QCS.API.Controllers
                 var nId = CurrentUserNId;
 
                 // 1. My Requests Stats (เอกสารที่ฉันสร้าง)
-                // หมายเหตุ: ใช้ CreatedBy ถ้ามี หรือใช้ Logic อื่นตาม Database จริง
-                var myRequestsQuery = _context.PurchaseRequests.AsQueryable();
+
+                var Query = _context.PurchaseRequests.AsQueryable();
+                var myRequestsQuery = Query.Where(r => r.Status != (int)RequestStatus.Approved);
+
                 // .Where(r => r.CreatedBy == nId); // Uncomment เมื่อมี field CreatedBy
 
                 var totalCreated = await myRequestsQuery.CountAsync();
-                var totalPending = await myRequestsQuery.CountAsync(r => r.Status == (int)RequestStatus.Pending);
-                var totalCompleted = await myRequestsQuery.CountAsync(r => r.Status == (int)RequestStatus.Approved || r.Status == (int)RequestStatus.Rejected);
+
+                // รออนุมัติ
+                var totalPending = await Query.CountAsync(r => r.Status == (int)RequestStatus.Pending);
+
+                // [Modified] อนุมัติ/เสร็จสิ้น (ไม่นับ Rejected ตาม Requirement)
+                // นับสถานะ Approved (2) และ Completed (3)
+                var totalApproved = await Query.CountAsync(r => r.Status == (int)RequestStatus.Approved || r.Status == (int)RequestStatus.Completed);
 
                 // 2. My Tasks Stats (งานที่รอฉันอนุมัติ)
                 var myTaskCount = 0;
@@ -66,9 +73,10 @@ namespace QCS.API.Controllers
                 {
                     TotalCreated = totalCreated,
                     TotalPending = totalPending,
-                    TotalCompleted = totalCompleted,
-                    MyRequestCount = totalCreated, // Badge tab 1 (แสดงทั้งหมด หรือเฉพาะ Active ก็ได้)
-                    MyTaskCount = myTaskCount      // Badge tab 2
+                    TotalCompleted = totalApproved, // ใช้ค่าที่กรอง Rejected ออกแล้ว
+                    MyRequestCount = totalCreated,
+                    MyTaskCount = myTaskCount,
+                    ApprovedCount = totalApproved   // [New] ส่งค่าไปสำหรับ Tab ใหม่
                 });
             }
             catch (Exception ex)

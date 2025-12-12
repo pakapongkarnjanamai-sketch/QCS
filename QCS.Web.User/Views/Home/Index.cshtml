@@ -1,5 +1,5 @@
 ﻿@{
-    ViewData["Title"] = "Dashboard & My Tasks";
+    ViewData["Title"] = "My Tasks & Requests";
 }
 
 @section Styles {
@@ -12,73 +12,18 @@
             padding-bottom: 20px;
         }
 
-        .qcs-card-dashboard {
+        .qcs-card-content {
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            padding: 25px;
+            padding: 20px;
             border: none;
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-        }
-
-        /* --- Dashboard Widgets --- */
-        .dash-widget {
-            display: flex;
-            align-items: center;
-            padding: 20px;
-            border-radius: 12px;
-            color: #fff;
+            /* [สำคัญ] ใช้เป็นจุดอ้างอิงพิกัดให้กับปุ่ม Speed Dial */
             position: relative;
-            overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            cursor: default;
-            border: none;
-        }
-
-            .dash-widget:hover {
-                transform: translateY(-3px);
-                box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-            }
-
-        .dash-icon {
-            font-size: 2.5rem;
-            opacity: 0.8;
-            margin-right: 15px;
-        }
-
-        .dash-info h3 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin: 0;
-            line-height: 1.2;
-        }
-
-        .dash-info span {
-            font-size: 0.9rem;
-            opacity: 0.95;
-            font-weight: 500;
-        }
-
-        /* Formal Gradients */
-        .bg-gradient-primary {
-            background: linear-gradient(135deg, #2190F7, #1565C0);
-        }
-
-        .bg-gradient-warning {
-            background: linear-gradient(135deg, #FFC107, #FF8F00);
-            color: #333 !important;
-        }
-
-        .bg-gradient-success {
-            background: linear-gradient(135deg, #28a745, #1e7e34);
-        }
-
-        .bg-gradient-danger {
-            background: linear-gradient(135deg, #dc3545, #c82333);
         }
 
         /* --- TabPanel Customization --- */
@@ -87,12 +32,24 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            margin-top: 25px;
         }
 
+            /* Force DevExtreme containers to fill height */
+            #tabPanel .dx-tabpanel-container,
+            #tabPanel .dx-multiview-wrapper,
+            #tabPanel .dx-multiview-item-container,
+            #tabPanel .dx-multiview-item,
+            #tabPanel .dx-multiview-item-content {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+            }
+
             #tabPanel .dx-tabs {
-                border-bottom: 2px solid #f1f3f5;
+                border-bottom: 1px solid #f1f3f5;
                 background-color: transparent;
+                flex-shrink: 0;
+                margin-bottom: 10px;
             }
 
             #tabPanel .dx-tab {
@@ -100,34 +57,39 @@
                 padding: 10px 20px;
             }
 
-                #tabPanel .dx-tab .dx-tab-text {
-                    font-family: 'Segoe UI', sans-serif;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    color: #6c757d;
-                    text-transform: none;
-                }
+            #tabPanel .dx-tab-text {
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 1rem;
+                font-weight: 600;
+                color: #6c757d;
+                text-transform: none;
+            }
 
-                #tabPanel .dx-tab.dx-tab-selected {
-                    border-bottom: 3px solid #2190F7;
-                    color: #2190F7;
-                }
+            #tabPanel .dx-tab-selected {
+                border-bottom: 3px solid #258cfb;
+                color: #258cfb;
+            }
 
-                    #tabPanel .dx-tab.dx-tab-selected .dx-tab-text {
-                        color: #2190F7;
-                    }
+                #tabPanel .dx-tab-selected .dx-tab-text {
+                    color: #258cfb;
+                }
 
         /* --- Grid & Content --- */
         .grid-wrapper {
             flex: 1;
-            margin-top: 20px;
             display: flex;
             flex-direction: column;
             min-height: 0;
+            padding: 5px;
         }
 
+            /* Force DataGrid to fill wrapper */
+            .grid-wrapper .dx-datagrid {
+                height: 100%;
+            }
+
         .doc-link {
-            color: #2190F7;
+            color: #258cfb;
             text-decoration: none;
             font-weight: 600;
             cursor: pointer;
@@ -135,51 +97,51 @@
         }
 
             .doc-link:hover {
-                color: #0d47a1;
+                color: #0a58ca;
                 text-decoration: underline;
             }
 
-        /* --- Helper Classes --- */
         .text-header {
             color: #2c3e50;
+        }
+
+        /* Status Badge Styling (Optional Enhancement) */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-draft {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-approved {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #842029;
         }
     </style>
 }
 
 <div class="container full-height-container mt-3">
-    <div class="qcs-card-dashboard">
+    <div class="qcs-card-content" id="main-dashboard-card">
 
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-shrink-0">
-            <h4 class="fw-bold m-0 text-header">
-                <i class="fas fa-chart-pie text-primary me-2"></i>@ViewData["Title"]
-            </h4>
-        </div>
-
-        <div class="row g-3 flex-shrink-0" id="dashboardWidgets">
-            <div class="col-md-3 col-sm-6">
-                <div class="dash-widget bg-gradient-primary">
-                    <i class="fas fa-file-alt dash-icon"></i>
-                    <div class="dash-info"><h3 id="lblTotalCreated">-</h3><span>เอกสารที่สร้าง</span></div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="dash-widget bg-gradient-warning">
-                    <i class="fas fa-clock dash-icon" style="color: #333;"></i>
-                    <div class="dash-info"><h3 id="lblTotalPending">-</h3><span>รออนุมัติ</span></div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="dash-widget bg-gradient-success">
-                    <i class="fas fa-check-circle dash-icon"></i>
-                    <div class="dash-info"><h3 id="lblTotalCompleted">-</h3><span>อนุมัติ/เสร็จสิ้น</span></div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="dash-widget bg-gradient-danger">
-                    <i class="fas fa-user-check dash-icon"></i>
-                    <div class="dash-info"><h3 id="lblMyTasks">-</h3><span>งานรออนุมัติ</span></div>
-                </div>
-            </div>
+        <div class="d-flex align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
+            <h6 class="m-0 fw-bold text-header">
+                <i class="fas fa-clipboard-list text-primary me-2"></i> @ViewData["Title"]
+            </h6>
         </div>
 
         <div id="tabPanel"></div>
@@ -194,6 +156,8 @@
             </button>
         </div>
 
+        <div id="action-add"></div>
+
     </div>
 </div>
 
@@ -202,47 +166,52 @@
         $(function () {
             // === CONFIG ===
             const FORM_URL = '@Url.Action("Form", "Request")';
+             
+            // === 1. SET POSITION RELATIVE TO CARD ===
+            DevExpress.config({
+                floatingActionButtonConfig: {
+                    position: {
+                        of: "body", // เกาะติดกับ Card สีขาว
+                        my: "right bottom",
+                        at: "right bottom",
+                        offset: "-50 -50"           // ระยะห่างจากมุมขวาล่างของ Card 25px
+                    }
+                }
+            });
+
+            // === 2. INITIALIZE SPEED DIAL ACTION ===
+            $("#action-add").dxSpeedDialAction({
+                icon: "plus",
+                label: "สร้างใบเสนอราคาใหม่",
+                hint: "Create New Request",
+                index: 1,
+                onClick: function() {
+                    window.location.href = FORM_URL;
+                }
+            });
 
             // === MAIN LOGIC ===
-            loadDashboardData();
+            loadSummaryData();
 
-            function loadDashboardData() {
+            function loadSummaryData() {
                 $.ajax({
                     url: `${API_BASE}/Dashboard/Summary`,
                     method: "GET",
                     xhrFields: { withCredentials: true },
                     success: function (data) {
-                        // 1. Update Widgets
-                        $("#lblTotalCreated").text(data.totalCreated);
-                        $("#lblTotalPending").text(data.totalPending);
-                        $("#lblTotalCompleted").text(data.totalCompleted);
-                        $("#lblMyTasks").text(data.myTaskCount);
-
-                        // 2. Build Tabs
-                        initTabPanel(data.myRequestCount, data.myTaskCount);
+                        initTabPanel(data.myRequestCount, data.myTaskCount, data.approvedCount);
                     },
                     error: function(err) {
-                        console.error("Failed to load dashboard summary", err);
-                        // Initialize empty tabs on error as fallback
-                        initTabPanel(0, 0);
+                        console.error("Failed to load summary", err);
+                        initTabPanel(0, 0, 0);
                     }
                 });
             }
 
-            function initTabPanel(requestCount, taskCount) {
+            function initTabPanel(requestCount, taskCount, approvedCount) {
                 const tabs = [];
 
-                // Tab 1: My Requests
-                if (requestCount > 0) {
-                    tabs.push({
-                        title: "เอกสารของฉัน (My Requests)",
-                        icon: "file",
-                        badge: requestCount,
-                        template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyRequests"))
-                    });
-                }
-
-                // Tab 2: My Tasks
+                // Tab 1: My Tasks (งานรออนุมัติ - สำคัญสุด)
                 if (taskCount > 0) {
                     tabs.push({
                         title: "งานรออนุมัติ (My Tasks)",
@@ -252,8 +221,26 @@
                     });
                 }
 
-                // Show Empty State if no data
-                if (tabs.length === 0) {
+                // Tab 2: My Requests (เอกสารของฉัน)
+                tabs.push({
+                    title: "เอกสารของฉัน (My Requests)",
+                    icon: "file",
+                    badge: requestCount,
+                    template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyRequests"))
+                });
+
+                // Tab 3: Approved List (เอกสารที่อนุมัติแล้ว)
+                if (approvedCount > 0) {
+                    tabs.push({
+                        title: "เอกสารที่อนุมัติแล้ว (Approved)",
+                        icon: "activefolder",
+                        badge: approvedCount,
+                        template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridApproved"))
+                    });
+                }
+
+                // Show Empty State if absolutely no data
+                if (tabs.length === 0 && requestCount === 0) {
                     $("#emptyState").removeClass("d-none");
                     return;
                 }
@@ -278,11 +265,14 @@
                         if ($("#gridMyTasks").length && !$("#gridMyTasks").data("dxDataGrid")) {
                             renderMyTasksGrid();
                         }
+                        if ($("#gridApproved").length && !$("#gridApproved").data("dxDataGrid")) {
+                            renderApprovedGrid();
+                        }
                     }
                 });
             }
 
-            // === GRID CONFIGURATION ===
+            // === GRID COLUMNS & CONFIG ===
             const baseColumns = [
                 {
                     dataField: "code",
@@ -300,7 +290,7 @@
                 {
                     dataField: "title",
                     caption: "หัวข้อ",
-                    minWidth: 200,
+                    minWidth: 180,
                     allowSorting: false,
                     allowFiltering: false,
                     allowSearch: false
@@ -308,13 +298,13 @@
                 {
                     dataField: "vendorName",
                     caption: "ผู้ขาย",
-                    width: 220
+                    width: 300
                 },
                 {
                     dataField: "requestDate",
-                    caption: "วันที่ขอซื้อ",
+                    caption: "วันที่ขอ",
                     dataType: "date",
-                    format: "yyyy-MM-dd", // <--- Updated Date Format
+                    format: "yyyy-MM-dd",
                     width: 120,
                     alignment: "center"
                 },
@@ -327,7 +317,6 @@
                     allowFiltering: false,
                     allowSearch: false,
                     cellTemplate: (container, options) => {
-                        // Use global helper from _DevExtremeLayout
                         const info = getStatusInfo(options.value, options.data.currentStepId);
                         $("<span>")
                             .addClass("status-badge " + info.cls)
@@ -362,35 +351,20 @@
                     headerFilter: { visible: true },
                     scrolling: { mode: "virtual" },
                     searchPanel: { visible: true, width: 350, placeholder: "ค้นหาเอกสาร..." },
-                    columns: baseColumns,
-                    onToolbarPreparing: function(e) {
-                        e.toolbarOptions.items.unshift({
-                            location: "before",
-                            widget: "dxButton",
-                            options: {
-                                icon: "plus",
-                                text: "สร้างใบเสนอราคาใหม่",
-                                type: "default",
-                                stylingMode: "contained",
-                                onClick: function() { window.location.href = FORM_URL; }
-                            }
-                        });
-                    }
+                    columns: baseColumns
                 });
             }
 
             function renderMyTasksGrid() {
-                // Add 'Requester' column for tasks grid
                 const taskColumns = [
-                    ...baseColumns.slice(0, 2), // Code, Title
+                    ...baseColumns.slice(0, 2),
                     {
                         dataField: "requesterName",
                         caption: "ผู้ขอซื้อ (Requester)",
                         width: 180
                     },
-                    ...baseColumns.slice(2) // Vendor, Date, Status, Buttons
+                    ...baseColumns.slice(2)
                 ];
-
                 $("#gridMyTasks").dxDataGrid({
                     dataSource: DevExpress.data.AspNet.createStore({
                         key: "id",
@@ -410,7 +384,26 @@
                 });
             }
 
-            // Create button event for empty state
+            function renderApprovedGrid() {
+                $("#gridApproved").dxDataGrid({
+                    dataSource: DevExpress.data.AspNet.createStore({
+                        key: "id",
+                        loadUrl: `${API_BASE}/PurchaseRequest/ApprovedList`,
+                        onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
+                    }),
+                    height: "100%",
+                    showBorders: true,
+                    rowAlternationEnabled: true,
+                    hoverStateEnabled: true,
+                    columnAutoWidth: true,
+                    filterRow: { visible: true },
+                    headerFilter: { visible: true },
+                    scrolling: { mode: "virtual" },
+                    searchPanel: { visible: true, width: 350, placeholder: "ค้นหาเอกสารที่อนุมัติแล้ว..." },
+                    columns: baseColumns
+                });
+            }
+
             $("#btnCreateEmpty").on("click", function() { window.location.href = FORM_URL; });
         });
     </script>
