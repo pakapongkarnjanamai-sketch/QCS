@@ -329,7 +329,7 @@ namespace QCS.Application.Services
                             actionDate = DateTime.Now;
                             approverNId = _currentUserService.UserId;
                             approverName = await GetApproverNameAsync(1, _currentUserService.UserId);
-                            comment = input.Remark;
+                            comment = input.Comment;
                         }
                         else
                         {
@@ -402,7 +402,7 @@ namespace QCS.Application.Services
                         step1.ActionDate = DateTime.Now;
                         step1.ApproverNId = _currentUserService.UserId;
                         step1.ApproverName = await GetApproverNameAsync(1, _currentUserService.UserId);
-                        step1.Comment = input.Remark;
+                        step1.Comment = input.Comment;
                     }
 
                     // Activate Step 2 -> Pending

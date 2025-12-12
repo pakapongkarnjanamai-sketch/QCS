@@ -17,7 +17,7 @@ namespace QCS.Domain.DTOs
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
         public string? Remark { get; set; }
-
+        public string? Comment { get; set; }
         // รับไฟล์แนบจริง (Binary) จาก FormData
         public List<IFormFile> Attachments { get; set; }
 

@@ -578,54 +578,98 @@
                 });
             }
 
-            async function executeSaveOrSubmit(isSubmit, comment) {
-                loadingIndicator.show();
-                try {
-                    const formData = new FormData();
-                    const data = formInstance.option("formData");
+        async function executeSaveOrSubmit(isSubmit, comment) {
+                  loadingIndicator.show();
+                  try {
+                      const formData = new FormData();
+                      const data = formInstance.option("formData");
 
-                    if (MODE === "EDIT") formData.append("Id", PR_ID);
-                    formData.append("Title", data.title);
+                      // --- ส่วนข้อมูล Header ---
+                      if (MODE === "EDIT") formData.append("Id", PR_ID);
+                      formData.append("Title", data.title);
 
-                    const vendorEditor = formInstance.getEditor("vendorId");
-                    formData.append("VendorId", vendorEditor.option("value"));
-                    formData.append("VendorName", vendorEditor.option("displayValue") || "");
+                      const vendorEditor = formInstance.getEditor("vendorId");
+                      formData.append("VendorId", vendorEditor.option("value"));
+                      formData.append("VendorName", vendorEditor.option("displayValue") || "");
 
-                    if(data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
-                    if(data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
-                    formData.append("Remark", comment || data.remark || "");
+                      if (data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
+                      if (data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
 
-                    const gridFiles = attachmentGridInstance.option("dataSource");
-                    const newFilesMeta = [];
-                    const existingUpdates = [];
+                      // --- [จุดที่แก้ไข] แยก Remark และ Comment ---
 
-                    gridFiles.forEach(f => {
-                        if (f.isNew) newFilesMeta.push({ FileName: f.fileName || f.originalFileName, DocumentTypeId: f.documentTypeId });
-                        else if (f.id) existingUpdates.push({ Id: f.id, DocumentTypeId: f.documentTypeId });
-                    });
+                      // 1. Remark: หมายเหตุของตัวเอกสาร (เอามาจาก Form เสมอ)
+                      formData.append("Remark", data.remark || "");
 
-                    formData.append("QuotationsJson", JSON.stringify(newFilesMeta));
-                    if (MODE === "EDIT") {
-                        formData.append("UpdatedQuotationsJson", JSON.stringify(existingUpdates));
-                        if (deletedFileIds.length > 0) formData.append("DeletedFileIds", deletedFileIds.join(","));
-                    }
+                      // 2. Comment: ความเห็นตอนอนุมัติ/ส่งงาน (เอามาจาก Popup เฉพาะตอน Submit)
+                      if (isSubmit && comment) {
+                          formData.append("Comment", comment);
+                      }
+                      // -------------------------------------------
 
-                    fileList.forEach(f => formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f));
+                      // --- ส่วนจัดการไฟล์แนบ (Files & Metadata) ---
+                      const gridFiles = attachmentGridInstance.option("dataSource") || [];
+                      const newFilesMeta = [];
+                      const existingUpdates = [];
 
-                    let endpoint = "";
-                    if (MODE === "CREATE") endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
-                    else endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
+                      gridFiles.forEach(f => {
+                          if (f.isNew) {
+                              // ไฟล์ใหม่: เก็บ Metadata รอจับคู่กับไฟล์ Binary
+                              newFilesMeta.push({
+                                  FileName: f.fileName || f.originalFileName,
+                                  DocumentTypeId: f.documentTypeId
+                              });
+                          } else if (f.id) {
+                              // ไฟล์เก่า: เก็บ ID กับ Type เผื่อมีการแก้ไขประเภทเอกสาร
+                              existingUpdates.push({
+                                  Id: f.id,
+                                  DocumentTypeId: f.documentTypeId
+                              });
+                          }
+                      });
 
-                    const res = await fetch(CONFIG.API_BASE_URL + endpoint, { method: 'POST', body: formData, credentials: 'include' });
-                    if (!res.ok) throw new Error(await res.text());
+                      // ส่ง JSON String ของ Metadata
+                      formData.append("QuotationsJson", JSON.stringify(newFilesMeta));
 
-                    setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 500);
-                } catch (err) {
-                    console.error("Execute Error:", err.message);
-                } finally {
-                    loadingIndicator.hide();
-                }
-            }
+                      if (MODE === "EDIT") {
+                          formData.append("UpdatedQuotationsJson", JSON.stringify(existingUpdates));
+                          if (deletedFileIds.length > 0) {
+                              formData.append("DeletedFileIds", deletedFileIds.join(","));
+                          }
+                      }
+
+                      // แนบไฟล์ Binary (เฉพาะไฟล์ใหม่ที่อยู่ในตัวแปร fileList)
+                      fileList.forEach(f => {
+                          formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f);
+                      });
+
+                      // --- กำหนด Endpoint ---
+                      let endpoint = "";
+                      if (MODE === "CREATE") {
+                          endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
+                      } else {
+                          endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
+                      }
+
+                      // --- ยิง Request ---
+                      const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
+                          method: 'POST',
+                          body: formData,
+                          credentials: 'include'
+                      });
+
+                      if (!res.ok) throw new Error(await res.text());
+
+                      // สำเร็จ -> กลับหน้า List
+                      DevExpress.ui.notify("บันทึกข้อมูลสำเร็จ", "success", 1500);
+                      setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 1000);
+
+                  } catch (err) {
+                      console.error("Execute Error:", err.message);
+                      DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);
+                  } finally {
+                      loadingIndicator.hide();
+                  }
+              }
 
             async function sendApprovalAction(action, comment) {
                 loadingIndicator.show();
