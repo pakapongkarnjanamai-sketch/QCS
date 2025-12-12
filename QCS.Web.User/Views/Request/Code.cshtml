@@ -15,7 +15,7 @@
             height: 100vh;
             padding: 20px;
             box-sizing: border-box;
-            background-color: #f8f9fa; /* พื้นหลังรวมให้ดูเทาอ่อนๆ เพื่อให้ card สีขาวเด่นขึ้น */
+            background-color: #f8f9fa;
         }
 
         /* --- Left: PDF Viewer --- */
@@ -61,14 +61,23 @@
             text-align: center;
         }
 
-        /* --- Right: Info Panel --- */
+        /* --- Right: Info Panel (Updated Layout) --- */
         .info-section {
             display: flex;
             flex-direction: column;
-            gap: 15px; /* ระยะห่างระหว่าง Card */
+            gap: 15px; /* ระยะห่างระหว่าง Action Card กับ Scroll Area */
             height: 100%;
-            overflow-y: auto;
-            padding-right: 5px;
+            overflow: hidden; /* ปิด Scroll ของ Container แม่ */
+        }
+
+        /* Wrapper สำหรับส่วนเนื้อหาที่ต้องการให้ Scroll */
+        .info-scroll-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto; /* เปิด Scroll เฉพาะส่วนนี้ */
+            flex: 1; /* ให้ยืดเต็มพื้นที่ที่เหลือ */
+            padding-right: 5px; /* เผื่อที่ให้ Scrollbar */
         }
 
         .info-card {
@@ -79,8 +88,6 @@
             flex-shrink: 0;
             border: 1px solid #eff2f5;
         }
-
-    
 
         .card-header-text {
             font-size: 15px;
@@ -120,7 +127,7 @@
 
         .file-icon {
             font-size: 24px;
-            color: #f05b41; /* Adobe Red */
+            color: #f05b41;
             margin-right: 15px;
         }
 
@@ -230,10 +237,9 @@
             border-left: 3px solid #ddd;
             color: #555;
             font-style: italic;
-            /* --- ส่วนที่เพิ่ม --- */
-            white-space: pre-wrap; /* 1. รักษารูปแบบการเคาะบรรทัด (Enter) และ Wrap ข้อความอัตโนมัติ */
-            word-break: break-word; /* 2. ถ้ามีคำยาวๆ ติดกัน (เช่น URL) ให้ตัดคำลงมาบรรทัดใหม่ */
-            overflow-wrap: break-word; /* 3. คำสั่งเสริมเพื่อให้รองรับ Browser หลากหลาย */
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         /* --- Badges --- */
@@ -244,45 +250,32 @@
             font-weight: 700;
         }
 
-        .bg-success-soft {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .bg-warning-soft {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .bg-danger-soft {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .bg-secondary-soft {
-            background: #e2e3e5;
-            color: #383d41;
-        }
+        .bg-success-soft { background: #d4edda; color: #155724; }
+        .bg-warning-soft { background: #fff3cd; color: #856404; }
+        .bg-danger-soft { background: #f8d7da; color: #721c24; }
+        .bg-secondary-soft { background: #e2e3e5; color: #383d41; }
 
         /* Responsive */
         @@media (max-width: 1024px) {
-            .viewer-container
+            .viewer-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow-y: auto;
+            }
 
-        {
-            grid-template-columns: 1fr;
-            height: auto;
-            overflow-y: auto;
-        }
+            .pdf-section {
+                height: 500px;
+            }
 
-        .pdf-section {
-            height: 500px;
-        }
-
-        .info-section {
-            height: auto;
-            overflow: visible;
-        }
-
+            .info-section {
+                height: auto;
+                overflow: visible;
+            }
+            /* Reset Scroll Wrapper on mobile */
+            .info-scroll-wrapper {
+                overflow: visible;
+                height: auto;
+            }
         }
     </style>
 }
@@ -310,30 +303,31 @@
     <div class="info-section">
 
         <div id="actionCard" class="info-card" style="display:none;">
-       
             <div id="actionButtonContainer" class="d-flex gap-2 w-100">
             </div>
         </div>
 
-        <div class="info-card">
-            <div class="card-header-text">
-                <span>Request Info</span>
-                <span id="headerStatus"></span>
+        <div class="info-scroll-wrapper">
+            <div class="info-card">
+                <div class="card-header-text">
+                    <span>Request Info</span>
+                    <span id="headerStatus"></span>
+                </div>
+                <div id="requestInfoForm"></div>
             </div>
-            <div id="requestInfoForm"></div>
-        </div>
 
-        <div class="info-card" style="min-height: 200px;">
-            <div class="card-header-text">
-                <span>Attachments</span>
-                <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+            <div class="info-card" style="min-height: 200px;">
+                <div class="card-header-text">
+                    <span>Attachments</span>
+                    <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+                </div>
+                <div id="documentList"></div>
             </div>
-            <div id="documentList"></div>
-        </div>
 
-        <div class="info-card">
-            <div class="card-header-text">Approval Flow</div>
-            <div id="approvalList" class="timeline"></div>
+            <div class="info-card">
+                <div class="card-header-text">Approval Flow</div>
+                <div id="approvalList" class="timeline"></div>
+            </div>
         </div>
 
     </div>
@@ -352,9 +346,7 @@
 @section Scripts {
     <script>
         $(function () {
-            // ==========================================
-            // 1. CONFIG
-            // ==========================================
+            // === CONFIG ===
             const DOC_CODE = "@Model";
             const API = {
                 GET_DATA: `${API_BASE}/Request/DetailByCode/${DOC_CODE}`,
@@ -372,9 +364,7 @@
             let currentActionType = "";
             let actionPopupInstance;
 
-            // ==========================================
-            // 2. INIT
-            // ==========================================
+            // === INIT ===
             initActionPopup();
 
             if (DOC_CODE) loadData();
@@ -392,7 +382,7 @@
                     currentDocId = data.purchaseRequestId;
 
                     renderHeader(data);
-                    renderActionButtons(data); // <--- ฟังก์ชันนี้ปรับปรุงใหม่
+                    renderActionButtons(data);
                     renderForm(data);
                     renderDocuments(data.quotations);
 
@@ -413,10 +403,7 @@
                 }
             }
 
-            // ==========================================
-            // 3. ACTIONS & POPUP LOGIC
-            // ==========================================
-
+            // === ACTIONS & POPUP LOGIC ===
             function initActionPopup() {
                 actionPopupInstance = $("#actionPopup").dxPopup({
                     width: 400, height: "auto", visible: false,
@@ -441,7 +428,6 @@
                 }).dxPopup("instance");
             }
 
-            // --- CHANGED: Render Buttons inside the new Card ---
             function renderActionButtons(data) {
                 const permissions = data.permissions || {};
                 const canApprove = permissions.canApprove;
@@ -450,40 +436,26 @@
                 const $card = $("#actionCard");
                 const $container = $("#actionButtonContainer");
 
-                // ถ้าไม่มีสิทธิ์เลย ให้ซ่อน Card
                 if (!canApprove && !canReject) {
                     $card.hide();
                     return;
                 }
 
-                // แสดง Card และเคลียร์ปุ่มเก่า
                 $card.show();
                 $container.empty();
 
-                // 1. ปุ่ม Reject
                 if (canReject) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'Reject',
-                        icon: 'fas fa-times',
-                        type: 'danger',
-                        stylingMode: 'outlined', // แบบเส้นขอบ สบายตากว่า
-                        width: '100%',
-                        height: 40, // ปุ่มใหญ่
-                        elementAttr: { class: "fw-bold shadow-sm" },
+                        text: 'Reject', icon: 'fas fa-times', type: 'danger', stylingMode: 'outlined',
+                        width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Reject')
                     }).addClass("flex-grow-1");
                 }
 
-                // 2. ปุ่ม Approve
                 if (canApprove) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'Approve',
-                        icon: 'fas fa-check',
-                        type: 'success', // สีเขียว
-                        stylingMode: 'contained', // แบบทึบ เพื่อเน้น
-                        width: '100%',
-                        height: 40, // ปุ่มใหญ่
-                        elementAttr: { class: "fw-bold shadow-sm" },
+                        text: 'Approve', icon: 'fas fa-check', type: 'success', stylingMode: 'contained',
+                        width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Approve')
                     }).addClass("flex-grow-1");
                 }
@@ -537,7 +509,6 @@
                     showError("Error: Document ID not found.");
                     return;
                 }
-
                 const loader = createLoader("Processing...");
                 try {
                     const endpoint = (action === 'Approve') ? API.APPROVE : API.REJECT;
@@ -547,9 +518,7 @@
                         body: JSON.stringify({ purchaseRequestId: currentDocId, comment: comment }),
                         credentials: 'include'
                     });
-
                     if (!res.ok) throw new Error(await res.text());
-
                     DevExpress.ui.notify("ดำเนินการสำเร็จ (Success)", "success", 2000);
                     setTimeout(() => location.reload(), 1000);
                 } catch (err) {
@@ -559,9 +528,7 @@
                 }
             }
 
-            // ==========================================
-            // 4. RENDERING (Display Logic)
-            // ==========================================
+            // === RENDERING ===
             function renderHeader(data) {
                 const statusInt = typeof data.status === 'string' ? parseInt(data.status) : data.status;
                 const statusText = MAPS.status[statusInt] || "Unknown";
@@ -569,32 +536,19 @@
                 if (statusInt === 1) badgeClass = "bg-warning-soft";
                 if (statusInt === 2 || statusInt === 3) badgeClass = "bg-success-soft";
                 if (statusInt === 9 || statusInt === 99) badgeClass = "bg-danger-soft";
-
                 $("#headerStatus").html(`<span class="status-badge ${badgeClass}">${statusText}</span>`);
             }
 
             function renderForm(data) {
                 $("#requestInfoForm").dxForm({
-                    formData: data,
-                    readOnly: true,
-                    labelLocation: "top",
-                    colCount: 2,
+                    formData: data, readOnly: true, labelLocation: "top", colCount: 2,
                     items: [
                         { dataField: "documentNo", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
                         { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
-                        {
-                            dataField: "validFrom", label: { text: "Valid From" },
-                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
-                        },
-                        {
-                            dataField: "validUntil", label: { text: "Valid Until" },
-                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
-                        },
-                        {
-                            dataField: "remark", label: { text: "Remark" }, colSpan: 2,
-                            editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 }
-                        }
+                        { dataField: "validFrom", label: { text: "Valid From" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
+                        { dataField: "validUntil", label: { text: "Valid Until" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
+                        { dataField: "remark", label: { text: "Remark" }, colSpan: 2, editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 } }
                     ]
                 });
             }
@@ -602,17 +556,14 @@
             function renderDocuments(docs) {
                 const container = $("#documentList").empty();
                 $("#attachmentCount").text(docs ? docs.length : 0);
-
                 if (!docs || docs.length === 0) {
                     container.html('<div class="text-center text-muted small p-3">No attachments</div>');
                     return;
                 }
-
                 docs.forEach(doc => {
                     const typeName = MAPS.docType[doc.documentTypeId] || "Attachment";
                     const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
                     const displayFileName = doc.originalFileName || doc.fileName;
-
                     const item = $(`
                         <div class="file-item" data-id="${doc.id}">
                             <i class="fas fa-file-pdf file-icon"></i>
@@ -636,9 +587,7 @@
                     container.html('<div class="text-center text-muted small p-3">No approval history</div>');
                     return;
                 }
-
                 steps.sort((a, b) => a.sequenceNo - b.sequenceNo);
-
                 steps.forEach(step => {
                     let dotClass = "";
                     if (step.status === 2) dotClass = "completed";
@@ -651,7 +600,6 @@
                          approverDisplay = step.assignments.map(a => a.employeeName).join(", ");
                     }
                     if (!approverDisplay) approverDisplay = "System/Waiting";
-
                     const dateStr = formatDateTime(step.actionDate);
 
                     const html = `
@@ -676,10 +624,8 @@
                 $(".file-item").removeClass("active");
                 $(`.file-item[data-id="${doc.id}"]`).addClass("active");
                 $("#docTitleLabel").text(doc.originalFileName || doc.fileName);
-
                 const viewer = $("#pdfViewer").empty();
                 const loader = createLoader("Opening file...", "#pdfViewer");
-
                 try {
                     const url = `${API.VIEW_FILE}/${doc.id}`;
                     const res = await fetch(url, { method: 'GET', credentials: 'include' });
@@ -694,9 +640,6 @@
                 }
             }
 
-            // ==========================================
-            // 5. UTILS
-            // ==========================================
             function formatSize(b) {
                 if (!b) return "";
                 const i = Math.floor(Math.log(b) / Math.log(1024));
