@@ -1,122 +1,88 @@
 ﻿@model string
 
 @{
-    ViewData["Title"] = $"{Model}";
+    ViewData["Title"] = $"Document: {Model}";
     Layout = "_NoNavLayout";
 }
 
 @section Styles {
     <style>
-        /* --- Layout & Container --- */
-        .quotation-details-container {
-            width: 100%;
-     
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 12px;
-        }
-
-        .details-grid {
+        /* --- Layout --- */
+        .viewer-container {
             display: grid;
-            grid-template-columns: 1fr 450px;
+            grid-template-columns: 1fr 400px; /* ขยายส่วน PDF ลดส่วน Info */
             gap: 20px;
-            height: calc(100vh - 40px); /* Adjusted height for NoNav layout */
-            min-height: 700px;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         /* --- Left: PDF Viewer --- */
-        .pdf-viewer-section {
+        .pdf-section {
             background: white;
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
-            height: 100%;
             overflow: hidden;
+            border: 1px solid #e0e0e0;
         }
 
-        .document-controls {
+        .pdf-toolbar {
+            padding: 12px 15px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 15px;
         }
 
-        .document-title {
-            font-weight: 600;
-            color: #333;
-            font-size: 1.1em;
+        .pdf-title {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .control-button {
-            padding: 6px 12px;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #555;
-            transition: 0.2s;
-        }
-
-            .control-button:hover {
-                background: #e9ecef;
-            }
-
-        .pdf-viewer-container {
+        .pdf-body {
             flex: 1;
-            width: 100%;
-            border: 1px solid #eee;
-            border-radius: 8px;
-            background: #525659;
+            background: #525659; /* สีพื้นหลังมาตรฐาน PDF Viewer */
             position: relative;
-            overflow: hidden;
-        }
-
-        .loading-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #bbb;
-        }
-
-        .error-message {
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100%;
-            color: #dc3545;
-            font-weight: 600;
         }
 
-        /* --- Right: Info Section --- */
+        .pdf-placeholder {
+            color: #ccc;
+            text-align: center;
+        }
+
+        /* --- Right: Info Panel --- */
         .info-section {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
             height: 100%;
             overflow-y: auto;
-            padding-right: 5px;
+            padding-right: 5px; /* For Scrollbar */
         }
 
-        .card-box {
+        .info-card {
             background: white;
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             flex-shrink: 0;
         }
 
-        .section-header {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 15px;
+        .card-header-text {
+            font-size: 15px;
+            font-weight: 700;
             color: #2c3e50;
+            margin-bottom: 15px;
             border-bottom: 2px solid #f1f3f5;
             padding-bottom: 8px;
             display: flex;
@@ -124,12 +90,12 @@
             align-items: center;
         }
 
-        /* --- Document List --- */
-        .document-item {
+        /* --- File List Item --- */
+        .file-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             padding: 12px;
-            border: 1px solid #eee;
+            border: 1px solid #f1f3f5;
             border-radius: 8px;
             margin-bottom: 8px;
             cursor: pointer;
@@ -137,65 +103,54 @@
             background: #fff;
         }
 
-            .document-item:hover {
+            .file-item:hover {
                 background-color: #f8f9fa;
                 border-color: #2190F7;
+                transform: translateX(2px);
             }
 
-            .document-item.active {
+            .file-item.active {
                 background-color: #e3f2fd;
                 border-color: #2190F7;
             }
 
-        .document-icon {
-            font-size: 20px;
-            color: #2190F7;
-            margin-right: 12px;
-            margin-top: 3px;
+        .file-icon {
+            font-size: 24px;
+            color: #f05b41; /* Adobe Red */
+            margin-right: 15px;
         }
 
-        .document-info {
+        .file-details {
             flex: 1;
             overflow: hidden;
         }
 
-        .document-name {
-            font-size: 14px;
-            font-weight: 500;
+        .file-name {
+            font-weight: 600;
+            font-size: 13px;
             color: #333;
-            margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .document-type-badge {
-            display: inline-block;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: #e9ecef;
-            color: #495057;
-            margin-right: 5px;
-            font-weight: 600;
-        }
-
-        .document-meta {
+        .file-meta {
             font-size: 11px;
             color: #888;
+            margin-top: 2px;
         }
 
-        /* --- Approval Timeline --- */
+        /* --- Timeline (Clean Design) --- */
         .timeline {
             position: relative;
-            padding-left: 20px;
+            padding-left: 25px;
             margin-top: 10px;
         }
 
             .timeline::before {
                 content: '';
                 position: absolute;
-                left: 6px;
+                left: 8px;
                 top: 5px;
                 bottom: 5px;
                 width: 2px;
@@ -204,7 +159,7 @@
 
         .timeline-item {
             position: relative;
-            padding-bottom: 20px;
+            padding-bottom: 25px;
         }
 
             .timeline-item:last-child {
@@ -213,10 +168,10 @@
 
         .timeline-dot {
             position: absolute;
-            left: -20px;
-            top: 5px;
-            width: 14px;
-            height: 14px;
+            left: -25px;
+            top: 4px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             background: #fff;
             border: 3px solid #dee2e6;
@@ -238,19 +193,18 @@
                 background: #dc3545;
             }
 
-        .timeline-content {
-            margin-left: 10px;
-        }
-
         .timeline-step {
             font-weight: 600;
             font-size: 13px;
             color: #333;
         }
 
-        .timeline-approver {
+        .timeline-user {
             font-size: 12px;
-            color: #666;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 5px;
             margin-top: 2px;
         }
 
@@ -258,13 +212,16 @@
             font-size: 11px;
             color: #999;
             margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .timeline-comment {
-            margin-top: 6px;
+            margin-top: 8px;
             font-size: 12px;
             background: #f8f9fa;
-            padding: 8px;
+            padding: 8px 12px;
             border-radius: 6px;
             border-left: 3px solid #ddd;
             color: #555;
@@ -273,248 +230,228 @@
 
         /* --- Badges --- */
         .status-badge {
-            padding: 4px 10px;
+            padding: 3px 10px;
             border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
         }
 
-        .status-success {
+        .bg-success-soft {
             background: #d4edda;
             color: #155724;
         }
 
-        .status-warning {
+        .bg-warning-soft {
             background: #fff3cd;
             color: #856404;
         }
 
-        .status-danger {
+        .bg-danger-soft {
             background: #f8d7da;
             color: #721c24;
         }
 
-        .status-secondary {
+        .bg-secondary-soft {
             background: #e2e3e5;
             color: #383d41;
         }
 
-        /* --- Responsive --- */
-        @@media screen and (max-width: 1024px) {
-            .details-grid {
+        /* Responsive */
+        @@media (max-width: 1024px) {
+            .viewer-container {
                 grid-template-columns: 1fr;
-                display: block;
+                height: auto;
+                overflow-y: auto;
             }
 
-            .pdf-viewer-section {
+            .pdf-section {
                 height: 500px;
-                margin-bottom: 20px;
+            }
+
+            .info-section {
+                height: auto;
+                overflow: visible;
             }
         }
     </style>
 }
 
-<div class="quotation-details-container">
-    <div class="details-grid">
+<div class="viewer-container">
 
-        <div class="pdf-viewer-section">
-            <div class="document-controls">
-                <div class="document-title">
-                    <i class="fas fa-file-alt"></i> <span id="docTitleLabel">Document Viewer</span>
-                </div>
-                <button class="control-button" id="btnFullscreen"><i class="fas fa-expand"></i> Fullscreen</button>
+    <div class="pdf-section">
+        <div class="pdf-toolbar">
+            <div class="pdf-title">
+                <i class="fas fa-file-alt text-primary"></i>
+                <span id="docTitleLabel">Document Viewer</span>
             </div>
-            <div id="pdfViewer" class="pdf-viewer-container">
-                <div class="loading-placeholder">
-                    <i class="fas fa-search fa-2x"></i>
-                    <span class="mt-2">Select a document to view</span>
-                </div>
+            <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
+                <i class="fas fa-expand"></i> Fullscreen
+            </button>
+        </div>
+        <div id="pdfViewer" class="pdf-body">
+            <div class="pdf-placeholder">
+                <i class="fas fa-search fa-3x mb-3 opacity-50"></i>
+                <div>Select a document to view</div>
             </div>
         </div>
+    </div>
 
-        <div class="info-section">
+    <div class="info-section">
 
-            <div class="card-box">
-                <div class="section-header">
-                    <span>Request Information</span>
-                    <span id="headerStatus"></span>
-                </div>
-                <div id="requestInfoForm"></div>
+        <div class="info-card">
+            <div class="card-header-text">
+                <span>Request Info</span>
+                <span id="headerStatus"></span>
             </div>
-
-            <div class="card-box" style="min-height: 200px;">
-                <div class="section-header">
-                    <span>Attachments</span>
-                    <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
-                </div>
-                <div id="documentList"></div>
-            </div>
-
-            <div class="card-box">
-                <div class="section-header">Approval Flow</div>
-                <div id="approvalList" class="timeline"></div>
-            </div>
-
+            <div id="requestInfoForm"></div>
         </div>
+
+        <div class="info-card" style="min-height: 200px;">
+            <div class="card-header-text">
+                <span>Attachments</span>
+                <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+            </div>
+            <div id="documentList"></div>
+        </div>
+
+        <div class="info-card">
+            <div class="card-header-text">Approval Flow</div>
+            <div id="approvalList" class="timeline"></div>
+        </div>
+
     </div>
 </div>
 
 @section Scripts {
     <script>
-        // ==========================================
-        // 1. CONFIGURATION
-        // ==========================================
-        const CONFIG = {
-            docCode: "@Model",
-            api: {
-                baseUrl: API_BASE,
-                endpoints: {
-                    getByCode: "/PurchaseRequest/ByCode",
-                    viewFile: "/PurchaseRequest/ViewFile"
-                }
-            },
-            maps: {
+        $(function () {
+            // ==========================================
+            // 1. CONFIG
+            // ==========================================
+            const DOC_CODE = "@Model";
+            const API = {
+                GET_DATA: `${API_BASE}/PurchaseRequest/ByCode`,
+                VIEW_FILE: `${API_BASE}/PurchaseRequest/ViewFile`
+            };
+            const MAPS = {
                 status: { 0: "Draft", 1: "Pending", 2: "Approved", 3: "Completed", 99: "Rejected" },
                 docType: { 10: "Quotation", 20: "Technical Spec", 30: "Other" }
-            }
-        };
+            };
 
-        // ==========================================
-        // 2. MAIN LOGIC
-        // ==========================================
-        $(function () {
-            if (CONFIG.docCode) initPage();
-            else renderError("Document Code is missing.");
-        });
+            // ==========================================
+            // 2. INIT
+            // ==========================================
+            if (DOC_CODE) loadData();
+            else showError("Document Code is missing.");
 
-        async function initPage() {
-            const loader = createLoadingIndicator("Loading Data...");
-            try {
-                const data = await service.getData(CONFIG.docCode);
+            async function loadData() {
+                const loader = createLoader("Loading Data...");
+                try {
+                    const url = new URL(API.GET_DATA);
+                    url.searchParams.append("code", DOC_CODE);
 
-                ui.renderHeader(data);
-                ui.renderForm(data);
-                ui.renderDocuments(data.quotations);
-                ui.renderApprovals(data.approvalSteps);
+                    const res = await fetch(url, { credentials: 'include' });
+                    if (!res.ok) throw new Error("Document not found.");
 
-                // Auto-load first file
-                if (data.quotations && data.quotations.length > 0) {
-                    ui.loadViewer(data.quotations[0]);
-                } else {
-                    ui.setViewerMsg("No files attached.");
+                    let data = await res.json();
+                    if (data.data) data = data.data; // Handle wrapped response
+                    if (Array.isArray(data)) data = data[0];
+                    if (!data) throw new Error("No data returned.");
+
+                    renderHeader(data);
+                    renderForm(data);
+                    renderDocuments(data.quotations);
+                    renderApprovals(data.approvalSteps);
+
+                    // Auto-load first file
+                    if (data.quotations && data.quotations.length > 0) {
+                        loadViewer(data.quotations[0]);
+                    } else {
+                        $("#pdfViewer").html('<div class="pdf-placeholder">No files attached</div>');
+                    }
+
+                    $("#btnFullscreen").on("click", toggleFullscreen);
+
+                } catch (err) {
+                    showError(err.message);
+                } finally {
+                    loader.hide();
                 }
-
-                $("#btnFullscreen").on("click", () => utils.toggleFullscreen("pdfViewer"));
-
-            } catch (err) {
-                renderError(err.message);
-            } finally {
-                loader.hide();
             }
-        }
 
-        // ==========================================
-        // 3. SERVICE
-        // ==========================================
-        const service = {
-            async getData(code) {
-                const url = new URL(CONFIG.api.baseUrl + CONFIG.api.endpoints.getByCode);
-                url.searchParams.append("code", code);
-
-                const res = await utils.fetchJSON(url.toString());
-                const list = res.data || res;
-
-                if (!list || (Array.isArray(list) && list.length === 0)) throw new Error("Document not found.");
-                return Array.isArray(list) ? list[0] : list;
-            },
-
-            getFileUrl(id) {
-                return `${CONFIG.api.baseUrl}${CONFIG.api.endpoints.viewFile}/${id}`;
-            }
-        };
-
-        // ==========================================
-        // 4. UI RENDERING
-        // ==========================================
-        const ui = {
-            renderHeader(data) {
-                const statusText = CONFIG.maps.status[data.status] || "Unknown";
-                let badgeClass = "status-secondary";
-                if (data.status === 1) badgeClass = "status-warning";
-                if (data.status === 2 || data.status === 3) badgeClass = "status-success";
-                if (data.status === 99) badgeClass = "status-danger";
+            // ==========================================
+            // 3. RENDERING
+            // ==========================================
+            function renderHeader(data) {
+                const statusText = MAPS.status[data.status] || "Unknown";
+                let badgeClass = "bg-secondary-soft";
+                if (data.status === 1) badgeClass = "bg-warning-soft";
+                if (data.status === 2 || data.status === 3) badgeClass = "bg-success-soft";
+                if (data.status === 99) badgeClass = "bg-danger-soft";
 
                 $("#headerStatus").html(`<span class="status-badge ${badgeClass}">${statusText}</span>`);
-            },
+            }
 
-            renderForm(data) {
+            function renderForm(data) {
                 $("#requestInfoForm").dxForm({
                     formData: data,
                     readOnly: true,
                     labelLocation: "top",
                     colCount: 2,
                     items: [
-                        { dataField: "code", label: { text: "Request No" }, colSpan: 2 },
+                        { dataField: "code", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
                         { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
                         {
-                            dataField: "validFrom",
-                            label: { text: "Valid From" },
-                            editorType: "dxDateBox",
-                            editorOptions: { displayFormat: "yyyy-MM-dd" }
+                            dataField: "validFrom", label: { text: "Valid From" },
+                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
-                            dataField: "validUntil",
-                            label: { text: "Valid Until" },
-                            editorType: "dxDateBox",
-                            editorOptions: { displayFormat: "yyyy-MM-dd" }
+                            dataField: "validUntil", label: { text: "Valid Until" },
+                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
-                            dataField: "remark",
-                            label: { text: "Remark" },
-                            colSpan: 2,
-                            editorType: "dxTextArea",
-                            editorOptions: { autoResizeEnabled: true, minHeight: 60 }
+                            dataField: "remark", label: { text: "Remark" }, colSpan: 2,
+                            editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 }
                         }
                     ]
                 });
-            },
+            }
 
-            renderDocuments(docs) {
+            function renderDocuments(docs) {
                 const container = $("#documentList").empty();
                 $("#attachmentCount").text(docs ? docs.length : 0);
 
                 if (!docs || docs.length === 0) {
-                    container.html('<div class="text-center text-muted p-3">No files</div>');
+                    container.html('<div class="text-center text-muted small p-3">No attachments</div>');
                     return;
                 }
 
                 docs.forEach(doc => {
-                    const typeName = CONFIG.maps.docType[doc.documentTypeId] || `Type ${doc.documentTypeId}`;
-                    const iconClass = utils.getIcon(doc.contentType || doc.fileName);
-                    const sizeStr = utils.formatSize(doc.fileSize);
+                    const typeName = MAPS.docType[doc.documentTypeId] || "Attachment";
+                    const sizeStr = formatSize(doc.fileSize);
 
                     const item = $(`
-                        <div class="document-item" data-id="${doc.id}">
-                            <i class="fas ${iconClass} document-icon"></i>
-                            <div class="document-info">
-                                <div class="document-name" title="${doc.fileName}">${doc.fileName}</div>
-                                <div>
-                                    <span class="document-type-badge">${typeName}</span>
-                                    <span class="document-meta">${sizeStr}</span>
+                        <div class="file-item" data-id="${doc.id}">
+                            <i class="fas fa-file-pdf file-icon"></i>
+                            <div class="file-details">
+                                <div class="file-name" title="${doc.fileName}">${doc.fileName}</div>
+                                <div class="file-meta">
+                                    <span class="badge bg-light text-dark border me-1">${typeName}</span>
+                                    <span>${sizeStr}</span>
                                 </div>
                             </div>
                         </div>
                     `);
-                    item.on("click", () => ui.loadViewer(doc));
+                    item.on("click", () => loadViewer(doc));
                     container.append(item);
                 });
-            },
+            }
 
-            renderApprovals(steps) {
+            function renderApprovals(steps) {
                 const container = $("#approvalList").empty();
                 if (!steps || steps.length === 0) {
-                    container.html('<div class="text-center text-muted p-3">No approval history</div>');
+                    container.html('<div class="text-center text-muted small p-3">No approval history</div>');
                     return;
                 }
 
@@ -525,42 +462,40 @@
                     else if (step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
-                    const stepStatusText = CONFIG.maps.status[step.status] || "Draft/Waiting";
-                    const approver = step.approverName || "Waiting for approver";
-
-                    // Format Date: yyyy-MM-dd HH:mm
-                    const actionDateStr = utils.formatDateTime(step.actionDate);
+                    const stepStatus = MAPS.status[step.status] || "Waiting";
+                    const approver = step.approverName || "System/Waiting";
+                    const dateStr = formatDateTime(step.actionDate);
 
                     const html = `
                         <div class="timeline-item">
                             <div class="timeline-dot ${dotClass}"></div>
                             <div class="timeline-content">
                                 <div class="timeline-step">Step ${step.sequence}: ${step.stepName}</div>
-                                <div class="timeline-approver">
+                                <div class="timeline-user">
                                     <i class="fas fa-user-circle"></i> ${approver}
-                                    <span style="font-size:11px; color:#aaa;">(${stepStatusText})</span>
+                                    <span class="text-muted">(${stepStatus})</span>
                                 </div>
-                                ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${actionDateStr}</div>` : ''}
+                                ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${dateStr}</div>` : ''}
                                 ${step.comment ? `<div class="timeline-comment">"${step.comment}"</div>` : ''}
                             </div>
                         </div>
                     `;
                     container.append(html);
                 });
-            },
+            }
 
-            async loadViewer(doc) {
-                $(".document-item").removeClass("active");
-                $(`.document-item[data-id="${doc.id}"]`).addClass("active");
+            async function loadViewer(doc) {
+                $(".file-item").removeClass("active");
+                $(`.file-item[data-id="${doc.id}"]`).addClass("active");
                 $("#docTitleLabel").text(doc.fileName);
 
                 const viewer = $("#pdfViewer").empty();
-                const loader = createLoadingIndicator("Opening file...");
+                const loader = createLoader("Opening file...", "#pdfViewer"); // Local loader
 
                 try {
-                    const url = service.getFileUrl(doc.id);
+                    const url = `${API.VIEW_FILE}/${doc.id}`;
                     const res = await fetch(url, { method: 'GET', credentials: 'include' });
-                    if (!res.ok) throw new Error("File not found on server");
+                    if (!res.ok) throw new Error("Unable to load file content.");
 
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
@@ -572,72 +507,56 @@
                         $("<embed>").attr({ src: objUrl, type: type, width: "100%", height: "100%" }).appendTo(viewer);
                     }
                 } catch (e) {
-                    ui.setViewerError(e.message);
+                    viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
                 } finally {
                     loader.hide();
                 }
-            },
-
-            setViewerMsg(msg) {
-                $("#pdfViewer").html(`
-                    <div class="loading-placeholder">
-                        <i class="fas fa-info-circle fa-2x mb-2"></i>
-                        <span>${msg}</span>
-                    </div>
-                `);
-            },
-
-            setViewerError(msg) {
-                $("#pdfViewer").html(`
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-triangle me-2"></i> ${msg}
-                    </div>
-                `);
             }
-        };
 
-        // ==========================================
-        // 5. UTILITIES
-        // ==========================================
-        const utils = {
-            async fetchJSON(url) {
-                const res = await fetch(url, { credentials: 'include' });
-                if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
-                return res.json();
-            },
-
-            formatSize(b) {
+            // ==========================================
+            // 4. UTILS
+            // ==========================================
+            function formatSize(b) {
                 if (!b) return "0 B";
                 const i = Math.floor(Math.log(b) / Math.log(1024));
                 return (b / Math.pow(1024, i)).toFixed(1) + " " + ["B", "KB", "MB", "GB"][i];
-            },
+            }
 
-            // Format: yyyy-MM-dd HH:mm
-            formatDateTime(dateStr) {
+            function formatDateTime(dateStr) {
                 if (!dateStr) return "-";
                 const d = new Date(dateStr);
                 if (isNaN(d.getTime())) return "-";
+                const pad = (n) => n.toString().padStart(2, '0');
+                // Format: yyyy-MM-dd HH:mm
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
 
-                const year = d.getFullYear();
-                const month = (d.getMonth() + 1).toString().padStart(2, '0');
-                const day = d.getDate().toString().padStart(2, '0');
-                const hour = d.getHours().toString().padStart(2, '0');
-                const minute = d.getMinutes().toString().padStart(2, '0');
+            function createLoader(msg, target = "body") {
+                if (typeof DevExpress === 'undefined') return { hide: () => { } };
+                // Reuse existing loader if possible or create simple overlay
+                const id = "local-loader-" + Math.floor(Math.random() * 1000);
+                const $el = $("<div>").attr("id", id).appendTo(target);
 
-                return `${year}-${month}-${day} ${hour}:${minute}`;
-            },
+                const loadPanel = $el.dxLoadPanel({
+                    shadingColor: "rgba(255,255,255,0.7)",
+                    position: { of: target },
+                    visible: true,
+                    showIndicator: true,
+                    showPane: true,
+                    message: msg,
+                    container: target
+                }).dxLoadPanel("instance");
 
-            getIcon(t) {
-                t = (t || "").toLowerCase();
-                if (t.includes('pdf')) return 'fa-file-pdf';
-                if (t.includes('image')) return 'fa-file-image';
-                if (t.includes('word')) return 'fa-file-word';
-                if (t.includes('excel')) return 'fa-file-excel';
-                return 'fa-file';
-            },
+                return { hide: () => { loadPanel.hide(); $el.remove(); } };
+            }
 
-            toggleFullscreen(id) {
-                const el = document.getElementById(id);
+            function showError(msg) {
+                if (typeof DevExpress !== 'undefined') DevExpress.ui.notify(msg, "error", 4000);
+                else alert(msg);
+            }
+
+            function toggleFullscreen() {
+                const el = document.getElementById("pdfViewer");
                 if (!document.fullscreenElement) {
                     if (el.requestFullscreen) el.requestFullscreen();
                     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
@@ -645,25 +564,6 @@
                     if (document.exitFullscreen) document.exitFullscreen();
                 }
             }
-        };
-
-        function createLoadingIndicator(msg) {
-            if (typeof DevExpress === 'undefined') return { hide: () => { } };
-            let p = $("#global-loader").dxLoadPanel("instance");
-            if (!p) {
-                $("<div>").attr("id", "global-loader").appendTo("body").dxLoadPanel({
-                    shadingColor: "rgba(0,0,0,0.4)", position: { of: window }, visible: false, showIndicator: true, showPane: true, shading: true, closeOnOutsideClick: false
-                });
-                p = $("#global-loader").dxLoadPanel("instance");
-            }
-            p.option("message", msg);
-            p.show();
-            return { hide: () => p.hide() };
-        }
-
-        function renderError(msg) {
-            if (typeof DevExpress !== 'undefined' && DevExpress.ui) DevExpress.ui.notify(msg, "error", 4000);
-            else alert(msg);
-        }
+        });
     </script>
 }

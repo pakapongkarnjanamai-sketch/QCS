@@ -52,7 +52,7 @@ builder.Services.AddAuthorization(options =>
 
 // Services
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IApiUserService, ApiUserService>();
+//builder.Services.AddScoped<IApiUserService, ApiUserService>();
 
 // HTTP Client for API calls
 builder.Services.AddHttpClient("DocTrackerAPI", client =>
@@ -86,7 +86,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Middleware หลัง authentication/authorization
-app.UseMiddleware<ApiUserSyncMiddleware>();
+//app.UseMiddleware<ApiUserSyncMiddleware>();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();

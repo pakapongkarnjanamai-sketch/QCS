@@ -20,6 +20,7 @@
     <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
     <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
     <script src="~/src/devextreme-license.js"></script>
+
     <script src="~/js/site.js"></script>
     <script src="~/lib/font-awesome/js/all.min.js"></script>
 
@@ -31,133 +32,127 @@
     </environment>
 
     <style>
+        /* === GLOBAL THEME (Based on Code.cshtml) === */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f4; /* พื้นหลังสีเทาอ่อน */
+            background-color: #f8f9fa; /* สีพื้นหลังตามต้นแบบ */
             margin: 0;
             padding-top: 60px;
+            color: #333;
         }
 
         .navbar {
             padding-left: 24px;
             padding-right: 24px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); /* เงาแบบนุ่มนวล */
+            background-color: #fff !important;
         }
 
         .navbar-brand {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
-            text-decoration: none;
+            color: #2c3e50 !important; /* สีหัวข้อเข้ม */
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
-            .navbar-brand:hover {
-                color: #255C8C !important;
-                text-decoration: none;
-            }
-
-        /* === GLOBAL DESIGN SYSTEM (QCS Clean Theme) === */
-
-        /* 1. Card Container (กล่องสีขาวมีเงา) */
+        /* === 1. Card Container (Formal Style) === */
         .qcs-card {
             background-color: #fff;
             padding: 20px 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-radius: 12px; /* ความโค้งมน 12px */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); /* เงาแบบ Code.cshtml */
             margin-bottom: 20px;
+            border: none; /* เอาเส้นขอบออก */
         }
 
-        /* 2. Page Header Styles */
-        .page-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
+        /* === 2. Headers === */
         .page-title {
-            margin: 0;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: 600;
             color: #2c3e50;
         }
 
-            .page-title i {
-                margin-right: 10px;
-                color: #0d6efd; /* Primary Color */
-            }
-
-        /* 3. Section Header inside Card */
         .section-header {
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            color: #2c3e50;
+            font-size: 16px;
             font-weight: 600;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 2px solid #f1f3f5; /* เส้นแบ่งสีอ่อน */
+            padding-bottom: 8px;
         }
 
-        /* 4. Status Badges (Standardized - Global) */
+        /* === 3. Status Badges === */
         .status-badge {
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: white;
+            font-size: 12px;
+            font-weight: 600;
             display: inline-block;
             min-width: 90px;
             text-align: center;
-            white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: none; /* เอาเงาออกจาก Badge ให้ดู Clean ขึ้น */
         }
 
-        /* Color Definitions */
         .status-draft {
-            background-color: #6c757d;
-            color: #fff;
+            background: #e2e3e5;
+            color: #383d41;
         }
-        /* สีเทา: แบบร่าง/ข้าม */
-        .status-pending {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        /* สีเหลือง: รออนุมัติ */
-        .status-verify {
-            background-color: #17a2b8;
-            color: #fff;
-        }
-        /* สีฟ้า: รอตรวจสอบ */
-        .status-approved {
-            background-color: #28a745;
-            color: #fff;
-        }
-        /* สีเขียว: อนุมัติแล้ว */
-        .status-completed {
-            background-color: #28a745;
-            color: #fff;
-        }
-        /* สีเขียว: จบกระบวนการ */
-        .status-rejected {
-            background-color: #dc3545;
-            color: #fff;
-        }
-        /* สีแดง: ไม่อนุมัติ/ตีกลับ */
-        .status-cancelled {
-            background-color: #343a40;
-            color: #fff;
-        }
-        /* สีเทาเข้ม: ยกเลิก */
 
-        /* 5. Utility Links */
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-verify {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-cancelled {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+        }
+
+        /* === 4. Links & Buttons === */
         .doc-no-link {
-            font-weight: bold;
-            color: #0d6efd;
+            font-weight: 600;
+            color: #2190F7; /* สีฟ้าตามต้นแบบ */
             text-decoration: none;
             cursor: pointer;
+            transition: 0.2s;
         }
 
             .doc-no-link:hover {
+                color: #0b5ed7;
                 text-decoration: underline;
+            }
+
+        /* Override DevExtreme Buttons to match theme */
+        .dx-button-mode-contained.dx-button-default {
+            background-color: #2190F7;
+            border-color: #2190F7;
+        }
+
+            .dx-button-mode-contained.dx-button-default:hover {
+                background-color: #1976d2;
             }
 
     </style>
@@ -166,9 +161,9 @@
 </head>
 
 <body>
-    <nav class="navbar navbar-light bg-light fixed-top navbar-expand-md">
+    <nav class="navbar navbar-light fixed-top navbar-expand-md">
         <a class="navbar-brand" href="@Url.Action("Index", "Home")">
-            QCS <span class="badge bg-secondary fs-6 rounded-pill">User</span>
+            QCS <span class="badge bg-light text-secondary border fs-6 rounded-pill">User Portal</span>
         </a>
         <div id="menu"></div>
     </nav>
@@ -181,7 +176,7 @@
             $("#menu").dxMenu({
                 dataSource: [
                     { text: "หน้าหลัก (My Requests)", icon: "home", path: "@Url.Action("Index", "Home")" },
-                     { text: "ใบเสนอราคา (Quotation)", icon: "file", path: "@Url.Action("List", "Quotation")" },
+                    { text: "ใบเสนอราคา (Quotation)", icon: "file", path: "@Url.Action("List", "Quotation")" },
                 ],
                 displayExpr: "text",
                 showFirstSubmenuMode: "onHover",
@@ -197,32 +192,17 @@
         });
 
         // 2. Global Helper Functions
-        // ฟังก์ชันแปลงสถานะเป็นข้อความและ Class สี (ใช้ได้ทุกหน้า)
         function getStatusInfo(status, stepId) {
-            // Draft / 0
             if (status === 0) return { text: "Saved (Draft)", cls: "status-draft" };
-
-            // Rejected / 9
             if (status === 9) return { text: "Rejected", cls: "status-rejected" };
-
-            // Cancelled / 99
             if (status === 99) return { text: "Cancelled", cls: "status-cancelled" };
-
-            // Approved / 2
             if (status === 2) return { text: "Approved", cls: "status-approved" };
-
-            // Completed / 3
             if (status === 3) return { text: "Completed", cls: "status-completed" };
-
-            // Pending / 1
             if (status === 1) {
-                // แยกสีตามขั้นตอน (Step) - Logic นี้สามารถปรับเปลี่ยนได้ตาม Workflow จริง
-                if (stepId === 2) return { text: "Waiting Verify", cls: "status-verify" }; // ขั้นตรวจสอบ (สีฟ้า)
-                if (stepId === 3) return { text: "Waiting Approval", cls: "status-pending" }; // ขั้นอนุมัติ (สีเหลือง)
-
+                if (stepId === 2) return { text: "Waiting Verify", cls: "status-verify" };
+                if (stepId === 3) return { text: "Waiting Approval", cls: "status-pending" };
                 return { text: "In Progress", cls: "status-pending" };
             }
-
             return { text: "Unknown", cls: "status-draft" };
         }
     </script>

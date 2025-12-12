@@ -4,7 +4,7 @@
 
 @section Styles {
     <style>
-        /* --- Layout & Container (Full Height) --- */
+        /* --- Layout & Container --- */
         .full-height-container {
             height: calc(100vh - 80px);
             display: flex;
@@ -14,10 +14,10 @@
 
         .qcs-card-dashboard {
             background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            padding: 20px;
-            border: 1px solid #eaeaea;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 25px;
+            border: none;
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -27,47 +27,63 @@
         /* --- Grid Wrapper --- */
         .grid-wrapper {
             flex: 1;
-            margin-top: 15px; /* ระยะห่างจากหัวข้อ */
+            margin-top: 20px;
             display: flex;
             flex-direction: column;
             min-height: 0;
         }
 
-        /* --- Status Badges --- */
+        /* --- Links --- */
+        .doc-link {
+            color: #2190F7;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+            .doc-link:hover {
+                color: #0d47a1;
+                text-decoration: underline;
+            }
+
+        /* --- Custom Status Badges (Specific to this page) --- */
+        /* Note: Global badges are available in _DevExtremeLayout,
+                   but we keep specific logic here for 'Approved' vs 'Completed' */
         .status-badge {
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 700;
+            font-size: 12px;
+            font-weight: 600;
             color: white;
             display: inline-block;
-            min-width: 90px;
+            min-width: 100px;
             text-align: center;
         }
 
         .st-completed {
-            background-color: #28a745; /* สีเขียว สำหรับ Approved */
+            background-color: #28a745; /* Green for Approved */
         }
 
         .st-verify {
-            background-color: #17a2b8; /* สีฟ้า สำหรับตรวจสอบ/จบกระบวนการ */
+            background-color: #17a2b8; /* Blue for Process Completed */
         }
 
-        .doc-link {
-            color: #007bff;
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
+        /* --- Headers --- */
+        .text-header {
+            color: #2c3e50;
         }
-
-            .doc-link:hover {
-                text-decoration: underline;
-            }
     </style>
 }
 
 <div class="container full-height-container mt-3">
     <div class="qcs-card-dashboard">
+
+        <div class="d-flex align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
+            <h4 class="m-0 fw-bold text-header">
+                <i class="fas fa-file-invoice-dollar text-primary me-2"></i> @ViewData["Title"]
+            </h4>
+        </div>
 
         <div class="grid-wrapper">
             <div id="gridContainer"></div>
@@ -89,26 +105,25 @@
                         ajaxOptions.xhrFields = { withCredentials: true };
                     }
                 }),
-                height: "100%", // ยืดเต็มพื้นที่ wrapper
+                height: "100%",
                 showBorders: true,
                 rowAlternationEnabled: true,
                 hoverStateEnabled: true,
                 columnAutoWidth: true,
-                scrolling: { mode: "virtual" }, // ใช้ Virtual Scrolling เพื่อประสิทธิภาพและการแสดงผลแบบ Full Height
-                searchPanel: { visible: true, width: 300, placeholder: "ค้นหา..." },
+                scrolling: { mode: "virtual" },
+                searchPanel: { visible: true, width: 350, placeholder: "ค้นหาเอกสาร..." },
                 headerFilter: { visible: true },
                 columns: [
                     {
                         dataField: "code",
                         caption: "เลขที่เอกสาร",
-                        width: 150,
+                        width: 160,
                         sortOrder: "desc",
                         cellTemplate: (container, options) => {
-                            // ทำเป็น Link เหมือนหน้า Dashboard
                             $("<a>")
                                 .addClass("doc-link")
                                 .text(options.value)
-                                .attr("href", `${DETAIL_URL}/${options.value}`) // ส่ง Code ไป
+                                .attr("href", `${DETAIL_URL}/${options.value}`)
                                 .attr("target", "_blank")
                                 .appendTo(container);
                         }
@@ -116,36 +131,36 @@
                     {
                         dataField: "title",
                         caption: "หัวข้อ/รายการ",
-                        minWidth: 200
+                        minWidth: 220
                     },
                     {
                         dataField: "vendorName",
                         caption: "ผู้ขาย (Vendor)",
-                        width: 200
+                        width: 220
                     },
                     {
                         dataField: "requestDate",
                         caption: "วันที่ขอ",
                         dataType: "date",
-                        format: "dd/MM/yyyy",
+                        format: "yyyy-MM-dd", /* Updated Format */
                         width: 120,
                         alignment: "center"
                     },
                     {
                         dataField: "status",
                         caption: "สถานะ",
-                        width: 130,
+                        width: 140,
                         alignment: "center",
                         allowSorting: false,
                         allowFiltering: false,
                         cellTemplate: function (container, options) {
                             let text = "Approved";
-                            let cls = "st-completed"; // สีเขียว
+                            let cls = "st-completed";
 
-                            // เช็คสถานะ 3 = จบกระบวนการ
+                            // Status 3 = Process Completed
                             if (options.value == 3) {
                                 text = "จบกระบวนการ";
-                                cls = "st-verify"; // สีฟ้า
+                                cls = "st-verify";
                             }
 
                             $("<span>")
@@ -159,9 +174,9 @@
                         width: 80,
                         buttons: [{
                             hint: "ดูรายละเอียด",
-                            icon: "find", // หรือใช้ arrowright ให้เหมือน Dashboard ก็ได้
+                            icon: "find",
                             onClick: function (e) {
-                              window.open(`${DETAIL_URL}/${e.row.data.code}`, '_blank');
+                                window.open(`${DETAIL_URL}/${e.row.data.code}`, '_blank');
                             }
                         }]
                     }
