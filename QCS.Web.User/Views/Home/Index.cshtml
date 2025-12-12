@@ -146,20 +146,18 @@
 
     </div>
 </div>
-
 @section Scripts {
     <script>
         $(function () {
             // === CONFIG ===
             const FORM_URL = '@Url.Action("Form", "Request")';
-            
+            // URL สำหรับหน้า Code
+            const CODE_URL = '@Url.Action("Code", "Request")';
+
             // === BUTTON EVENTS ===
-            // 1. ปุ่มบน Header
             $("#btnCreateHeader").on("click", function() {
                 window.location.href = FORM_URL;
             });
-
-            // 2. ปุ่มใน Empty State
             $("#btnCreateEmpty").on("click", function() {
                 window.location.href = FORM_URL;
             });
@@ -177,7 +175,6 @@
                     },
                     error: function(err) {
                         console.error("Failed to load summary", err);
-                        // Fallback กรณี Error ให้แสดง 0
                         initTabPanel(0, 0, 0);
                     }
                 });
@@ -185,8 +182,7 @@
 
             function initTabPanel(requestCount, taskCount, approvedCount) {
                 const tabs = [];
-
-                // Tab 1: My Tasks (งานรออนุมัติ - สำคัญสุด)
+                // Tab 1: My Tasks
                 if (taskCount > 0) {
                     tabs.push({
                         title: "งานรออนุมัติ (My Tasks)",
@@ -195,16 +191,14 @@
                         template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyTasks"))
                     });
                 }
-
-                // Tab 2: My Requests (เอกสารของฉัน)
+                // Tab 2: My Requests
                 tabs.push({
                     title: "เอกสารของฉัน (My Requests)",
                     icon: "file",
                     badge: requestCount,
                     template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyRequests"))
                 });
-
-                // Tab 3: Approved List (เอกสารที่อนุมัติแล้ว)
+                // Tab 3: Approved List
                 if (approvedCount > 0) {
                     tabs.push({
                         title: "เอกสารที่อนุมัติแล้ว (Approved)",
@@ -214,7 +208,6 @@
                     });
                 }
 
-                // Show Empty State if absolutely no data
                 if (tabs.length === 0 && requestCount === 0) {
                     $("#emptyState").removeClass("d-none");
                     return;
@@ -226,23 +219,14 @@
                     deferRendering: false,
                     itemTitleTemplate: function(itemData) {
                         const container = $("<div>").addClass("d-flex align-items-center gap-2");
-                        if(itemData.icon) {
-                            container.append($("<i>").addClass("dx-icon-" + itemData.icon));
-                        }
+                        if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
                         container.append($("<span>").text(itemData.title));
                         return container;
                     },
                     onContentReady: function(e) {
-                        // Init Grids when tab is ready
-                        if ($("#gridMyRequests").length && !$("#gridMyRequests").data("dxDataGrid")) {
-                            renderMyRequestsGrid();
-                        }
-                        if ($("#gridMyTasks").length && !$("#gridMyTasks").data("dxDataGrid")) {
-                            renderMyTasksGrid();
-                        }
-                        if ($("#gridApproved").length && !$("#gridApproved").data("dxDataGrid")) {
-                            renderApprovedGrid();
-                        }
+                        if ($("#gridMyRequests").length && !$("#gridMyRequests").data("dxDataGrid")) renderMyRequestsGrid();
+                        if ($("#gridMyTasks").length && !$("#gridMyTasks").data("dxDataGrid")) renderMyTasksGrid();
+                        if ($("#gridApproved").length && !$("#gridApproved").data("dxDataGrid")) renderApprovedGrid();
                     }
                 });
             }
@@ -270,19 +254,8 @@
                     allowFiltering: false,
                     allowSearch: false
                 },
-                {
-                    dataField: "vendorName",
-                    caption: "ผู้ขาย",
-                    width: 300
-                },
-                {
-                    dataField: "requestDate",
-                    caption: "วันที่ขอ",
-                    dataType: "date",
-                    format: "yyyy-MM-dd",
-                    width: 120,
-                    alignment: "center"
-                },
+                { dataField: "vendorName", caption: "ผู้ขาย", width: 300 },
+                { dataField: "requestDate", caption: "วันที่ขอ", dataType: "date", format: "yyyy-MM-dd", width: 120, alignment: "center" },
                 {
                     dataField: "status",
                     caption: "สถานะ",
@@ -292,22 +265,15 @@
                     allowFiltering: false,
                     allowSearch: false,
                     cellTemplate: (container, options) => {
-                        // หมายเหตุ: ตรวจสอบให้แน่ใจว่าฟังก์ชัน getStatusInfo มีอยู่ในโปรเจกต์ของคุณ
-                        // หรือถ้าไม่มี ให้เขียนฟังก์ชันนี้เพิ่ม
                         let info = { cls: "status-draft", text: options.value };
                         if(typeof getStatusInfo === 'function') {
                              info = getStatusInfo(options.value, options.data.currentStepId);
                         } else {
-                            // Basic Fallback if function missing
                              if(options.value === 1) info = { cls: "status-pending", text: "Pending" };
                              else if(options.value === 2) info = { cls: "status-approved", text: "Approved" };
                              else if(options.value === 9) info = { cls: "status-rejected", text: "Rejected" };
                         }
-
-                        $("<span>")
-                            .addClass("status-badge " + info.cls)
-                            .text(info.text)
-                            .appendTo(container);
+                        $("<span>").addClass("status-badge " + info.cls).text(info.text).appendTo(container);
                     }
                 },
                 {
@@ -342,15 +308,43 @@
             }
 
             function renderMyTasksGrid() {
+                // 1. Column Code: เพิ่ม target="_blank"
+                const taskCodeColumn = {
+                    dataField: "code",
+                    caption: "เลขที่เอกสาร",
+                    width: 150,
+                    cellTemplate: (container, options) => {
+                        const docNo = options.value;
+                        $("<a>")
+                            .addClass("doc-link")
+                            .text(docNo)
+                            .attr("href", `${CODE_URL}/${docNo}`)
+                            .attr("target", "_blank") // <--- เปิดแท็บใหม่
+                            .appendTo(container);
+                    }
+                };
+
+                // 2. Column Button: ใช้ window.open(url, '_blank')
+                const taskButtonColumn = {
+                    type: "buttons",
+                    width: 70,
+                    buttons: [{
+                        hint: "เปิดดู",
+                        icon: "arrowright",
+                        onClick: (e) => window.open(`${CODE_URL}/${e.row.data.code}`, "_blank") // <--- เปิดแท็บใหม่
+                    }]
+                };
+
                 const taskColumns = [
-                    ...baseColumns.slice(0, 2),
-                    {
-                        dataField: "requesterName",
-                        caption: "ผู้ขอซื้อ (Requester)",
-                        width: 180
-                    },
-                    ...baseColumns.slice(2)
+                    taskCodeColumn,
+                    baseColumns[1],
+                    { dataField: "requesterName", caption: "ผู้ขอซื้อ (Requester)", width: 180 },
+                    baseColumns[2],
+                    baseColumns[3],
+                    baseColumns[4],
+                    taskButtonColumn
                 ];
+
                 $("#gridMyTasks").dxDataGrid({
                     dataSource: DevExpress.data.AspNet.createStore({
                         key: "id",
