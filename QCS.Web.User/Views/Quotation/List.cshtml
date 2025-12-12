@@ -1,0 +1,171 @@
+﻿@{
+    ViewData["Title"] = "ใบเสนอราคา (Quotation)";
+}
+
+@section Styles {
+    <style>
+        /* --- Layout & Container (Full Height) --- */
+        .full-height-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 20px;
+        }
+
+        .qcs-card-dashboard {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 20px;
+            border: 1px solid #eaeaea;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Grid Wrapper --- */
+        .grid-wrapper {
+            flex: 1;
+            margin-top: 15px; /* ระยะห่างจากหัวข้อ */
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* --- Status Badges --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: white;
+            display: inline-block;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .st-completed {
+            background-color: #28a745; /* สีเขียว สำหรับ Approved */
+        }
+
+        .st-verify {
+            background-color: #17a2b8; /* สีฟ้า สำหรับตรวจสอบ/จบกระบวนการ */
+        }
+
+        .doc-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+            .doc-link:hover {
+                text-decoration: underline;
+            }
+    </style>
+}
+
+<div class="container full-height-container mt-3">
+    <div class="qcs-card-dashboard">
+
+        <div class="grid-wrapper">
+            <div id="gridContainer"></div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            const DETAIL_URL = '@Url.Action("Detail", "Quotation")';
+
+            $("#gridContainer").dxDataGrid({
+                dataSource: DevExpress.data.AspNet.createStore({
+                    key: "id",
+                    loadUrl: `${API_BASE}/PurchaseRequest/ApprovedList`,
+                    onBeforeSend: function (method, ajaxOptions) {
+                        ajaxOptions.xhrFields = { withCredentials: true };
+                    }
+                }),
+                height: "100%", // ยืดเต็มพื้นที่ wrapper
+                showBorders: true,
+                rowAlternationEnabled: true,
+                hoverStateEnabled: true,
+                columnAutoWidth: true,
+                scrolling: { mode: "virtual" }, // ใช้ Virtual Scrolling เพื่อประสิทธิภาพและการแสดงผลแบบ Full Height
+                searchPanel: { visible: true, width: 300, placeholder: "ค้นหา..." },
+                headerFilter: { visible: true },
+                columns: [
+                    {
+                        dataField: "code",
+                        caption: "เลขที่เอกสาร",
+                        width: 150,
+                        sortOrder: "desc",
+                        cellTemplate: (container, options) => {
+                            // ทำเป็น Link เหมือนหน้า Dashboard
+                            $("<a>")
+                                .addClass("doc-link")
+                                .text(options.value)
+                                .attr("href", `${DETAIL_URL}/${options.value}`) // ส่ง Code ไป
+                                .appendTo(container);
+                        }
+                    },
+                    {
+                        dataField: "title",
+                        caption: "หัวข้อ/รายการ",
+                        minWidth: 200
+                    },
+                    {
+                        dataField: "vendorName",
+                        caption: "ผู้ขาย (Vendor)",
+                        width: 200
+                    },
+                    {
+                        dataField: "requestDate",
+                        caption: "วันที่ขอ",
+                        dataType: "date",
+                        format: "dd/MM/yyyy",
+                        width: 120,
+                        alignment: "center"
+                    },
+                    {
+                        dataField: "status",
+                        caption: "สถานะ",
+                        width: 130,
+                        alignment: "center",
+                        allowSorting: false,
+                        allowFiltering: false,
+                        cellTemplate: function (container, options) {
+                            let text = "อนุมัติแล้ว";
+                            let cls = "st-completed"; // สีเขียว
+
+                            // เช็คสถานะ 3 = จบกระบวนการ
+                            if (options.value == 3) {
+                                text = "จบกระบวนการ";
+                                cls = "st-verify"; // สีฟ้า
+                            }
+
+                            $("<span>")
+                                .addClass("status-badge " + cls)
+                                .text(text)
+                                .appendTo(container);
+                        }
+                    },
+                    {
+                        type: "buttons",
+                        width: 80,
+                        buttons: [{
+                            hint: "ดูรายละเอียด",
+                            icon: "find", // หรือใช้ arrowright ให้เหมือน Dashboard ก็ได้
+                            onClick: function (e) {
+                                window.location.href = `${DETAIL_URL}/${e.row.data.code}`;
+                            }
+                        }]
+                    }
+                ]
+            });
+        });
+    </script>
+}
