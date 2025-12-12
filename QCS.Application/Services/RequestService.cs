@@ -16,7 +16,8 @@ namespace QCS.Application.Services
         // ==========================================================
         // 🔍 QUERY (สำหรับ DevExtreme & Detail)
         // ==========================================================
-
+        // ใน Interface IRequestService
+        Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code);
 
 
         /// <summary>
@@ -98,7 +99,22 @@ namespace QCS.Application.Services
         // 🔍 QUERY METHODS
         // ==========================================================
 
-  
+
+        // ใน Class RequestService
+        public async Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code)
+        {
+            // ค้นหา ID จาก Code ก่อน
+            var id = await _context.PurchaseRequests
+                .AsNoTracking()
+                .Where(r => r.Code == code)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
+
+            if (id == 0) return null;
+
+            // Reuse Logic เดิมของ GetByIdAsync เพื่อให้ Return Data Structure เดียวกันเป๊ะ
+            return await GetByIdAsync(id);
+        }
 
         public async Task<PurchaseRequestDetailDto?> GetByIdAsync(int id)
         {

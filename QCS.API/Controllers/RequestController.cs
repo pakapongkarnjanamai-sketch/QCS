@@ -19,7 +19,14 @@ namespace QCS.API.Controllers
         {
             _service = service;
         }
-
+        // เพิ่มใน RequestController
+        [HttpGet("DetailByCode/{code}")]
+        public async Task<IActionResult> GetRequestDetailByCode(string code)
+        {
+            var result = await _service.GetByCodeAsync(code);
+            if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
+            return Ok(result);
+        }
         // ==========================================================
         // 🔍 GET DETAIL
         // ==========================================================

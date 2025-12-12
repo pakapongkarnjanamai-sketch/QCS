@@ -10,11 +10,12 @@
         /* --- Layout --- */
         .viewer-container {
             display: grid;
-            grid-template-columns: 1fr 400px; /* ขยายส่วน PDF ลดส่วน Info */
+            grid-template-columns: 1fr 400px;
             gap: 20px;
             height: 100vh;
             padding: 20px;
             box-sizing: border-box;
+            background-color: #f8f9fa; /* พื้นหลังรวมให้ดูเทาอ่อนๆ เพื่อให้ card สีขาวเด่นขึ้น */
         }
 
         /* --- Left: PDF Viewer --- */
@@ -48,7 +49,7 @@
 
         .pdf-body {
             flex: 1;
-            background: #525659; /* สีพื้นหลังมาตรฐาน PDF Viewer */
+            background: #525659;
             position: relative;
             display: flex;
             align-items: center;
@@ -64,10 +65,10 @@
         .info-section {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px; /* ระยะห่างระหว่าง Card */
             height: 100%;
             overflow-y: auto;
-            padding-right: 5px; /* For Scrollbar */
+            padding-right: 5px;
         }
 
         .info-card {
@@ -76,7 +77,10 @@
             padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             flex-shrink: 0;
+            border: 1px solid #eff2f5;
         }
+
+    
 
         .card-header-text {
             font-size: 15px;
@@ -226,6 +230,10 @@
             border-left: 3px solid #ddd;
             color: #555;
             font-style: italic;
+            /* --- ส่วนที่เพิ่ม --- */
+            white-space: pre-wrap; /* 1. รักษารูปแบบการเคาะบรรทัด (Enter) และ Wrap ข้อความอัตโนมัติ */
+            word-break: break-word; /* 2. ถ้ามีคำยาวๆ ติดกัน (เช่น URL) ให้ตัดคำลงมาบรรทัดใหม่ */
+            overflow-wrap: break-word; /* 3. คำสั่งเสริมเพื่อให้รองรับ Browser หลากหลาย */
         }
 
         /* --- Badges --- */
@@ -258,20 +266,23 @@
 
         /* Responsive */
         @@media (max-width: 1024px) {
-            .viewer-container {
-                grid-template-columns: 1fr;
-                height: auto;
-                overflow-y: auto;
-            }
+            .viewer-container
 
-            .pdf-section {
-                height: 500px;
-            }
+        {
+            grid-template-columns: 1fr;
+            height: auto;
+            overflow-y: auto;
+        }
 
-            .info-section {
-                height: auto;
-                overflow: visible;
-            }
+        .pdf-section {
+            height: 500px;
+        }
+
+        .info-section {
+            height: auto;
+            overflow: visible;
+        }
+
         }
     </style>
 }
@@ -298,6 +309,12 @@
 
     <div class="info-section">
 
+        <div id="actionCard" class="info-card" style="display:none;">
+       
+            <div id="actionButtonContainer" class="d-flex gap-2 w-100">
+            </div>
+        </div>
+
         <div class="info-card">
             <div class="card-header-text">
                 <span>Request Info</span>
@@ -322,6 +339,16 @@
     </div>
 </div>
 
+<div id="actionPopup">
+    <div class="p-2">
+        <div id="actionReasonBox"></div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <div id="btnCancelAction"></div>
+            <div id="btnConfirmAction"></div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         $(function () {
@@ -330,40 +357,48 @@
             // ==========================================
             const DOC_CODE = "@Model";
             const API = {
-                GET_DATA: `${API_BASE}/Quotation/ByCode`,
-                VIEW_FILE: `${API_BASE}/Request/ViewFile`
+                GET_DATA: `${API_BASE}/Request/DetailByCode/${DOC_CODE}`,
+                VIEW_FILE: `${API_BASE}/Request/ViewFile`,
+                APPROVE: `${API_BASE}/Approval/Approve`,
+                REJECT: `${API_BASE}/Approval/Reject`
             };
             const MAPS = {
-                status: { 0: "Draft", 1: "Pending", 2: "Approved", 3: "Completed", 99: "Rejected" },
+                status: { 0: "Draft", 1: "Pending", 2: "Approved", 3: "Completed", 9: "Rejected", 99: "Rejected" },
                 docType: { 10: "Quotation", 20: "Technical Spec", 30: "Other" }
             };
+
+            // Global State
+            let currentDocId = null;
+            let currentActionType = "";
+            let actionPopupInstance;
 
             // ==========================================
             // 2. INIT
             // ==========================================
+            initActionPopup();
+
             if (DOC_CODE) loadData();
             else showError("Document Code is missing.");
 
             async function loadData() {
                 const loader = createLoader("Loading Data...");
                 try {
-                    const url = new URL(API.GET_DATA);
-                    url.searchParams.append("code", DOC_CODE);
-
-                    const res = await fetch(url, { credentials: 'include' });
+                    const res = await fetch(API.GET_DATA, { credentials: 'include' });
                     if (!res.ok) throw new Error("Document not found.");
 
-                    let data = await res.json();
-                    if (data.data) data = data.data; // Handle wrapped response
-                    if (Array.isArray(data)) data = data[0];
+                    const data = await res.json();
                     if (!data) throw new Error("No data returned.");
 
+                    currentDocId = data.purchaseRequestId;
+
                     renderHeader(data);
+                    renderActionButtons(data); // <--- ฟังก์ชันนี้ปรับปรุงใหม่
                     renderForm(data);
                     renderDocuments(data.quotations);
-                    renderApprovals(data.approvalSteps);
 
-                    // Auto-load first file
+                    const steps = data.workflowRoute ? data.workflowRoute.steps : [];
+                    renderApprovals(steps);
+
                     if (data.quotations && data.quotations.length > 0) {
                         loadViewer(data.quotations[0]);
                     } else {
@@ -371,7 +406,6 @@
                     }
 
                     $("#btnFullscreen").on("click", toggleFullscreen);
-
                 } catch (err) {
                     showError(err.message);
                 } finally {
@@ -380,14 +414,161 @@
             }
 
             // ==========================================
-            // 3. RENDERING
+            // 3. ACTIONS & POPUP LOGIC
+            // ==========================================
+
+            function initActionPopup() {
+                actionPopupInstance = $("#actionPopup").dxPopup({
+                    width: 400, height: "auto", visible: false,
+                    dragEnabled: true, hideOnOutsideClick: false,
+                    showCloseButton: true, title: "Action",
+                    contentTemplate: function(contentElement) {
+                        const container = $("<div>").addClass("p-2");
+                        $("<div>").attr("id", "actionReasonBox").appendTo(container).dxTextArea({
+                            height: 100, value: "", stylingMode: "outlined"
+                        });
+                        const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
+
+                        $("<div>").appendTo(btnGroup).dxButton({
+                            text: "ยกเลิก (Cancel)", stylingMode: "text",
+                            onClick: () => actionPopupInstance.hide()
+                        });
+                        $("<div>").attr("id", "btnConfirmAction").appendTo(btnGroup).dxButton({
+                            text: "ยืนยัน (Confirm)", stylingMode: "contained"
+                        });
+                        return container;
+                    }
+                }).dxPopup("instance");
+            }
+
+            // --- CHANGED: Render Buttons inside the new Card ---
+            function renderActionButtons(data) {
+                const permissions = data.permissions || {};
+                const canApprove = permissions.canApprove;
+                const canReject = permissions.canReject;
+
+                const $card = $("#actionCard");
+                const $container = $("#actionButtonContainer");
+
+                // ถ้าไม่มีสิทธิ์เลย ให้ซ่อน Card
+                if (!canApprove && !canReject) {
+                    $card.hide();
+                    return;
+                }
+
+                // แสดง Card และเคลียร์ปุ่มเก่า
+                $card.show();
+                $container.empty();
+
+                // 1. ปุ่ม Reject
+                if (canReject) {
+                    $("<div>").appendTo($container).dxButton({
+                        text: 'Reject',
+                        icon: 'fas fa-times',
+                        type: 'danger',
+                        stylingMode: 'outlined', // แบบเส้นขอบ สบายตากว่า
+                        width: '100%',
+                        height: 40, // ปุ่มใหญ่
+                        elementAttr: { class: "fw-bold shadow-sm" },
+                        onClick: () => openActionPopup('Reject')
+                    }).addClass("flex-grow-1");
+                }
+
+                // 2. ปุ่ม Approve
+                if (canApprove) {
+                    $("<div>").appendTo($container).dxButton({
+                        text: 'Approve',
+                        icon: 'fas fa-check',
+                        type: 'success', // สีเขียว
+                        stylingMode: 'contained', // แบบทึบ เพื่อเน้น
+                        width: '100%',
+                        height: 40, // ปุ่มใหญ่
+                        elementAttr: { class: "fw-bold shadow-sm" },
+                        onClick: () => openActionPopup('Approve')
+                    }).addClass("flex-grow-1");
+                }
+            }
+
+            function openActionPopup(action) {
+                currentActionType = action;
+                let title = "ยืนยัน (Confirm)";
+                let btnType = "default";
+                let ph = "ความคิดเห็นเพิ่มเติม (Optional)...";
+
+                if (action === 'Reject') {
+                    title = "ระบุเหตุผลไม่อนุมัติ (Reject Reason)";
+                    btnType = "danger";
+                    ph = "ต้องระบุเหตุผล (Required)...";
+                } else if (action === 'Approve') {
+                    title = "ยืนยันอนุมัติ (Confirm Approve)";
+                    btnType = "success";
+                }
+
+                actionPopupInstance.option("title", title);
+                actionPopupInstance.show().done(() => {
+                    const textArea = $("#actionReasonBox").dxTextArea("instance");
+                    if (textArea) {
+                        textArea.reset();
+                        textArea.option("placeholder", ph);
+                        setTimeout(() => textArea.focus(), 100);
+                    }
+
+                    const btnConfirm = $("#btnConfirmAction").dxButton("instance");
+                    if (btnConfirm) {
+                        btnConfirm.option({
+                            type: btnType,
+                            onClick: () => {
+                                const comment = textArea ? textArea.option("value") : "";
+                                if (currentActionType === 'Reject' && !comment) {
+                                    DevExpress.ui.notify("กรุณาระบุเหตุผล", "error", 2000);
+                                    textArea.focus();
+                                    return;
+                                }
+                                actionPopupInstance.hide();
+                                sendApprovalAction(currentActionType, comment);
+                            }
+                        });
+                    }
+                });
+            }
+
+            async function sendApprovalAction(action, comment) {
+                if(!currentDocId) {
+                    showError("Error: Document ID not found.");
+                    return;
+                }
+
+                const loader = createLoader("Processing...");
+                try {
+                    const endpoint = (action === 'Approve') ? API.APPROVE : API.REJECT;
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ purchaseRequestId: currentDocId, comment: comment }),
+                        credentials: 'include'
+                    });
+
+                    if (!res.ok) throw new Error(await res.text());
+
+                    DevExpress.ui.notify("ดำเนินการสำเร็จ (Success)", "success", 2000);
+                    setTimeout(() => location.reload(), 1000);
+                } catch (err) {
+                    showError("Approval Error: " + err.message);
+                } finally {
+                    loader.hide();
+                }
+            }
+
+            // ==========================================
+            // 4. RENDERING (Display Logic)
             // ==========================================
             function renderHeader(data) {
-                const statusText = MAPS.status[data.status] || "Unknown";
+                const statusInt = typeof data.status === 'string' ? parseInt(data.status) : data.status;
+                const statusText = MAPS.status[statusInt] || "Unknown";
                 let badgeClass = "bg-secondary-soft";
-                if (data.status === 1) badgeClass = "bg-warning-soft";
-                if (data.status === 2 || data.status === 3) badgeClass = "bg-success-soft";
-                if (data.status === 99) badgeClass = "bg-danger-soft";
+                if (statusInt === 1) badgeClass = "bg-warning-soft";
+                if (statusInt === 2 || statusInt === 3) badgeClass = "bg-success-soft";
+                if (statusInt === 9 || statusInt === 99) badgeClass = "bg-danger-soft";
 
                 $("#headerStatus").html(`<span class="status-badge ${badgeClass}">${statusText}</span>`);
             }
@@ -399,7 +580,7 @@
                     labelLocation: "top",
                     colCount: 2,
                     items: [
-                        { dataField: "code", label: { text: "No." }, colSpan: 2 },
+                        { dataField: "documentNo", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
                         { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
                         {
@@ -429,13 +610,14 @@
 
                 docs.forEach(doc => {
                     const typeName = MAPS.docType[doc.documentTypeId] || "Attachment";
-                    const sizeStr = formatSize(doc.fileSize);
+                    const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
+                    const displayFileName = doc.originalFileName || doc.fileName;
 
                     const item = $(`
                         <div class="file-item" data-id="${doc.id}">
                             <i class="fas fa-file-pdf file-icon"></i>
                             <div class="file-details">
-                                <div class="file-name" title="${doc.fileName}">${doc.fileName}</div>
+                                <div class="file-name" title="${displayFileName}">${displayFileName}</div>
                                 <div class="file-meta">
                                     <span class="badge bg-light text-dark border me-1">${typeName}</span>
                                     <span>${sizeStr}</span>
@@ -455,24 +637,30 @@
                     return;
                 }
 
-                steps.sort((a, b) => a.sequence - b.sequence);
+                steps.sort((a, b) => a.sequenceNo - b.sequenceNo);
+
                 steps.forEach(step => {
                     let dotClass = "";
                     if (step.status === 2) dotClass = "completed";
-                    else if (step.status === 99) dotClass = "rejected";
+                    else if (step.status === 9 || step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
                     const stepStatus = MAPS.status[step.status] || "Waiting";
-                    const approver = step.approverName || "System/Waiting";
+                    let approverDisplay = step.approverName;
+                    if (!approverDisplay && step.assignments && step.assignments.length > 0) {
+                         approverDisplay = step.assignments.map(a => a.employeeName).join(", ");
+                    }
+                    if (!approverDisplay) approverDisplay = "System/Waiting";
+
                     const dateStr = formatDateTime(step.actionDate);
 
                     const html = `
                         <div class="timeline-item">
                             <div class="timeline-dot ${dotClass}"></div>
                             <div class="timeline-content">
-                                <div class="timeline-step">Step ${step.sequence}: ${step.stepName}</div>
+                                <div class="timeline-step">Step ${step.sequenceNo}: ${step.stepName}</div>
                                 <div class="timeline-user">
-                                    <i class="fas fa-user-circle"></i> ${approver}
+                                    <i class="fas fa-user-circle"></i> ${approverDisplay}
                                     <span class="text-muted">(${stepStatus})</span>
                                 </div>
                                 ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${dateStr}</div>` : ''}
@@ -487,25 +675,18 @@
             async function loadViewer(doc) {
                 $(".file-item").removeClass("active");
                 $(`.file-item[data-id="${doc.id}"]`).addClass("active");
-                $("#docTitleLabel").text(doc.fileName);
+                $("#docTitleLabel").text(doc.originalFileName || doc.fileName);
 
                 const viewer = $("#pdfViewer").empty();
-                const loader = createLoader("Opening file...", "#pdfViewer"); // Local loader
+                const loader = createLoader("Opening file...", "#pdfViewer");
 
                 try {
                     const url = `${API.VIEW_FILE}/${doc.id}`;
                     const res = await fetch(url, { method: 'GET', credentials: 'include' });
                     if (!res.ok) throw new Error("Unable to load file content.");
-
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
-                    const type = doc.contentType || "application/pdf";
-
-                    if (type.startsWith("image/")) {
-                        $("<img>").attr("src", objUrl).css({ width: "100%", height: "100%", objectFit: "contain" }).appendTo(viewer);
-                    } else {
-                        $("<embed>").attr({ src: objUrl, type: type, width: "100%", height: "100%" }).appendTo(viewer);
-                    }
+                    $("<embed>").attr({ src: objUrl, type: "application/pdf", width: "100%", height: "100%" }).appendTo(viewer);
                 } catch (e) {
                     viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
                 } finally {
@@ -514,10 +695,10 @@
             }
 
             // ==========================================
-            // 4. UTILS
+            // 5. UTILS
             // ==========================================
             function formatSize(b) {
-                if (!b) return "0 B";
+                if (!b) return "";
                 const i = Math.floor(Math.log(b) / Math.log(1024));
                 return (b / Math.pow(1024, i)).toFixed(1) + " " + ["B", "KB", "MB", "GB"][i];
             }
@@ -527,26 +708,17 @@
                 const d = new Date(dateStr);
                 if (isNaN(d.getTime())) return "-";
                 const pad = (n) => n.toString().padStart(2, '0');
-                // Format: yyyy-MM-dd HH:mm
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
 
             function createLoader(msg, target = "body") {
                 if (typeof DevExpress === 'undefined') return { hide: () => { } };
-                // Reuse existing loader if possible or create simple overlay
                 const id = "local-loader-" + Math.floor(Math.random() * 1000);
                 const $el = $("<div>").attr("id", id).appendTo(target);
-
                 const loadPanel = $el.dxLoadPanel({
-                    shadingColor: "rgba(255,255,255,0.7)",
-                    position: { of: target },
-                    visible: true,
-                    showIndicator: true,
-                    showPane: true,
-                    message: msg,
-                    container: target
+                    shadingColor: "rgba(255,255,255,0.7)", position: { of: target },
+                    visible: true, showIndicator: true, showPane: true, message: msg, container: target
                 }).dxLoadPanel("instance");
-
                 return { hide: () => { loadPanel.hide(); $el.remove(); } };
             }
 
