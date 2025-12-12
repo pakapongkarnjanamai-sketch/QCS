@@ -100,7 +100,7 @@
             $("#gridContainer").dxDataGrid({
                 dataSource: DevExpress.data.AspNet.createStore({
                     key: "id",
-                    loadUrl: `${API_BASE}/PurchaseRequest/ApprovedList`,
+                    loadUrl: `${API_BASE}/Request/ApprovedList`,
                     onBeforeSend: function (method, ajaxOptions) {
                         ajaxOptions.xhrFields = { withCredentials: true };
                     }

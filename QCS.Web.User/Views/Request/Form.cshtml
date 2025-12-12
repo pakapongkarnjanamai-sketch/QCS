@@ -163,13 +163,13 @@
             const CONFIG = {
                 API_BASE_URL: API_BASE,
                 // Endpoints
-                API_GET_DETAIL: `/PurchaseRequest/Detail/${PR_ID}`,
+                API_GET_DETAIL: `/Request/Detail/${PR_ID}`,
                 API_WORKFLOW_ROUTE_INIT: '/Workflow/route/1',
                 // Actions
-                API_CREATE_SAVE: '/PurchaseRequest/Save',
-                API_CREATE_SUBMIT: '/PurchaseRequest/Submit',
-                API_UPDATE_SAVE: '/PurchaseRequest/Update',
-                API_UPDATE_SUBMIT: '/PurchaseRequest/SubmitUpdate',
+                API_CREATE_SAVE: '/Request/Save',
+                API_CREATE_SUBMIT: '/Request/Submit',
+                API_UPDATE_SAVE: '/Request/Update',
+                API_UPDATE_SUBMIT: '/Request/SubmitUpdate',
                 API_APPROVE: `/Approval/Approve`,
                 API_REJECT: `/Approval/Reject`,
                 VENDOR_API_URL: "/Vendor"
@@ -759,7 +759,7 @@
                 if (!newWindow) { alert("Pop-up blocked!"); return; }
 
                 try {
-                    const response = await fetch(`${CONFIG.API_BASE_URL}/PurchaseRequest/ViewFile/${id}`, { method: 'GET', credentials: 'include' });
+                    const response = await fetch(`${CONFIG.API_BASE_URL}/Request/ViewFile/${id}`, { method: 'GET', credentials: 'include' });
                     if (!response.ok) throw new Error("Cannot download file.");
                     const pdfBlob = await response.blob();
                     if (pdfBlob.type !== 'application/pdf') throw new Error("Invalid PDF");

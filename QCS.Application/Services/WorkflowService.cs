@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using QCS.Domain.Models;
 using System.Text.Json;
@@ -10,18 +9,18 @@ namespace QCS.Application.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<WorkflowService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICurrentUserService _currentUserService; // ✅ ใช้ Service ใหม่
         private readonly string _workflowApiBaseUrl;
 
         public WorkflowService(
             HttpClient httpClient,
             ILogger<WorkflowService> logger,
-            IHttpContextAccessor httpContextAccessor,
+            ICurrentUserService currentUserService, // ✅ Inject เข้ามา
             IConfiguration configuration)
         {
             _httpClient = httpClient;
             _logger = logger;
-            _httpContextAccessor = httpContextAccessor;
+            _currentUserService = currentUserService;
             _workflowApiBaseUrl = configuration["WorkflowApi:BaseUrl"] ?? "http://ap-ntc2138-qawb/WorkflowApi/";
         }
 
@@ -72,14 +71,15 @@ namespace QCS.Application.Services
 
         private void MarkCurrentUser(WorkflowRouteDetailDto routeData)
         {
-            var user = _httpContextAccessor.HttpContext?.User;
-            if (user?.Identity?.IsAuthenticated != true) return;
+            // ✅ ใช้ Service ตรวจสอบสิทธิ์
+            if (!_currentUserService.IsAuthenticated) return;
 
-            string currentNId = GetCurrentNId(user.Identity.Name);
+            // ✅ ดึง ID ได้เลย ไม่ต้อง Split String เองแล้ว
+            string currentNId = _currentUserService.UserId;
 
             if (routeData.Steps == null) return;
 
-            // ใช้ LINQ เพื่อ Update Flag IsCurrentUser แทน Loop ซ้อน
+            // ใช้ LINQ เพื่อ Update Flag IsCurrentUser
             var userAssignments = routeData.Steps
                 .SelectMany(s => s.Assignments ?? Enumerable.Empty<AssignmentDto>())
                 .Where(a => string.Equals(a.NId, currentNId, StringComparison.OrdinalIgnoreCase));
@@ -88,13 +88,6 @@ namespace QCS.Application.Services
             {
                 assign.IsCurrentUser = true;
             }
-        }
-
-        private string GetCurrentNId(string? identityName)
-        {
-            if (string.IsNullOrEmpty(identityName)) return string.Empty;
-            var parts = identityName.Split('\\');
-            return parts.Length > 1 ? parts[1] : parts[0];
         }
     }
 }

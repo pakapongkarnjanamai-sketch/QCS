@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\QCS.Application\QCS.Application.csproj" />
     <ProjectReference Include="..\QCS.Domain\QCS.Domain.csproj" />
   </ItemGroup>
 

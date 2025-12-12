@@ -325,7 +325,7 @@
                 $("#gridMyRequests").dxDataGrid({
                     dataSource: DevExpress.data.AspNet.createStore({
                         key: "id",
-                        loadUrl: `${API_BASE}/PurchaseRequest/MyRequests`,
+                        loadUrl: `${API_BASE}/Request/MyRequests`,
                         onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
                     }),
                     height: "100%",
@@ -354,7 +354,7 @@
                 $("#gridMyTasks").dxDataGrid({
                     dataSource: DevExpress.data.AspNet.createStore({
                         key: "id",
-                        loadUrl: `${API_BASE}/PurchaseRequest/PendingApprovals`,
+                        loadUrl: `${API_BASE}/Request/PendingApprovals`,
                         onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
                     }),
                     height: "100%",
@@ -374,7 +374,7 @@
                 $("#gridApproved").dxDataGrid({
                     dataSource: DevExpress.data.AspNet.createStore({
                         key: "id",
-                        loadUrl: `${API_BASE}/PurchaseRequest/ApprovedList`,
+                        loadUrl: `${API_BASE}/Request/ApprovedList`,
                         onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
                     }),
                     height: "100%",

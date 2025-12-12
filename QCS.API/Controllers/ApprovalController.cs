@@ -5,7 +5,6 @@ using QCS.Application.Services;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Infrastructure.Data;
-using System.Security.Claims;
 
 namespace QCS.API.Controllers
 {
@@ -16,28 +15,16 @@ namespace QCS.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly WorkflowService _workflowService;
+        private readonly ICurrentUserService _currentUserService; // ✅ เพิ่ม Field
 
-        public ApprovalController(AppDbContext context, WorkflowService workflowService)
+        public ApprovalController(
+            AppDbContext context,
+            WorkflowService workflowService,
+            ICurrentUserService currentUserService) // ✅ Inject เข้ามา
         {
             _context = context;
             _workflowService = workflowService;
-        }
-
-
-        // ==========================================================
-        // 🔑 HELPER: CURRENT USER (Logic เดียวกับ WorkflowService)
-        // ==========================================================
-        private string CurrentUserNId
-        {
-            get
-            {
-                var fullIdentityName = User.Identity?.Name; // เช่น "DOMAIN\n4734"
-                if (string.IsNullOrEmpty(fullIdentityName)) return "SYSTEM";
-
-                var parts = fullIdentityName.Split('\\');
-                // เอาส่วนข้างหลัง \ ถ้ามี หรือเอาทั้งหมดถ้าไม่มี
-                return parts.Length > 1 ? parts[1] : parts[0];
-            }
+            _currentUserService = currentUserService;
         }
 
         [HttpPost("Approve")]
@@ -62,21 +49,22 @@ namespace QCS.API.Controllers
                     return BadRequest("ไม่พบขั้นตอนที่รอการอนุมัติในขณะนี้");
 
                 // ==========================================================
-                // 🔐 SECURITY CHECK: ตรวจสอบสิทธิ์กับ Workflow API (Plan)
+                // 🔐 SECURITY CHECK: ตรวจสอบสิทธิ์กับ Workflow API
                 // ==========================================================
-                // เนื่องจากใน DB เราปล่อยว่างไว้ (null) เราจึงต้องไปดูว่า "ใครควรจะเป็นคนอนุมัติ" จาก Workflow
-
-                int routeId = 1; // สมมติ Route ID
+                int routeId = 1; // ควรย้ายไป Config ในอนาคต
                 var routeData = await _workflowService.GetWorkflowRouteDetailAsync(routeId);
 
                 // หา Configuration ของ Step นี้
                 var stepConfig = routeData?.Steps?.FirstOrDefault(s => s.SequenceNo == currentStepObj.Sequence);
 
+                // ✅ ใช้ User ID จาก Service กลาง
+                string currentUserId = _currentUserService.UserId;
+
                 bool isAuthorized = false;
                 if (stepConfig != null && stepConfig.Assignments != null)
                 {
                     // เช็คว่า User ปัจจุบันมีอยู่ในรายการ Assignments ของ Step นี้ไหม
-                    isAuthorized = stepConfig.Assignments.Any(a => a.NId.Equals(CurrentUserNId, StringComparison.OrdinalIgnoreCase));
+                    isAuthorized = stepConfig.Assignments.Any(a => a.NId.Equals(currentUserId, StringComparison.OrdinalIgnoreCase));
                 }
 
                 if (!isAuthorized)
@@ -87,17 +75,17 @@ namespace QCS.API.Controllers
                 // ==========================================================
 
                 // 🌐 FETCH NAME: ดึงชื่อจริงจาก Workflow มาบันทึก
-                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, CurrentUserNId);
-                if (string.IsNullOrEmpty(approverName)) approverName = CurrentUserNId;
+                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, currentUserId);
+                if (string.IsNullOrEmpty(approverName)) approverName = currentUserId;
 
                 // ✅ ACTION: บันทึกว่า "ใคร" เป็นคนทำจริงๆ
                 currentStepObj.Status = (int)RequestStatus.Approved;
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
-                currentStepObj.ApproverNId = CurrentUserNId; // <-- บันทึกตอนกระทำ
-                currentStepObj.ApproverName = approverName;  // <-- บันทึกตอนกระทำ
+                currentStepObj.ApproverNId = currentUserId; // <-- บันทึก ID ที่ได้จาก Service
+                currentStepObj.ApproverName = approverName;
 
-                // ... [Logic การหา Next Step เหมือนเดิม] ...
+                // ... [Logic การหา Next Step] ...
                 var nextStepObj = request.ApprovalSteps
                     .Where(s => s.Sequence > currentStepObj.Sequence)
                     .OrderBy(s => s.Sequence)
@@ -111,7 +99,6 @@ namespace QCS.API.Controllers
                 else
                 {
                     // ปลุก Step ถัดไป (Draft -> Pending)
-                    // ข้อสังเกต: Step ถัดไป ใน DB ก็ยังเป็น null อยู่ ซึ่งถูกต้องแล้ว รอให้คนถัดไปมากด
                     if (nextStepObj.Status == (int)RequestStatus.Draft)
                     {
                         nextStepObj.Status = (int)RequestStatus.Pending;
@@ -162,10 +149,13 @@ namespace QCS.API.Controllers
                 var routeData = await _workflowService.GetWorkflowRouteDetailAsync(routeId);
                 var stepConfig = routeData?.Steps?.FirstOrDefault(s => s.SequenceNo == currentStepObj.Sequence);
 
+                // ✅ ใช้ User ID จาก Service กลาง
+                string currentUserId = _currentUserService.UserId;
+
                 bool isAuthorized = false;
                 if (stepConfig != null && stepConfig.Assignments != null)
                 {
-                    isAuthorized = stepConfig.Assignments.Any(a => a.NId.Equals(CurrentUserNId, StringComparison.OrdinalIgnoreCase));
+                    isAuthorized = stepConfig.Assignments.Any(a => a.NId.Equals(currentUserId, StringComparison.OrdinalIgnoreCase));
                 }
 
                 if (!isAuthorized)
@@ -174,14 +164,14 @@ namespace QCS.API.Controllers
                 }
 
                 // ดึงชื่อ
-                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, CurrentUserNId);
-                if (string.IsNullOrEmpty(approverName)) approverName = CurrentUserNId;
+                string approverName = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, currentUserId);
+                if (string.IsNullOrEmpty(approverName)) approverName = currentUserId;
 
                 // ✅ RECORD REJECTION
                 currentStepObj.Status = (int)RequestStatus.Rejected;
                 currentStepObj.ActionDate = DateTime.Now;
                 currentStepObj.Comment = input.Comment;
-                currentStepObj.ApproverNId = CurrentUserNId; // <-- บันทึกตอนกระทำ
+                currentStepObj.ApproverNId = currentUserId; // <-- บันทึก ID
                 currentStepObj.ApproverName = approverName;
 
                 // Update Header
