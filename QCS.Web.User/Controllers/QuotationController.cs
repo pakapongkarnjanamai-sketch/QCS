@@ -12,7 +12,7 @@ namespace QCS.Web.User.Controllers
         public IActionResult Index(string id)
         {
             // ส่ง id (ที่เป็น String Code) ไปให้หน้า View
-            return View("Detail", id);
+            return View("Index", id);
         }
     }
 }
