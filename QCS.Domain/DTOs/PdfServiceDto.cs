@@ -11,7 +11,7 @@ namespace QCS.Domain.DTOs
     {
         public List<PdfFileDto> PdfFiles { get; set; } = new();
         public string DocumentName { get; set; }
-        public string VendorName { get; set; }
+        public string ReferenceCode { get; set; }
         public ApprovalDataDto ApprovalData { get; set; }
         public DrawSettingDto DrawSetting { get; set; }
     }

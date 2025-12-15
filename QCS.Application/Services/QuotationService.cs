@@ -111,16 +111,16 @@ namespace QCS.Application.Services
             // 2. เตรียมข้อมูล DTO สำหรับส่งไป PDF Service
             var pdfRequest = new MergeAndStampRequestDto
             {
-                DocumentName = request.Code,
-                VendorName = request.VendorName ?? "Unknown Vendor",
+                DocumentName = request.Title,
+                ReferenceCode = request.Code ?? "Unknown Reference Code",
 
                 // ตั้งค่าการ Stamp (สี, ตำแหน่ง, ขนาดฟอนต์)
                 DrawSetting = new DrawSettingDto
                 {
-                    Color = "#6fa8dc",      // สีดำ
-                    AlignmentStamp = 3,     // 8 = BottomRight (อิงตาม Enum ของ PDF Service)
+                    Color = "#4d759a",      // สีดำ
+                    AlignmentStamp = 7,     // 8 = BottomRight (อิงตาม Enum ของ PDF Service)
                     FontSize = 8,
-                    Margin = 20
+                    Margin = 100
                 },
 
                 // ข้อมูลลำดับการอนุมัติ
@@ -153,7 +153,8 @@ namespace QCS.Application.Services
             var jsonContent = new StringContent(JsonSerializer.Serialize(pdfRequest, jsonOptions), Encoding.UTF8, "application/json");
 
             // ดึง URL จาก appsettings.json (Key: PdfServiceUrl) -> "http://localhost:5226"
-            var pdfServiceUrl = _configuration["PdfServiceUrl"] ?? "http://localhost:5226";
+            var pdfServiceUrl = _configuration["ExternalServices:PdfServiceUrl"];
+       
             var response = await _httpClient.PostAsync($"{pdfServiceUrl}/api/Pdf/merge-stamp", jsonContent);
 
             if (!response.IsSuccessStatusCode)
