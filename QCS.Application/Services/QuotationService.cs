@@ -117,21 +117,21 @@ namespace QCS.Application.Services
                 // ตั้งค่าการ Stamp (สี, ตำแหน่ง, ขนาดฟอนต์)
                 DrawSetting = new DrawSettingDto
                 {
-                    Color = "#000000",      // สีดำ
-                    AlignmentStamp = 8,     // 8 = BottomRight (อิงตาม Enum ของ PDF Service)
-                    FontSize = 10,
+                    Color = "#6fa8dc",      // สีดำ
+                    AlignmentStamp = 3,     // 8 = BottomRight (อิงตาม Enum ของ PDF Service)
+                    FontSize = 8,
                     Margin = 20
                 },
 
                 // ข้อมูลลำดับการอนุมัติ
                 ApprovalData = new ApprovalDataDto
                 {
-                    Name = $"PR Ref: {request.Code}",
+                    Name = $"QC Ref: {request.Code}",
                     Step = request.ApprovalSteps
                         .OrderBy(s => s.Sequence)
                         .Select(s => new StepDto
                         {
-                            StepName = $"Step {s.StepName}", // หรือใช้ s.RoleName
+                            StepName = $"{s.StepName}", // หรือใช้ s.RoleName
                             Approver = s.ApproverName ?? "System Admin", // ชื่อคนอนุมัติ
                             ApprovalDate = s.ActionDate ?? DateTime.Now
                         }).ToList()

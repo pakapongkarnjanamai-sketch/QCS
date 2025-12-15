@@ -67,7 +67,8 @@
             gap: 20px;
             height: 100%;
             overflow-y: auto;
-            padding-right: 5px; /* For Scrollbar */
+            padding-right: 5px;
+            /* For Scrollbar */
         }
 
         .info-card {
@@ -90,7 +91,7 @@
             align-items: center;
         }
 
-        /* --- File List Item --- */
+        /* --- File List Item (ปรับปรุงใหม่: แสดงข้อมูลเฉยๆ ไม่ Interactive) --- */
         .file-item {
             display: flex;
             align-items: center;
@@ -98,21 +99,23 @@
             border: 1px solid #f1f3f5;
             border-radius: 8px;
             margin-bottom: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
+            cursor: default; /* เปลี่ยนจาก pointer เป็น default */
             background: #fff;
         }
 
-            .file-item:hover {
-                background-color: #f8f9fa;
-                border-color: #2190F7;
-                transform: translateX(2px);
-            }
+        /* เอา hover effect ออก */
+        /*
+                    .file-item:hover {
+                        background-color: #f8f9fa;
+                        border-color: #2190F7;
+                        transform: translateX(2px);
+                    }
 
-            .file-item.active {
-                background-color: #e3f2fd;
-                border-color: #2190F7;
-            }
+                    .file-item.active {
+                        background-color: #e3f2fd;
+                        border-color: #2190F7;
+                    }
+                */
 
         .file-icon {
             font-size: 24px;
@@ -227,9 +230,12 @@
             color: #555;
             font-style: italic;
             /* --- ส่วนที่เพิ่ม --- */
-            white-space: pre-wrap; /* 1. รักษารูปแบบการเคาะบรรทัด (Enter) และ Wrap ข้อความอัตโนมัติ */
-            word-break: break-word; /* 2. ถ้ามีคำยาวๆ ติดกัน (เช่น URL) ให้ตัดคำลงมาบรรทัดใหม่ */
-            overflow-wrap: break-word; /* 3. คำสั่งเสริมเพื่อให้รองรับ Browser หลากหลาย */
+            white-space: pre-wrap;
+            /* 1. รักษารูปแบบการเคาะบรรทัด (Enter) และ Wrap ข้อความอัตโนมัติ */
+            word-break: break-word;
+            /* 2. ถ้ามีคำยาวๆ ติดกัน (เช่น URL) ให้ตัดคำลงมาบรรทัดใหม่ */
+            overflow-wrap: break-word;
+            /* 3. คำสั่งเสริมเพื่อให้รองรับ Browser หลากหลาย */
         }
 
 
@@ -289,6 +295,7 @@
                 <i class="fas fa-file-alt text-primary"></i>
                 <span id="docTitleLabel">Document Viewer</span>
             </div>
+
             <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
                 <i class="fas fa-expand"></i> Fullscreen
             </button>
@@ -296,7 +303,8 @@
         <div id="pdfViewer" class="pdf-body">
             <div class="pdf-placeholder">
                 <i class="fas fa-search fa-3x mb-3 opacity-50"></i>
-                <div>Select a document to view</div>
+
+                <div>Generating Document...</div>
             </div>
         </div>
     </div>
@@ -307,6 +315,7 @@
             <div class="card-header-text">
                 <span>Request Info</span>
                 <span id="headerStatus"></span>
+
             </div>
             <div id="requestInfoForm"></div>
         </div>
@@ -315,6 +324,7 @@
             <div class="card-header-text">
                 <span>Attachments</span>
                 <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+
             </div>
             <div id="documentList"></div>
         </div>
@@ -342,7 +352,6 @@
                 status: { 0: "Draft", 1: "Pending", 2: "Approved", 3: "Completed", 99: "Rejected" },
                 docType: { 10: "Quotation", 20: "Technical Spec", 30: "Other" }
             };
-
             // ==========================================
             // 2. INIT
             // ==========================================
@@ -357,9 +366,9 @@
 
                     const res = await fetch(url, { credentials: 'include' });
                     if (!res.ok) throw new Error("Document not found.");
-
                     let data = await res.json();
-                    if (data.data) data = data.data; // Handle wrapped response
+                    if (data.data) data = data.data;
+                    // Handle wrapped response
                     if (Array.isArray(data)) data = data[0];
                     if (!data) throw new Error("No data returned.");
 
@@ -368,15 +377,11 @@
                     renderDocuments(data.quotations);
                     renderApprovals(data.approvalSteps);
 
-                    // Auto-load first file
-                    if (data.quotations && data.quotations.length > 0) {
-                        loadViewer(data.quotations[0]);
-                    } else {
-                        $("#pdfViewer").html('<div class="pdf-placeholder">No files attached</div>');
-                    }
+                    // Auto-load Generated PDF
+                    // ใช้ data.id (PurchaseRequestId) เพื่อส่งไป Generate/View PDF
+                    loadViewer(data.id, data.code);
 
                     $("#btnFullscreen").on("click", toggleFullscreen);
-
                 } catch (err) {
                     showError(err.message);
                 } finally {
@@ -393,7 +398,6 @@
                 if (data.status === 1) badgeClass = "bg-warning-soft";
                 if (data.status === 2 || data.status === 3) badgeClass = "bg-success-soft";
                 if (data.status === 99) badgeClass = "bg-danger-soft";
-
                 $("#headerStatus").html(`<span class="status-badge ${badgeClass}">${statusText}</span>`);
             }
 
@@ -402,23 +406,31 @@
                     formData: data,
                     readOnly: true,
                     labelLocation: "top",
+
                     colCount: 2,
                     items: [
                         { dataField: "code", label: { text: "No." }, colSpan: 2 },
-                        { dataField: "title", label: { text: "Title" }, colSpan: 2 },
+                        {
+                            dataField: "title", label:
+                                { text: "Title" }, colSpan: 2
+                        },
                         { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
                         {
                             dataField: "validFrom", label: { text: "Valid From" },
+
                             editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
+
                             dataField: "validUntil", label: { text: "Valid Until" },
                             editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
+
                             dataField: "remark", label: { text: "Remark" }, colSpan: 2,
                             editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 }
                         }
+
                     ]
                 });
             }
@@ -432,12 +444,13 @@
                     return;
                 }
 
+                // แสดงรายการไฟล์เฉยๆ ไม่ใส่ Event Click
                 docs.forEach(doc => {
                     const typeName = MAPS.docType[doc.documentTypeId] || "Attachment";
                     const sizeStr = formatSize(doc.fileSize);
 
                     const item = $(`
-                        <div class="file-item" data-id="${doc.id}">
+                          <div class="file-item" data-id="${doc.id}">
                             <i class="fas fa-file-pdf file-icon"></i>
                             <div class="file-details">
                                 <div class="file-name" title="${doc.fileName}">${doc.fileName}</div>
@@ -448,7 +461,7 @@
                             </div>
                         </div>
                     `);
-                    item.on("click", () => loadViewer(doc));
+                    // item.on("click", ...)  <-- เอาออก
                     container.append(item);
                 });
             }
@@ -465,23 +478,29 @@
                     let dotClass = "";
                     if (step.status === 2) dotClass = "completed";
                     else if (step.status === 99) dotClass = "rejected";
-                    else if (step.status === 1) dotClass = "current";
+                    else if
+                        (step.status === 1) dotClass = "current";
 
                     const stepStatus = MAPS.status[step.status] || "Waiting";
                     const approver = step.approverName || "System/Waiting";
                     const dateStr = formatDateTime(step.actionDate);
 
-                    const html = `
+                    const html
+                        = `
                         <div class="timeline-item">
                             <div class="timeline-dot ${dotClass}"></div>
                             <div class="timeline-content">
-                                <div class="timeline-step">Step ${step.sequence}: ${step.stepName}</div>
+
+                                 <div class="timeline-step">Step ${step.sequence}: ${step.stepName}</div>
                                 <div class="timeline-user">
                                     <i class="fas fa-user-circle"></i> ${approver}
+
                                     <span class="text-muted">(${stepStatus})</span>
                                 </div>
-                                ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${dateStr}</div>` : ''}
-                                ${step.comment ? `<div class="timeline-comment">"${step.comment}"</div>` : ''}
+                                ${step.actionDate ?
+                            `<div class="timeline-date"><i class="far fa-clock"></i> ${dateStr}</div>` : ''}
+                                ${step.comment ?
+                            `<div class="timeline-comment">"${step.comment}"</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -489,28 +508,31 @@
                 });
             }
 
-            async function loadViewer(doc) {
-                $(".file-item").removeClass("active");
-                $(`.file-item[data-id="${doc.id}"]`).addClass("active");
-                $("#docTitleLabel").text(doc.fileName);
+            async function loadViewer(requestId, code) {
+                // ไม่ต้องยุ่งกับ active class ของ file list แล้ว
+                $("#docTitleLabel").text(`${code}`);
 
                 const viewer = $("#pdfViewer").empty();
-                const loader = createLoader("Opening file...", "#pdfViewer"); // Local loader
+                const loader = createLoader("Generating PDF...", "#pdfViewer");
 
                 try {
-                    const url = `${API.VIEW_FILE}/${doc.id}`;
+                    // เรียก API โดยใช้ PurchaseRequestId
+                    const url = `${API.VIEW_FILE}/${requestId}`;
                     const res = await fetch(url, { method: 'GET', credentials: 'include' });
-                    if (!res.ok) throw new Error("Unable to load file content.");
+
+                    if (!res.ok) {
+                        // ลองอ่าน error message จาก server
+                        let errorMsg = "Unable to load file content.";
+                        try { errorMsg = await res.text(); } catch {}
+                        throw new Error(errorMsg);
+                    }
 
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
-                    const type = doc.contentType || "application/pdf";
 
-                    if (type.startsWith("image/")) {
-                        $("<img>").attr("src", objUrl).css({ width: "100%", height: "100%", objectFit: "contain" }).appendTo(viewer);
-                    } else {
-                        $("<embed>").attr({ src: objUrl, type: type, width: "100%", height: "100%" }).appendTo(viewer);
-                    }
+                    // เนื่องจาก API นี้ Generate PDF เสมอ (ตาม Service) จึงกำหนด Type เป็น PDF
+                    $("<embed>").attr({ src: objUrl, type: "application/pdf", width: "100%", height: "100%" }).appendTo(viewer);
+
                 } catch (e) {
                     viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
                 } finally {
@@ -547,11 +569,11 @@
                     position: { of: target },
                     visible: true,
                     showIndicator: true,
+
                     showPane: true,
                     message: msg,
                     container: target
                 }).dxLoadPanel("instance");
-
                 return { hide: () => { loadPanel.hide(); $el.remove(); } };
             }
 
