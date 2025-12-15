@@ -35,13 +35,10 @@ namespace QCS.API.Controllers
             return DataSourceLoader.Load(source, loadOptions);
         }
 
-        // ==========================================================
-        // 📥 VIEW FILE
-        // ==========================================================
         [HttpGet("ViewFile/{id}")]
         public async Task<IActionResult> ViewFile(int id)
         {
-            var fileDto = await _quotationService.GetAttachmentAsync(id);
+            var fileDto = await _quotationService.GenerateStampedPdfAsync(id);
 
             if (fileDto == null || fileDto.Data == null)
                 return NotFound("File content missing");
