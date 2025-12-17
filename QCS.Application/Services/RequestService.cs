@@ -34,12 +34,13 @@ namespace QCS.Application.Services
         private readonly AppDbContext _context;
         private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
-
-        public RequestService(AppDbContext context, WorkflowService workflowService, ICurrentUserService currentUserService)
+        private readonly IWebHostEnvironment _env;
+        public RequestService(AppDbContext context, WorkflowService workflowService, ICurrentUserService currentUserService, IWebHostEnvironment env)
         {
             _context = context;
             _workflowService = workflowService;
             _currentUserService = currentUserService;
+            _env = env;
         }
 
         // ==========================================================
@@ -59,7 +60,7 @@ namespace QCS.Application.Services
                 Title = r.Title,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
-                Status = r.Status,
+                CurrentStepId = r.CurrentStepId,
              
             });
         }
@@ -77,7 +78,7 @@ namespace QCS.Application.Services
                 Title = r.Title,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
-                Status = r.Status,
+                CurrentStepId = r.CurrentStepId,
            
             });
         }
@@ -113,7 +114,7 @@ namespace QCS.Application.Services
                 Title = r.Title,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
-                Status = r.Status,
+                CurrentStepId = r.CurrentStepId,
                 RequesterName = r.ApprovalSteps
                         .Where(s => s.Sequence == 1)
                         .Select(s => s.ApproverName)
@@ -128,198 +129,399 @@ namespace QCS.Application.Services
         public async Task<PurchaseRequestDetailDto?> GetByIdAsync(int id)
         {
             var request = await _context.Requests
-                .AsNoTracking()
-                .Include(r => r.Quotations)
-                .FirstOrDefaultAsync(r => r.Id == id);
+             .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
+             .Include(r => r.ApprovalSteps)
+             .AsNoTracking()
+             .FirstOrDefaultAsync(r => r.Id == id);
 
             if (request == null) return null;
 
-            return await MapToDetailDto(request);
+            // 1. ดึง Workflow Template เพื่อเช็คสิทธิ์
+            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1); // ควรย้าย 1 ไป Config
+
+            // 2. Merge ข้อมูล History ลงใน Route (เพื่อแสดง Timeline)
+            if (workflowRoute?.Steps != null)
+            {
+                foreach (var routeStep in workflowRoute.Steps)
+                {
+                    var actualStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == routeStep.SequenceNo);
+                    if (actualStep != null)
+                    {
+                        routeStep.Status = actualStep.Status;
+                        routeStep.ActionDate = actualStep.ActionDate;
+                        routeStep.Comment = actualStep.Comment;
+                        routeStep.ApproverName = actualStep.ApproverName;
+                        routeStep.ApproverNId = actualStep.ApproverNId;
+                    }
+
+                    // Mark Current User Assignment
+                    if (routeStep.Assignments != null)
+                    {
+                        foreach (var assign in routeStep.Assignments)
+                        {
+                            if (string.Equals(assign.NId, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                assign.IsCurrentUser = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. คำนวณ Permission
+            bool canApprove = false;
+            bool canReject = false;
+            bool canEdit = request.Status == (int)RequestStatus.Draft;
+
+            if (request.Status == (int)RequestStatus.Pending && workflowRoute?.Steps != null)
+            {
+                var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
+                if (currentStepConfig?.Assignments != null && currentStepConfig.Assignments.Any(a => a.IsCurrentUser))
+                {
+                    canApprove = true;
+                    canReject = true;
+                }
+            }
+
+            return new PurchaseRequestDetailDto
+            {
+                PurchaseRequestId = request.Id,
+                DocumentNo = request.Code,
+                Title = request.Title,
+                RequestDate = request.RequestDate,
+                Status = request.Status.ToString(),
+                CurrentStepId = request.CurrentStepId,
+                VendorId = request.VendorId,
+                VendorName = request.VendorName,
+                ValidFrom = request.ValidFrom,
+                ValidUntil = request.ValidUntil,
+                Remark = request.Remark,
+                Quotations = request.Quotations.Select(q => new QuotationItemDto
+                {
+                    Id = q.Id,
+                    DocumentTypeId = q.DocumentTypeId,
+                    OriginalFileName = q.FileName,
+                    FilePath = q.FilePath
+                }).ToList(),
+                Permissions = new PermissionDto
+                {
+                    CanApprove = canApprove,
+                    CanReject = canReject,
+                    CanEdit = canEdit
+                },
+                WorkflowRoute = workflowRoute
+            };
         }
 
         public async Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code)
         {
-            var request = await _context.Requests
+            // ค้นหา ID จาก Code ก่อน
+            var id = await _context.Requests
                 .AsNoTracking()
-                .Include(r => r.Quotations)
-                .FirstOrDefaultAsync(r => r.Code == code); // Fix: DocumentCode -> Code
+                .Where(r => r.Code == code)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
 
-            if (request == null) return null;
+            if (id == 0) return null;
 
-            return await MapToDetailDto(request);
+            // Reuse Logic เดิมของ GetByIdAsync เพื่อให้ Return Data Structure เดียวกันเป๊ะ
+            return await GetByIdAsync(id);
         }
 
-        private async Task<PurchaseRequestDetailDto> MapToDetailDto(Request r)
-        {
-            // Fix: Map fields according to PurchaseRequestDetailDto definition
-            return new PurchaseRequestDetailDto
-            {
-                PurchaseRequestId = r.Id,      // Fix: Id -> PurchaseRequestId
-                DocumentNo = r.Code,           // Fix: Code -> DocumentNo
-                Title = r.Title,               // Fix: Subject -> Title
-                                               // Amount = r.Amount,          // Removed: No Amount in Entity/DTO
-                                               // Description = r.Description,// Removed: No Description in Entity/DTO
+        //private async Task<PurchaseRequestDetailDto> MapToDetailDto(Request r)
+        //{
+        //    // Fix: Map fields according to PurchaseRequestDetailDto definition
+        //    return new PurchaseRequestDetailDto
+        //    {
+        //        PurchaseRequestId = r.Id,      // Fix: Id -> PurchaseRequestId
+        //        DocumentNo = r.Code,           // Fix: Code -> DocumentNo
+        //        Title = r.Title,               // Fix: Subject -> Title
+        //                                       // Amount = r.Amount,          // Removed: No Amount in Entity/DTO
+        //                                       // Description = r.Description,// Removed: No Description in Entity/DTO
 
-                VendorId = r.VendorId,
-                VendorName = r.VendorName,
-                ValidFrom = r.ValidFrom,
-                ValidUntil = r.ValidUntil,
-                Remark = r.Remark,
+        //        VendorId = r.VendorId,
+        //        VendorName = r.VendorName,
+        //        ValidFrom = r.ValidFrom,
+        //        ValidUntil = r.ValidUntil,
+        //        Remark = r.Remark,
 
-                Status = ((RequestStatus)r.Status).ToString(), // Fix: Convert int to string
-                CurrentStepId = r.CurrentStepId,
+        //        Status = ((RequestStatus)r.Status).ToString(), // Fix: Convert int to string
+        //        CurrentStepId = r.CurrentStepId,
 
-                // RequesterName logic (Assuming CreatedBy is NId, might need lookup)
-                RequesterName = r.CreatedBy,
-                RequestDate = r.RequestDate, // Fix: CreatedAt -> RequestDate
+        //        // RequesterName logic (Assuming CreatedBy is NId, might need lookup)
+        //        RequesterName = r.CreatedBy,
+        //        RequestDate = r.RequestDate, // Fix: CreatedAt -> RequestDate
 
-                Quotations = r.Quotations.Select(q => new QuotationItemDto
-                {
-                    Id = q.Id,
-                    FileName = q.FileName,
-                    DocumentTypeId = q.DocumentTypeId
-                }).ToList()
-            };
-        }
+        //        Quotations = r.Quotations.Select(q => new QuotationItemDto
+        //        {
+        //            Id = q.Id,
+        //            FileName = q.FileName,
+        //            DocumentTypeId = q.DocumentTypeId
+        //        }).ToList()
+        //    };
+        //}
 
         // ==========================================================
         // 📝 CRUD OPERATIONS
         // ==========================================================
 
-        public async Task<Request> CreateAsync(CreatePurchaseRequestDto input,  bool isSubmit)
+        public async Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit)
         {
-            string newCode = await GenerateDocumentCodeAsync();
-
-            var request = new Request
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                Code = newCode,                // Fix: DocumentCode -> Code
-                Title = input.Title,           // Fix: Subject -> Title
-                                               // Amount = input.Amount,      // Removed
-                                               // Description = input.Description, // Removed
+                // 1. Prepare Workflow & Doc No
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+                if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
 
-                VendorId = input.VendorId,
-                VendorName = input.VendorName,
-                ValidFrom = input.ValidFrom,
-                ValidUntil = input.ValidUntil,
-                Remark = input.Remark,
-                // Comment = input.Comment,    // Note: Comment is in DTO but not in Request entity directly? ignoring for now or map to log
+                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
+                var newDocNo = await GenerateDocNoAsync();
 
-                RequestDate = DateTime.Now,    // Fix: Set RequestDate
-          
-                Status = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
-                CurrentStepId = isSubmit ? 1 : 0
-            };
+                // 2. Determine Status
+                int currentStepId = 1;
+                int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
 
-            // Fix: Attachments -> Attachments, MetaJson -> QuotationsJson
-            if (input.Attachments != null && input.Attachments.Count > 0)
-            {
-                await ProcessAttachmentsAsync(request, input.Attachments, input.QuotationsJson);
+                if (isSubmit)
+                {
+                    var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
+                    currentStepId = nextStep != null ? nextStep.SequenceNo : 99;
+                    if (currentStepId == 99) docStatus = (int)RequestStatus.Approved;
+                }
+
+                // 3. Create Entity
+                var pr = new Request
+                {
+                    Code = newDocNo,
+                    Title = input.Title,
+                    RequestDate = DateTime.Now,
+                    Status = docStatus,
+                    CurrentStepId = currentStepId,
+                    VendorId = input.VendorId,
+                    VendorName = input.VendorName,
+                    ValidFrom = input.ValidFrom,
+                    ValidUntil = input.ValidUntil,
+                    Remark = input.Remark,
+                    ApprovalSteps = new List<ApprovalStep>(),
+                    Quotations = new List<Quotation>()
+                };
+
+                // 4. Create Approval Steps History
+                foreach (var step in sortedSteps)
+                {
+                    int stepStatus = (int)RequestStatus.Draft;
+                    string? approverNId = null;
+                    string? approverName = null;
+                    string? comment = null;
+                    DateTime? actionDate = null;
+
+                    if (step.SequenceNo == 1) // Step 1 = Requester
+                    {
+                        if (isSubmit)
+                        {
+                            stepStatus = (int)RequestStatus.Approved;
+                            actionDate = DateTime.Now;
+                            approverNId = _currentUserService.UserId;
+                            approverName = await GetApproverNameAsync(1, _currentUserService.UserId);
+                            comment = input.Comment;
+                        }
+                        else
+                        {
+                            stepStatus = (int)RequestStatus.Pending; // Draft mode
+                        }
+                    }
+                    else if (step.SequenceNo == 2 && isSubmit)
+                    {
+                        stepStatus = (int)RequestStatus.Pending; // Waiting for Step 2
+                    }
+
+                    pr.ApprovalSteps.Add(new ApprovalStep
+                    {
+                        Sequence = step.SequenceNo,
+                        StepName = step.StepName,
+                        Status = stepStatus,
+                        ActionDate = actionDate,
+                        ApproverNId = approverNId,
+                        ApproverName = approverName,
+                        Comment = comment
+                    });
+                }
+
+                // 5. Handle Files
+                await HandleFileUploadsAsync(input, pr);
+
+                await _context.Requests.AddAsync(pr);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return pr;
             }
-
-            _context.Requests.Add(request);
-            await _context.SaveChangesAsync();
-
-            return request;
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task UpdateAsync(UpdatePurchaseRequestDto input, bool isSubmit)
         {
-            var request = await _context.Requests
-                .Include(r => r.Quotations)
-                .FirstOrDefaultAsync(r => r.Id == input.Id);
-
-            if (request == null) throw new Exception("Request not found");
-
-            // Update Fields
-            request.Title = input.Title;       // Fix: Subject -> Title
-                                               // request.Amount = input.Amount; // Removed
-                                               // request.Description = input.Description; // Removed
-
-            request.VendorId = input.VendorId;
-            request.VendorName = input.VendorName;
-            request.ValidFrom = input.ValidFrom;
-            request.ValidUntil = input.ValidUntil;
-            request.Remark = input.Remark;
-
-            request.UpdatedAt = DateTime.Now;
-
-            if (isSubmit)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                request.Status = (int)RequestStatus.Pending;
-                request.CurrentStepId = 1;
-            }
+                var pr = await _context.Requests
+                    .Include(r => r.Quotations)
+                    .Include(r => r.ApprovalSteps)
+                    .FirstOrDefaultAsync(r => r.Id == input.Id);
 
-            // Fix: NewAttachments -> NewAttachments, QuotationsJson -> QuotationsJson
-            if (input.NewAttachments != null && input.NewAttachments.Count > 0)
+                if (pr == null) throw new KeyNotFoundException("Document not found");
+                if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
+
+                // Update Fields
+                pr.Title = input.Title;
+                pr.VendorId = input.VendorId;
+                pr.VendorName = input.VendorName;
+                pr.ValidFrom = input.ValidFrom;
+                pr.ValidUntil = input.ValidUntil;
+                pr.Remark = input.Remark;
+
+                if (isSubmit)
+                {
+                    pr.Status = (int)RequestStatus.Pending;
+
+                    // Update Step 1 (Requester) -> Approved
+                    var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+                    if (step1 != null)
+                    {
+                        step1.Status = (int)RequestStatus.Approved;
+                        step1.ActionDate = DateTime.Now;
+                        step1.ApproverNId = _currentUserService.UserId;
+                        step1.ApproverName = await GetApproverNameAsync(1, _currentUserService.UserId);
+                        step1.Comment = input.Comment;
+                    }
+
+                    // Activate Step 2 -> Pending
+                    var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
+                    if (step2 != null)
+                    {
+                        step2.Status = (int)RequestStatus.Pending;
+                        step2.ApproverNId = null; // Clear old data if rejected
+                        step2.ApproverName = null;
+                        pr.CurrentStepId = 2;
+                    }
+                }
+
+                // Handle Files Updates (Metadata)
+                if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
+                {
+                    var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (updates != null)
+                    {
+                        foreach (var item in updates)
+                        {
+                            var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
+                            if (f != null) f.DocumentTypeId = item.DocumentTypeId;
+                        }
+                    }
+                }
+
+                // Handle Files Delete
+                if (!string.IsNullOrEmpty(input.DeletedFileIds))
+                {
+                    var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
+                    var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
+                    _context.Quotations.RemoveRange(toRemove);
+                }
+
+                // Handle New Files
+                await HandleFileUploadsAsync(input, pr);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
             {
-                await ProcessAttachmentsAsync(request, input.NewAttachments, input.QuotationsJson);
+                await transaction.RollbackAsync();
+                throw;
             }
-
-            // Handle Deleted Files if needed (input.DeletedFileIds)
-            // ...
-
-            await _context.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(int id)
         {
-            var request = await _context.Requests.FindAsync(id);
-            if (request != null)
+            var pr = await _context.Requests.FindAsync(id);
+            if (pr != null)
             {
-                _context.Requests.Remove(request);
+                // Soft Delete or Hard Delete based on policy
+                _context.Requests.Remove(pr);
                 await _context.SaveChangesAsync();
             }
         }
 
-        public async Task<AttachmentResultDto?> GetAttachmentAsync(int id)
+
+
+
+        public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
         {
-            var q = await _context.Quotations
-                .AsNoTracking()
-                .Include(x => x.AttachmentFile)
-                .FirstOrDefaultAsync(x => x.Id == id);
+            var q = await _context.Quotations.Include(x => x.AttachmentFile).FirstOrDefaultAsync(x => x.Id == fileId);
+            if (q == null) return null;
 
-            if (q?.AttachmentFile == null) return null;
-
-            return new AttachmentResultDto
+            // 1. Try DB
+            if (q.AttachmentFile?.Data != null)
             {
-                FileName = q.FileName,
-                ContentType = q.ContentType,
-                Data = q.AttachmentFile.Data
-            };
+                return new AttachmentResultDto
+                {
+                    Data = q.AttachmentFile.Data,
+                    ContentType = q.AttachmentFile.ContentType ?? "application/octet-stream",
+                    FileName = q.FileName
+                };
+            }
+
+            // 2. Try Disk (Legacy Support)
+            if (!string.IsNullOrEmpty(q.FilePath) && q.FilePath != "Database")
+            {
+                var path = Path.Combine(_env.WebRootPath, q.FilePath);
+                if (System.IO.File.Exists(path))
+                {
+                    return new AttachmentResultDto
+                    {
+                        Data = await System.IO.File.ReadAllBytesAsync(path),
+                        ContentType = q.ContentType ?? "application/octet-stream",
+                        FileName = q.FileName
+                    };
+                }
+            }
+
+            return null;
         }
 
         // ==========================================================
         // 🛠 PRIVATE HELPERS
         // ==========================================================
 
-        private async Task<string> GenerateDocumentCodeAsync()
+        private async Task<string> GenerateDocNoAsync()
         {
-            var prefix = $"PR-{DateTime.Now:yyyyMM}-";
-            var lastRequest = await _context.Requests
-                .Where(r => r.Code.StartsWith(prefix)) // Fix: DocumentCode -> Code
-                .OrderByDescending(r => r.Code)
-                .FirstOrDefaultAsync();
-
-            int runningNo = 1;
-            if (lastRequest != null)
-            {
-                var parts = lastRequest.Code.Split('-');
-                if (parts.Length >= 3 && int.TryParse(parts.Last(), out int lastNo))
-                {
-                    runningNo = lastNo + 1;
-                }
-            }
-
-            return $"{prefix}{runningNo:D3}";
+            var todayStr = DateTime.Now.ToString("yyyyMMdd");
+            var prefix = $"QC-{todayStr}-";
+            var countToday = await _context.Requests.CountAsync(x => x.Code.StartsWith(prefix));
+            return $"{prefix}{(countToday + 1):D3}";
         }
 
-        private async Task ProcessAttachmentsAsync(Request pr, List<IFormFile> files, string? jsonMeta)
+        private async Task<string> GetApproverNameAsync(int routeId, string nId)
         {
-            var metaList = string.IsNullOrEmpty(jsonMeta)
-                ? new List<QuotationItemDto>()
-                : JsonSerializer.Deserialize<List<QuotationItemDto>>(jsonMeta, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var name = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, nId);
+            return !string.IsNullOrEmpty(name) ? name : nId;
+        }
 
-            if (pr.Quotations == null) pr.Quotations = new List<Quotation>();
+        private async Task HandleFileUploadsAsync(dynamic input, Request pr)
+        {
+            // Reflection to get Attachments from both Create and Update DTOs
+            var files = (input.GetType().GetProperty("Attachments")?.GetValue(input) as List<IFormFile>)
+                     ?? (input.GetType().GetProperty("NewAttachments")?.GetValue(input) as List<IFormFile>);
+
+            if (files == null || files.Count == 0) return;
+
+            var metaJson = input.QuotationsJson as string;
+            var metaList = string.IsNullOrEmpty(metaJson)
+                ? new List<QuotationItemDto>()
+                : JsonSerializer.Deserialize<List<QuotationItemDto>>(metaJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             foreach (var file in files)
             {
@@ -337,12 +539,11 @@ namespace QCS.Application.Services
                         FileName = file.FileName,
                         ContentType = file.ContentType,
                         FileSize = file.Length,
-                        Data = fileData,
-                        CreatedAt = DateTime.Now
+                        Data = fileData
                     };
 
                     var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
-                    int typeId = meta != null ? meta.DocumentTypeId : 10;
+                    int typeId = meta != null ? meta.DocumentTypeId : 10; // Default 10 = Other
 
                     pr.Quotations.Add(new Quotation
                     {
@@ -351,7 +552,6 @@ namespace QCS.Application.Services
                         FileSize = file.Length,
                         DocumentTypeId = typeId,
                         FilePath = "Database",
-                        CreatedAt = DateTime.Now,
                         AttachmentFile = attachment
                     });
                 }

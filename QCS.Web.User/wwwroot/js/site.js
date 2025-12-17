@@ -112,7 +112,7 @@ function initSystemEnums() {
             SystemEnums.requestStatus = data.requestStatus;
             SystemEnums.workflowStep = data.workflowStep;
             SystemEnums.documentType = data.documentType;
-            SystemEnums.approvalStatus = data.approvalStatus;
+
             console.log("System Enums Loaded:", SystemEnums);
         },
         error: function (err) {

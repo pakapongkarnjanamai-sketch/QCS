@@ -110,21 +110,47 @@
             const DETAIL_URL = '@Url.Action("View", "Quotation")';
 
             // [REF_ENUM] Helper function (เหมือนกับหน้า Code.cshtml)
-            const getStatusBadgeInfo = (status) => {
-                let badgeClass = "bg-secondary-soft";
+             const getStatusBadgeInfo = (status) => {
+            let badgeClass = "bg-secondary-soft";
+            let text = "Unknown";
 
-                if (status === 1) badgeClass = "bg-warning-soft";
-                else if (status === 2) badgeClass = "bg-success-soft"; // Approved
-                else if (status === 3) badgeClass = "bg-info-soft";    // Completed (ใช้สีฟ้าอ่อนเพื่อแยกความต่าง)
-                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft";
+            switch (status) {
+                case 0: // Draft
+                    badgeClass = "bg-secondary-soft"; // สีเทา (แบบร่าง)
+                    text = "บันทึก (Draft)";
+                    break;
+                case 1: // Purchaser
+                    badgeClass = "bg-info-soft";      // สีฟ้า (กำลังดำเนินการโดยจัดซื้อ)
+                    text = "บันทึก (Purchaser)";
+                    break;
+                case 2: // Verifier
+                    badgeClass = "bg-warning-soft";   // สีเหลือง (รอตรวจสอบ)
+                    text = "รอตรวจสอบ";
+                    break;
+                case 3: // Manager
+                    badgeClass = "bg-warning-soft";   // สีเหลือง (รออนุมัติ - ระดับสูง)
+                    text = "รออนุมัติ";
+                    break;
+                case 99: // Completed
+                    badgeClass = "bg-success-soft";   // สีเขียว (จบงาน)
+                    text = "อนุมัติครบถ้วน";
+                    break;
+                case -1: // Rejected
+                    badgeClass = "bg-danger-soft";    // สีแดง (ปฏิเสธ)
+                    text = "ไม่อนุมัติ";
+                    break;
+                default:
+                    text = "Status " + status;
+                    break;
+            }
 
-                // ดึงชื่อจาก SystemEnums (Single Source of Truth)
-                const text = (typeof SystemEnums !== 'undefined')
-                    ? SystemEnums.getDisplayName('requestStatus', status)
-                    : "Status " + status;
+            // (Optional) หากมี SystemEnums ให้ใช้ชื่อจาก SystemEnums แทน
+            if (typeof SystemEnums !== 'undefined') {
+                text = SystemEnums.getDisplayName('workflowStep', status);
+            }
 
-                return { cls: badgeClass, txt: text };
-            };
+            return { cls: badgeClass, txt: text };
+        };
 
             $("#gridContainer").dxDataGrid({
                 dataSource: DevExpress.data.AspNet.createStore({
@@ -176,22 +202,28 @@
                         alignment: "center"
                     },
                     {
-                        dataField: "status",
-                        caption: "สถานะ",
-                        width: 150,
-                        alignment: "center",
-                        allowSorting: false,
-                        allowFiltering: false,
-                        cellTemplate: function (container, options) {
-                            // [REF_ENUM] ใช้ Helper ดึงข้อมูลมาแสดงผล
-                            const info = getStatusBadgeInfo(options.value);
-
-                            $("<span>")
-                                .addClass("status-badge " + info.cls)
-                                .text(info.txt)
-                                .appendTo(container);
-                        }
+                    dataField: "currentStepId",
+                    caption: "สถานะ",
+                    width: 160, // ขยายความกว้างเล็กน้อย
+                    alignment: "center",
+                    lookup: {
+                        // ปรับ DataSource ให้ตรงกับ Enum WorkflowStep
+                        dataSource: [
+                            { id: 0, name: "บันทึก (Draft)" },
+                            { id: 1, name: "บันทึก (Purchaser)" },
+                            { id: 2, name: "รอตรวจสอบ (Verifier)" },
+                            { id: 3, name: "รออนุมัติ (Manager)" },
+                            { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
+                            { id: -1, name: "ไม่อนุมัติ (Rejected)" }
+                        ],
+                        valueExpr: "id", displayExpr: "name"
                     },
+                    cellTemplate: (container, options) => {
+                        const info = getStatusBadgeInfo(options.value);
+                        $("<span>").addClass("status-badge " + info.cls).text(info.txt).appendTo(container);
+                    }
+                },
+              
                     {
                         type: "buttons",
                         width: 80,

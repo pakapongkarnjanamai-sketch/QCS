@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿
+
+using Microsoft.AspNetCore.Http;
 
 namespace QCS.Domain.DTOs
 {

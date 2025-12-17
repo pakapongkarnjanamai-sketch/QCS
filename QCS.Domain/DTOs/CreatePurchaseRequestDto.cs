@@ -1,6 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
+﻿
+using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 
 namespace QCS.Domain.DTOs
@@ -26,6 +25,4 @@ namespace QCS.Domain.DTOs
         public string QuotationsJson { get; set; }
     }
 
-  
-  
 }

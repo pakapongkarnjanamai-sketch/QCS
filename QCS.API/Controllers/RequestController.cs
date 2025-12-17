@@ -66,19 +66,18 @@ namespace QCS.API.Controllers
             if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
             return Ok(result);
         }
-
-        [HttpPost("Create")]
-        public async Task<IActionResult> Create([FromForm] CreatePurchaseRequestDto input)
+        [HttpPost("Save")] // บันทึกเป็น Draft
+        public async Task<IActionResult> Save([FromForm] CreatePurchaseRequestDto input)
         {
-            // Pass 'false' for isSubmit (Draft) by default, or change logic based on button
-            // If you have a separate Submit button, handle appropriately.
-            // Assuming this endpoint is for Save/Submit:
-
-            // NOTE: Check if you want to submit immediately or draft. 
-            // For now, let's say "Create" button = Draft (isSubmit: false)
-            // If you have logic to check button clicked, pass it here.
-
-            await _service.CreateAsync(input,  isSubmit: false);
+            // ส่ง flag isSubmit = false ไปให้ Service
+            var result = await _service.CreateAsync(input, isSubmit: false);
+            return Ok(new { success = true, id = result.Id, docNo = result.Code });
+        }
+        [HttpPost("Submit")]
+        public async Task<IActionResult> Submit([FromForm] CreatePurchaseRequestDto input)
+        {
+         
+            await _service.CreateAsync(input,  isSubmit: true);
             return Ok(new { success = true });
         }
 

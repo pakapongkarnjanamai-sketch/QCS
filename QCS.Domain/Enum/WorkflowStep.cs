@@ -10,7 +10,7 @@ namespace QCS.Domain.Enum
     public enum WorkflowStep
     {
         // สถานะเริ่มต้น (ยังไม่ส่ง Workflow)
-        [Display(Name = "Draft")]
+        [Display(Name = "บันทึก")]
         Draft = 0,
 
         // ขั้นตอนตาม Workflow Route (ID ต้องตรงกับ Database Workflow)
