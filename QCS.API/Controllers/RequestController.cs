@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace QCS.API.Controllers
 {
@@ -14,22 +17,40 @@ namespace QCS.API.Controllers
     {
         private readonly IRequestService _service;
 
-        // ✅ Inject Service เข้ามาแทน DbContext และ WorkflowService
         public RequestController(IRequestService service)
         {
             _service = service;
         }
-        // เพิ่มใน RequestController
-        [HttpGet("DetailByCode/{code}")]
-        public async Task<IActionResult> GetRequestDetailByCode(string code)
+
+        // ==========================================================
+        // ⚡ DATA GRID ENDPOINTS
+        // ==========================================================
+
+        [HttpGet("GetMyRequests")]
+        public object GetMyRequests(DataSourceLoadOptions loadOptions)
         {
-            var result = await _service.GetByCodeAsync(code);
-            if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
-            return Ok(result);
+            var query = _service.GetMyRequestsQuery();
+            return DataSourceLoader.Load(query, loadOptions);
         }
+
+        [HttpGet("GetMyTasks")]
+        public async Task<object> GetMyTasks(DataSourceLoadOptions loadOptions)
+        {
+            var query = await _service.GetMyTasksQueryAsync();
+            return DataSourceLoader.Load(query, loadOptions);
+        }
+
+        [HttpGet("ApprovedList")]
+        public object GetApprovedList(DataSourceLoadOptions loadOptions)
+        {
+            var query = _service.GetApprovedListQuery();
+            return DataSourceLoader.Load(query, loadOptions);
+        }
+
         // ==========================================================
-        // 🔍 GET DETAIL
+        // 📥 Detail & Actions
         // ==========================================================
+
         [HttpGet("Detail/{id}")]
         public async Task<IActionResult> GetRequestDetail(int id)
         {
@@ -38,58 +59,44 @@ namespace QCS.API.Controllers
             return Ok(result);
         }
 
-        // ==========================================================
-        // 📋 LISTS (Specialized Queries)
-        // ==========================================================
-        [HttpGet("MyRequests")]
-        public async Task<IActionResult> GetMyRequests()
+        [HttpGet("DetailByCode/{code}")]
+        public async Task<IActionResult> GetRequestDetailByCode(string code)
         {
-            var result = await _service.GetMyRequestsAsync();
+            var result = await _service.GetByCodeAsync(code);
+            if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
             return Ok(result);
         }
 
-        [HttpGet("PendingApprovals")]
-        public async Task<IActionResult> GetPendingApprovals()
+        [HttpPost("Create")]
+        public async Task<IActionResult> Create([FromForm] CreatePurchaseRequestDto input)
         {
-            var result = await _service.GetPendingApprovalsAsync();
-            return Ok(result);
+            // Pass 'false' for isSubmit (Draft) by default, or change logic based on button
+            // If you have a separate Submit button, handle appropriately.
+            // Assuming this endpoint is for Save/Submit:
+
+            // NOTE: Check if you want to submit immediately or draft. 
+            // For now, let's say "Create" button = Draft (isSubmit: false)
+            // If you have logic to check button clicked, pass it here.
+
+            await _service.CreateAsync(input,  isSubmit: false);
+            return Ok(new { success = true });
         }
 
-        [HttpGet("ApprovedList")]
-        public async Task<IActionResult> GetApprovedList()
+        [HttpPost("SubmitCreate")] // Optional: Endpoint for "Save & Submit"
+        public async Task<IActionResult> SubmitCreate([FromForm] CreatePurchaseRequestDto input)
         {
-            var result = await _service.GetApprovedListAsync();
-            return Ok(result);
+            await _service.CreateAsync(input,  isSubmit: true);
+            return Ok(new { success = true });
         }
 
-        // ==========================================================
-        // 💾 ACTIONS (Create / Update / Submit)
-        // ==========================================================
-
-        [HttpPost("Save")] // บันทึกเป็น Draft
-        public async Task<IActionResult> Save([FromForm] CreatePurchaseRequestDto input)
-        {
-            // ส่ง flag isSubmit = false ไปให้ Service
-            var result = await _service.CreateAsync(input, isSubmit: false);
-            return Ok(new { success = true, id = result.Id, docNo = result.Code });
-        }
-
-        [HttpPost("Submit")] // บันทึกและส่งอนุมัติทันที
-        public async Task<IActionResult> Submit([FromForm] CreatePurchaseRequestDto input)
-        {
-            // ส่ง flag isSubmit = true ไปให้ Service
-            var result = await _service.CreateAsync(input, isSubmit: true);
-            return Ok(new { success = true, id = result.Id, docNo = result.Code });
-        }
-
-        [HttpPost("Update")] // แก้ไข Draft
+        [HttpPost("Update")]
         public async Task<IActionResult> Update([FromForm] UpdatePurchaseRequestDto input)
         {
             await _service.UpdateAsync(input, isSubmit: false);
             return Ok(new { success = true });
         }
 
-        [HttpPost("SubmitUpdate")] // แก้ไขและส่งอนุมัติใหม่
+        [HttpPost("SubmitUpdate")]
         public async Task<IActionResult> SubmitUpdate([FromForm] UpdatePurchaseRequestDto input)
         {
             await _service.UpdateAsync(input, isSubmit: true);
@@ -103,19 +110,14 @@ namespace QCS.API.Controllers
             return Ok(new { message = "Deleted successfully" });
         }
 
-        // ==========================================================
-        // 📥 FILE HANDLING
-        // ==========================================================
         [HttpGet("ViewFile/{id}")]
         public async Task<IActionResult> ViewFile(int id)
         {
-            // ให้ Service ไปหาไฟล์มา (ไม่ว่าจะจาก DB หรือ Disk) แล้วคืนเป็น Model กลาง
             var fileDto = await _service.GetAttachmentAsync(id);
 
             if (fileDto == null || fileDto.Data == null)
                 return NotFound("File content missing");
 
-            // Controller มีหน้าที่แค่ Return FileResult
             return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
         }
     }
