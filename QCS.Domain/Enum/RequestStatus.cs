@@ -29,27 +29,7 @@ namespace QCS.Domain.Enum
         Cancelled = 99
     }
 
-    /// <summary>
-    /// สถานะของแต่ละขั้นตอนการอนุมัติ (Approval Step)
-    /// </summary>
-    public enum approvalStatus
-    {
-        [Display(Name = "ยังมาไม่ถึงขั้นตอนนี้")]
-        [Description("ยังมาไม่ถึงขั้นตอนนี้")]
-        Next = 0,
-        [Display(Name = "รอพิจารณา")]
-        [Description("รอพิจารณา")]
-        InReview = 1,
-        [Display(Name = "อนุมัติผ่าน")]
-        [Description("อนุมัติผ่าน")]
-        Approved = 2,
-        [Display(Name = "ข้าม")]
-        [Description("ข้าม")]
-        Skipped = 3,
-        [Display(Name = "ไม่อนุมัติ")]
-        [Description("ไม่อนุมัติ")]
-        Rejected = 9
-    }
+  
 
     /// <summary>
     /// Extension methods สำหรับ Enum Status ต่างๆ
