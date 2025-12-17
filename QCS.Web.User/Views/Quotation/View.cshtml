@@ -476,7 +476,7 @@
 
                     // [REF_ENUM] ชื่อสถานะใน Timeline
                     const stepStatusText = (typeof SystemEnums !== 'undefined')
-                        ? SystemEnums.getDisplayName('requestStatus', step.status)
+                        ? SystemEnums.getDisplayName('approvalStatus', step.status)
                         : "Waiting";
 
                     const approver = step.approverName || "System/Waiting";

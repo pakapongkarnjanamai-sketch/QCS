@@ -409,9 +409,7 @@
                     const container = $("<div>").addClass("d-flex align-items-center gap-2");
                     if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
                     container.append($("<span>").text(itemData.title));
-                    if (itemData.badge > 0) {
-                        container.append($("<span>").addClass("badge bg-danger rounded-pill ms-2").text(itemData.badge));
-                    }
+                
                     return container;
                 }
             });
