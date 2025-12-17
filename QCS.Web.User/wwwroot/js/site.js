@@ -62,3 +62,64 @@ function formatDate(date) {
 
     return `${year}${month}${day}_${hours}${minutes}${seconds}`;
 }
+function getStatusInfo(status, stepId) {
+    // 2.1 Determine Color Class (UI Logic)
+    let cls = "bg-secondary-soft"; // Default / Draft
+
+    if (status === 1) cls = "bg-warning-soft";
+    else if (status === 2) cls = "bg-success-soft";
+    else if (status === 3) cls = "bg-info-soft";
+    else if (status === 9 || status === 99) cls = "bg-danger-soft";
+
+    // Special case for "Waiting Verify" (ถ้าต้องการแยกสี)
+    if (status === 1 && stepId === 2) {
+        cls = "bg-info-soft";
+    }
+
+    // 2.2 Determine Text (Data Logic - Single Source of Truth)
+    // ใช้ SystemEnums ที่โหลดมาจาก site.js
+    let text = "Status " + status;
+    if (typeof SystemEnums !== 'undefined') {
+        text = SystemEnums.getDisplayName('requestStatus', status);
+    }
+
+    // คืนค่ารูปแบบเดียวกันกับที่หน้าอื่นใช้
+    return { text: text, cls: "status-badge " + cls };
+}
+
+// ประกาศตัวแปร Global สำหรับเก็บ Enum
+var SystemEnums = {
+    requestStatus: [],
+    workflowStep: [],
+    documentType: [],
+
+    // ฟังก์ชันสำหรับดึงชื่อภาษาไทยโดยใช้ ID (เอาไว้ใช้ตอนแสดงผลนอก Grid)
+    getDisplayName: function (enumName, id) {
+        if (!this[enumName]) return id;
+        var found = this[enumName].find(function (item) { return item.id == id; });
+        return found ? found.displayName : id;
+    }
+};
+
+// ฟังก์ชันดึงข้อมูลจาก API (ควรเรียกใน _Layout หรือส่วนต้นของหน้าเว็บ)
+function initSystemEnums() {
+    $.ajax({
+        url: API_BASE + "/Enum/all", // ตรวจสอบ URL API ของคุณให้ถูกต้อง
+        method: "GET",
+        xhrFields: { withCredentials: true },
+        async: false, // จำเป็นต้องรอให้โหลดเสร็จก่อน render หน้าเว็บ (เพื่อป้องกัน dropdown ว่าง)
+        success: function (data) {
+            SystemEnums.requestStatus = data.requestStatus;
+            SystemEnums.workflowStep = data.workflowStep;
+            SystemEnums.documentType = data.documentType;
+            SystemEnums.approvalStatus = data.approvalStatus;
+            console.log("System Enums Loaded:", SystemEnums);
+        },
+        error: function (err) {
+            console.error("Failed to load Enums", err);
+        }
+    });
+}
+
+// เรียกทำงานทันทีเมื่อไฟล์โหลด (หรือจะไปเรียกใน $(document).ready() ของ Layout ก็ได้)
+initSystemEnums();

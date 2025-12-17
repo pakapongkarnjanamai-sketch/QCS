@@ -22,14 +22,12 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* [สำคัญ] ใช้เป็นจุดอ้างอิงพิกัดให้กับปุ่ม Speed Dial */
             position: relative;
         }
 
         /* --- Grid Wrapper --- */
         .grid-wrapper {
             flex: 1;
-      
             display: flex;
             flex-direction: column;
             min-height: 0;
@@ -49,23 +47,43 @@
                 text-decoration: underline;
             }
 
-        /* --- Custom Status Badges (Specific to this page) --- */
-        /* Note: Global badges are available in _DevExtremeLayout,
-                   but we keep specific logic here for 'Approved' vs 'Completed' */
-      
-        .st-completed {
-            background-color: #d1e7dd;
-            color: #0f5132; /* Green for Approved */
-        }
-
-        .st-verify {
-            background-color: #17a2b8; /* Blue for Process Completed */
-            color: #0f5132;
-        }
-
         /* --- Headers --- */
         .text-header {
             color: #2c3e50;
+        }
+
+        /* --- Badges (Standardized) --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* ใช้ชุดสีมาตรฐานเดียวกับหน้าอื่นๆ */
+        .bg-success-soft {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .bg-warning-soft {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .bg-danger-soft {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .bg-secondary-soft {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .bg-info-soft {
+            background: #cff4fc;
+            color: #055160;
         }
     </style>
 }
@@ -91,10 +109,27 @@
         $(function () {
             const DETAIL_URL = '@Url.Action("View", "Quotation")';
 
+            // [REF_ENUM] Helper function (เหมือนกับหน้า Code.cshtml)
+            const getStatusBadgeInfo = (status) => {
+                let badgeClass = "bg-secondary-soft";
+
+                if (status === 1) badgeClass = "bg-warning-soft";
+                else if (status === 2) badgeClass = "bg-success-soft"; // Approved
+                else if (status === 3) badgeClass = "bg-info-soft";    // Completed (ใช้สีฟ้าอ่อนเพื่อแยกความต่าง)
+                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft";
+
+                // ดึงชื่อจาก SystemEnums (Single Source of Truth)
+                const text = (typeof SystemEnums !== 'undefined')
+                    ? SystemEnums.getDisplayName('requestStatus', status)
+                    : "Status " + status;
+
+                return { cls: badgeClass, txt: text };
+            };
+
             $("#gridContainer").dxDataGrid({
                 dataSource: DevExpress.data.AspNet.createStore({
                     key: "id",
-                    loadUrl: `${API_BASE}/Request/ApprovedList`,
+                    loadUrl: `${API_BASE}/Request/ApprovedList`, // ตรวจสอบว่า Endpoint นี้คืนค่ามาถูกต้อง
                     onBeforeSend: function (method, ajaxOptions) {
                         ajaxOptions.xhrFields = { withCredentials: true };
                     }
@@ -136,30 +171,24 @@
                         dataField: "requestDate",
                         caption: "วันที่ขอ",
                         dataType: "date",
-                        format: "yyyy-MM-dd", /* Updated Format */
+                        format: "yyyy-MM-dd",
                         width: 120,
                         alignment: "center"
                     },
                     {
                         dataField: "status",
                         caption: "สถานะ",
-                        width: 140,
+                        width: 150,
                         alignment: "center",
                         allowSorting: false,
                         allowFiltering: false,
                         cellTemplate: function (container, options) {
-                            let text = "Approved";
-                            let cls = "st-completed";
-
-                            // Status 3 = Process Completed
-                            if (options.value == 3) {
-                                text = "จบกระบวนการ";
-                                cls = "st-verify";
-                            }
+                            // [REF_ENUM] ใช้ Helper ดึงข้อมูลมาแสดงผล
+                            const info = getStatusBadgeInfo(options.value);
 
                             $("<span>")
-                                .addClass("status-badge " + cls)
-                                .text(text)
+                                .addClass("status-badge " + info.cls)
+                                .text(info.txt)
                                 .appendTo(container);
                         }
                     },

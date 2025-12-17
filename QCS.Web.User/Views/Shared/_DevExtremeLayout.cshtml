@@ -21,7 +21,7 @@
     <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
     <script src="~/src/devextreme-license.js"></script>
 
-    <script src="~/js/site.js"></script>
+  
     <script src="~/lib/font-awesome/js/all.min.js"></script>
 
     <environment names="Development">
@@ -30,7 +30,7 @@
     <environment names="Staging,Production">
         <script src="~/host/production.js"></script>
     </environment>
-
+    <script src="~/js/site.js"></script>
     <style>
         /* === GLOBAL THEME (Based on Code.cshtml) === */
         body {
@@ -192,20 +192,8 @@
             });
         });
 
-        // 2. Global Helper Functions
-        function getStatusInfo(status, stepId) {
-            if (status === 0) return { text: "Saved (Draft)", cls: "status-draft" };
-            if (status === 9) return { text: "Rejected", cls: "status-rejected" };
-            if (status === 99) return { text: "Cancelled", cls: "status-cancelled" };
-            if (status === 2) return { text: "Approved", cls: "status-approved" };
-            if (status === 3) return { text: "Completed", cls: "status-completed" };
-            if (status === 1) {
-                if (stepId === 2) return { text: "Waiting Verify", cls: "status-verify" };
-                if (stepId === 3) return { text: "Waiting Approval", cls: "status-pending" };
-                return { text: "In Progress", cls: "status-pending" };
-            }
-            return { text: "Unknown", cls: "status-draft" };
-        }
+       
+     
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

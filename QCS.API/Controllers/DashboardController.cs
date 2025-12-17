@@ -40,14 +40,14 @@ namespace QCS.API.Controllers
 
                 // .Where(r => r.CreatedBy == nId); // Uncomment เมื่อมี field CreatedBy
 
-                var totalCreated = await myRequestsQuery.CountAsync();
+                var totalCreated = await myRequestsQuery.Where(r => r.CreatedBy == nId).CountAsync();
 
                 // รออนุมัติ
                 var totalPending = await Query.CountAsync(r => r.Status == (int)RequestStatus.Pending);
 
                 // [Modified] อนุมัติ/เสร็จสิ้น (ไม่นับ Rejected ตาม Requirement)
                 // นับสถานะ Approved (2) และ Completed (3)
-                var totalApproved = await Query.CountAsync(r => r.Status == (int)RequestStatus.Approved || r.Status == (int)RequestStatus.Completed);
+                var totalApproved = await Query.CountAsync(r => r.CreatedBy == nId && r.Status == (int)RequestStatus.Approved);
 
                 // 2. My Tasks Stats (งานที่รอฉันอนุมัติ)
                 var myTaskCount = 0;

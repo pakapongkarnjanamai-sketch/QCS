@@ -14,7 +14,7 @@
             padding: 25px;
             border: none;
             margin-bottom: 20px;
-            min-width:1200px;
+            min-width: 1200px;
         }
 
         .section-header {
@@ -59,7 +59,7 @@
             background-color: #f0f9ff !important; /* Soft Blue */
         }
 
-   
+
         .unauthorized-overlay {
             opacity: 0.6;
             pointer-events: none;
@@ -72,6 +72,34 @@
 
         .text-highlight {
             color: #2190F7;
+        }
+
+        /* Status Badge Colors */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-draft {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 }
@@ -145,12 +173,11 @@
                 VENDOR_API_URL: "/Vendor"
             };
 
-            const documentTypes = [
-                { id: 10, name: 'ใบเสนอราคาหลัก (Main Quotation)' },
-                { id: 20, name: 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' },
-                { id: 30, name: 'รายละเอียดสเปค (Specifications)' },
-                { id: 40, name: 'เงื่อนไข (Terms & Conditions)' }
-            ];
+            // [REF_ENUM] ใช้ข้อมูลจาก SystemEnums (Global Variable) แทนการ Hardcode
+            // ตรวจสอบว่ามีข้อมูลหรือไม่ ถ้าไม่มีให้ใช้ค่า Default ว่างๆ ป้องกัน Error
+            const docTypesSource = (typeof SystemEnums !== 'undefined' && SystemEnums.documentType)
+                                    ? SystemEnums.documentType
+                                    : [];
 
             // Local State
             let fileList = [];          // Files to upload
@@ -178,15 +205,22 @@
                 if (!dateStr) return "-";
                 const d = new Date(dateStr);
                 const pad = (n) => n.toString().padStart(2, '0');
-                // Format: yyyy-MM-dd HH:mm
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             };
 
             const getStatusBadge = (status) => {
-                let cls = "status-draft", txt = "Waiting";
-                if (status === 1) { cls = "status-pending"; txt = "Pending"; }
-                else if (status === 2) { cls = "status-approved"; txt = "Approved"; }
-                else if (status === 9) { cls = "status-rejected"; txt = "Rejected"; }
+                let cls = "status-draft";
+
+                // [REF_ENUM] กำหนดสีตาม ID (Logic นี้ยังคงไว้ที่ Frontend ได้เพราะเป็นเรื่อง UI)
+                if (status === 1) cls = "status-pending";
+                else if (status === 2) cls = "status-approved";
+                else if (status === 3 || status === 9) cls = "status-rejected";
+
+                // [REF_ENUM] ดึงชื่อภาษาไทยจาก Enum Controller (Single Source of Truth)
+                let txt = (typeof SystemEnums !== 'undefined')
+                          ? SystemEnums.getDisplayName('approvalStatus', status)
+                          : "Status " + status;
+
                 return { cls, txt };
             };
 
@@ -213,7 +247,6 @@
                         location: 'after', widget: 'dxButton',
                         options: { text: 'กลับ (Back)', stylingMode: 'outlined', icon: 'arrowleft', onClick: () => window.location.href = '@Url.Action("Index", "Home")' }
                     },
-                    // Action Buttons (Hidden by default, shown based on permission)
                     {
                         location: 'after', widget: 'dxButton', visible: false,
                         options: { elementAttr: { id: "btnSave" }, text: 'บันทึก (Save Draft)', icon: 'save', type: 'default', stylingMode: 'outlined', onClick: () => handleSaveOrSubmit(false) }
@@ -246,19 +279,19 @@
                                 {
                                     dataField: "vendorId", label: { text: "ผู้ขาย (Vendor)" }, colSpan: 1,
                                     editorType: "dxSelectBox",
-                                    editorOptions: { dataSource: vendorStore, valueExpr: "Id", displayExpr: "Name", searchEnabled: true, placeholder: "เลือก Vendor..." },
+                                    editorOptions: { dataSource: vendorStore, valueExpr: "id", displayExpr: "name", searchEnabled: true, placeholder: "เลือก Vendor..." },
                                     validationRules: [{ type: "required" }]
                                 },
                                 {
                                     dataField: "validFrom", label: { text: "วันที่เริ่ม (Valid From)" },
                                     editorType: "dxDateBox",
-                                    editorOptions: { displayFormat: "yyyy-MM-dd" }, // <--- Date Format Adjusted
+                                    editorOptions: { displayFormat: "yyyy-MM-dd" },
                                     validationRules: [{ type: "required" }]
                                 },
                                 {
                                     dataField: "validUntil", label: { text: "ถึงวันที่ (Valid Until)" },
                                     editorType: "dxDateBox",
-                                    editorOptions: { displayFormat: "yyyy-MM-dd" }, // <--- Date Format Adjusted
+                                    editorOptions: { displayFormat: "yyyy-MM-dd" },
                                     validationRules: [{ type: "required" }]
                                 },
                                 { dataField: "remark", label: { text: "หมายเหตุ (Remark)" }, editorType: "dxTextArea", editorOptions: { height: 80 }, colSpan: 2 }
@@ -303,7 +336,6 @@
                     if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
                     const data = await response.json();
 
-                    // Pre-load Vendor if missing
                     if ((!data.vendorId || data.vendorId === 0) && data.vendorName) {
                         try {
                             const vendors = await vendorStore.load({ filter: ["Name", "=", data.vendorName] });
@@ -318,7 +350,6 @@
                     formInstance.option("formData", data);
                     formInstance.option("readOnly", !canEdit);
 
-                    // Update Attachment Grid
                     if (attachmentGridInstance) {
                         const files = data.quotations || [];
                         attachmentGridInstance.option("dataSource", files);
@@ -350,7 +381,6 @@
 
                     renderWorkflowRouteGrid(data.workflowRoute, data.currentStepId);
 
-                    // Update Toolbar Buttons
                     const items = toolbarInstance.option("items");
                     const setBtn = (id, v) => { const idx = items.findIndex(i => i.options?.elementAttr?.id === id); if (idx >= 0) items[idx].visible = v; };
                     setBtn("btnSave", canEdit);
@@ -391,7 +421,6 @@
                             if (currentData.some(row => (row.originalFileName || row.fileName) === f.name)) { DevExpress.ui.notify(`ไฟล์ ${f.name} มีอยู่แล้ว`, "warning", 2000); return; }
 
                             fileList.push(f);
-                            // Negative ID for temp files
                             filesToAdd.push({
                                 id: -1 * (new Date().getTime() + Math.floor(Math.random() * 1000)),
                                 originalFileName: f.name, fileName: f.name, isNew: true, fileSize: f.size, documentTypeId: 10
@@ -421,8 +450,13 @@
                             }
                         },
                         {
+                            // [REF_ENUM] ใช้ Lookup จาก SystemEnums
                             dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250,
-                            lookup: { dataSource: documentTypes, valueExpr: "id", displayExpr: "name" },
+                            lookup: {
+                                dataSource: docTypesSource,
+                                valueExpr: "id",
+                                displayExpr: "displayName" // ใช้ displayName ที่เป็นภาษาไทยจาก Backend
+                            },
                             validationRules: [{ type: "required" }]
                         },
                         {
@@ -464,39 +498,30 @@
             // 6. ACTIONS (Save, Submit, Approve, Reject)
             // ==========================================
             async function handleSaveOrSubmit(isSubmit) {
-                // 1. ตรวจสอบ Form หลัก
                 if (!formInstance.validate().isValid) {
                     DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000);
                     return;
                 }
 
-                // ดึงข้อมูลไฟล์จาก Grid
                 const ds = attachmentGridInstance.option("dataSource") || [];
 
-                // 2. ตรวจสอบว่ามีไฟล์แนบหรือไม่
                 if (ds.length === 0) {
                     DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารประกอบ", "error", 3000);
                     return;
                 }
 
-                // --- ส่วนที่แก้ไข: เพิ่มเงื่อนไขตรวจสอบประเภทไฟล์ ---
-
-                // เช็คว่ามี "ใบเสนอราคาหลัก (10)" หรือยัง
                 const hasMainQuotation = ds.some(f => f.documentTypeId === 10);
                 if (!hasMainQuotation) {
                     DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000);
                     return;
                 }
 
-                // เช็คว่ามี "ใบเสนอราคาคู่เทียบ (20)" หรือยัง
                 const hasComparativeQuotation = ds.some(f => f.documentTypeId === 20);
                 if (!hasComparativeQuotation) {
                     DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000);
                     return;
                 }
-                // ------------------------------------------------
 
-                // ถ้าผ่านเงื่อนไขทั้งหมด ให้ดำเนินการต่อ
                 if (isSubmit) openActionPopup('Submit');
                 else executeSaveOrSubmit(false, null);
             }
@@ -548,98 +573,84 @@
                 });
             }
 
-        async function executeSaveOrSubmit(isSubmit, comment) {
-                  loadingIndicator.show();
-                  try {
-                      const formData = new FormData();
-                      const data = formInstance.option("formData");
+            async function executeSaveOrSubmit(isSubmit, comment) {
+                loadingIndicator.show();
+                try {
+                    const formData = new FormData();
+                    const data = formInstance.option("formData");
 
-                      // --- ส่วนข้อมูล Header ---
-                      if (MODE === "EDIT") formData.append("Id", PR_ID);
-                      formData.append("Title", data.title);
+                    if (MODE === "EDIT") formData.append("Id", PR_ID);
+                    formData.append("Title", data.title);
 
-                      const vendorEditor = formInstance.getEditor("vendorId");
-                      formData.append("VendorId", vendorEditor.option("value"));
-                      formData.append("VendorName", vendorEditor.option("displayValue") || "");
+                    const vendorEditor = formInstance.getEditor("vendorId");
+                    formData.append("VendorId", vendorEditor.option("value"));
+                    formData.append("VendorName", vendorEditor.option("displayValue") || "");
 
-                      if (data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
-                      if (data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
+                    if (data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
+                    if (data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
 
-                      // --- [จุดที่แก้ไข] แยก Remark และ Comment ---
+                    formData.append("Remark", data.remark || "");
 
-                      // 1. Remark: หมายเหตุของตัวเอกสาร (เอามาจาก Form เสมอ)
-                      formData.append("Remark", data.remark || "");
+                    if (isSubmit && comment) {
+                        formData.append("Comment", comment);
+                    }
 
-                      // 2. Comment: ความเห็นตอนอนุมัติ/ส่งงาน (เอามาจาก Popup เฉพาะตอน Submit)
-                      if (isSubmit && comment) {
-                          formData.append("Comment", comment);
-                      }
-                      // -------------------------------------------
+                    const gridFiles = attachmentGridInstance.option("dataSource") || [];
+                    const newFilesMeta = [];
+                    const existingUpdates = [];
 
-                      // --- ส่วนจัดการไฟล์แนบ (Files & Metadata) ---
-                      const gridFiles = attachmentGridInstance.option("dataSource") || [];
-                      const newFilesMeta = [];
-                      const existingUpdates = [];
+                    gridFiles.forEach(f => {
+                        if (f.isNew) {
+                            newFilesMeta.push({
+                                FileName: f.fileName || f.originalFileName,
+                                DocumentTypeId: f.documentTypeId
+                            });
+                        } else if (f.id) {
+                            existingUpdates.push({
+                                Id: f.id,
+                                DocumentTypeId: f.documentTypeId
+                            });
+                        }
+                    });
 
-                      gridFiles.forEach(f => {
-                          if (f.isNew) {
-                              // ไฟล์ใหม่: เก็บ Metadata รอจับคู่กับไฟล์ Binary
-                              newFilesMeta.push({
-                                  FileName: f.fileName || f.originalFileName,
-                                  DocumentTypeId: f.documentTypeId
-                              });
-                          } else if (f.id) {
-                              // ไฟล์เก่า: เก็บ ID กับ Type เผื่อมีการแก้ไขประเภทเอกสาร
-                              existingUpdates.push({
-                                  Id: f.id,
-                                  DocumentTypeId: f.documentTypeId
-                              });
-                          }
-                      });
+                    formData.append("QuotationsJson", JSON.stringify(newFilesMeta));
 
-                      // ส่ง JSON String ของ Metadata
-                      formData.append("QuotationsJson", JSON.stringify(newFilesMeta));
+                    if (MODE === "EDIT") {
+                        formData.append("UpdatedQuotationsJson", JSON.stringify(existingUpdates));
+                        if (deletedFileIds.length > 0) {
+                            formData.append("DeletedFileIds", deletedFileIds.join(","));
+                        }
+                    }
 
-                      if (MODE === "EDIT") {
-                          formData.append("UpdatedQuotationsJson", JSON.stringify(existingUpdates));
-                          if (deletedFileIds.length > 0) {
-                              formData.append("DeletedFileIds", deletedFileIds.join(","));
-                          }
-                      }
+                    fileList.forEach(f => {
+                        formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f);
+                    });
 
-                      // แนบไฟล์ Binary (เฉพาะไฟล์ใหม่ที่อยู่ในตัวแปร fileList)
-                      fileList.forEach(f => {
-                          formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f);
-                      });
+                    let endpoint = "";
+                    if (MODE === "CREATE") {
+                        endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
+                    } else {
+                        endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
+                    }
 
-                      // --- กำหนด Endpoint ---
-                      let endpoint = "";
-                      if (MODE === "CREATE") {
-                          endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
-                      } else {
-                          endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
-                      }
+                    const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
 
-                      // --- ยิง Request ---
-                      const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
-                          method: 'POST',
-                          body: formData,
-                          credentials: 'include'
-                      });
+                    if (!res.ok) throw new Error(await res.text());
 
-                      if (!res.ok) throw new Error(await res.text());
+                    DevExpress.ui.notify("บันทึกข้อมูลสำเร็จ", "success", 1500);
+                    setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 1000);
 
-                      // สำเร็จ -> กลับหน้า List
-                      DevExpress.ui.notify("บันทึกข้อมูลสำเร็จ", "success", 1500);
-                      setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 1000);
-
-                  } catch (err) {
-                      console.error("Execute Error:", err.message);
-                      DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);
-                  } finally {
-                      loadingIndicator.hide();
-                  }
-              }
+                } catch (err) {
+                    console.error("Execute Error:", err.message);
+                    DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);
+                } finally {
+                    loadingIndicator.hide();
+                }
+            }
 
             async function sendApprovalAction(action, comment) {
                 loadingIndicator.show();
@@ -687,7 +698,7 @@
                             }
                         },
                         {
-                            dataField: "status", caption: "สถานะ", width: 110, alignment: "center",
+                            dataField: "status", caption: "สถานะ", width: 130, alignment: "center",
                             cellTemplate: (c, o) => {
                                 const b = getStatusBadge(o.value);
                                 $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c);
@@ -703,7 +714,7 @@
                         },
                         {
                             dataField: "actionDate", caption: "วันที่", width: 140, alignment: "center",
-                            customizeText: (c) => formatDateTime(c.value) // <--- Date Format Adjusted (yyyy-MM-dd HH:mm)
+                            customizeText: (c) => formatDateTime(c.value)
                         },
                         { dataField: "comment", caption: "ความเห็น", customizeText: (c) => c.value || "-" }
                     ]
@@ -730,10 +741,10 @@
                                 },
                                 {
                                     dataField: "actionDate", caption: "Date", width: 140, alignment: "center",
-                                    customizeText: (info) => formatDateTime(info.value) // <--- Date Format Adjusted (yyyy-MM-dd HH:mm)
+                                    customizeText: (info) => formatDateTime(info.value)
                                 },
                                 {
-                                    dataField: "status", caption: "Status", width: 100,
+                                    dataField: "status", caption: "Status", width: 130,
                                     cellTemplate: (cnt, opt) => {
                                         const b = getStatusBadge(opt.value);
                                         $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(cnt);

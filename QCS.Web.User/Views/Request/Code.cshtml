@@ -244,38 +244,57 @@
 
         /* --- Badges --- */
         .status-badge {
-            padding: 3px 10px;
+            padding: 4px 10px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 700;
         }
 
-        .bg-success-soft { background: #d4edda; color: #155724; }
-        .bg-warning-soft { background: #fff3cd; color: #856404; }
-        .bg-danger-soft { background: #f8d7da; color: #721c24; }
-        .bg-secondary-soft { background: #e2e3e5; color: #383d41; }
+        /* Color classes updated to match standard */
+        .bg-success-soft {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .bg-warning-soft {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .bg-danger-soft {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .bg-secondary-soft {
+            background: #e2e3e5;
+            color: #383d41;
+        }
 
         /* Responsive */
         @@media (max-width: 1024px) {
-            .viewer-container {
-                grid-template-columns: 1fr;
-                height: auto;
-                overflow-y: auto;
-            }
+            .viewer-container
 
-            .pdf-section {
-                height: 500px;
-            }
+        {
+            grid-template-columns: 1fr;
+            height: auto;
+            overflow-y: auto;
+        }
 
-            .info-section {
-                height: auto;
-                overflow: visible;
-            }
-            /* Reset Scroll Wrapper on mobile */
-            .info-scroll-wrapper {
-                overflow: visible;
-                height: auto;
-            }
+        .pdf-section {
+            height: 500px;
+        }
+
+        .info-section {
+            height: auto;
+            overflow: visible;
+        }
+        /* Reset Scroll Wrapper on mobile */
+        .info-scroll-wrapper {
+            overflow: visible;
+            height: auto;
+        }
+
         }
     </style>
 }
@@ -354,9 +373,20 @@
                 APPROVE: `${API_BASE}/Approval/Approve`,
                 REJECT: `${API_BASE}/Approval/Reject`
             };
-            const MAPS = {
-                status: { 0: "Draft", 1: "Pending", 2: "Approved", 3: "Completed", 9: "Rejected", 99: "Rejected" },
-                docType: { 10: "Quotation", 20: "Technical Spec", 30: "Other" }
+
+            // [REF_ENUM] ลบ MAPS และสร้าง Helper สำหรับดึงสถานะและสี
+            const getStatusBadgeInfo = (status) => {
+                let badgeClass = "bg-secondary-soft"; // Draft or Default
+                if (status === 1) badgeClass = "bg-warning-soft"; // Pending
+                else if (status === 2 || status === 3) badgeClass = "bg-success-soft"; // Approved/Completed
+                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft"; // Rejected
+
+                // ดึงชื่อภาษาไทยจาก SystemEnums
+                const text = (typeof SystemEnums !== 'undefined')
+                    ? SystemEnums.getDisplayName('requestStatus', status)
+                    : "Status " + status;
+
+                return { cls: badgeClass, txt: text };
             };
 
             // Global State
@@ -446,7 +476,7 @@
 
                 if (canReject) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'Reject', icon: 'fas fa-times', type: 'danger', stylingMode: 'outlined',
+                        text: 'ไม่อนุมัติ (Reject)', icon: 'fas fa-times', type: 'danger', stylingMode: 'outlined',
                         width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Reject')
                     }).addClass("flex-grow-1");
@@ -454,7 +484,7 @@
 
                 if (canApprove) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'Approve', icon: 'fas fa-check', type: 'success', stylingMode: 'contained',
+                        text: 'อนุมัติ (Approve)', icon: 'fas fa-check', type: 'success', stylingMode: 'contained',
                         width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Approve')
                     }).addClass("flex-grow-1");
@@ -531,12 +561,8 @@
             // === RENDERING ===
             function renderHeader(data) {
                 const statusInt = typeof data.status === 'string' ? parseInt(data.status) : data.status;
-                const statusText = MAPS.status[statusInt] || "Unknown";
-                let badgeClass = "bg-secondary-soft";
-                if (statusInt === 1) badgeClass = "bg-warning-soft";
-                if (statusInt === 2 || statusInt === 3) badgeClass = "bg-success-soft";
-                if (statusInt === 9 || statusInt === 99) badgeClass = "bg-danger-soft";
-                $("#headerStatus").html(`<span class="status-badge ${badgeClass}">${statusText}</span>`);
+                const info = getStatusBadgeInfo(statusInt);
+                $("#headerStatus").html(`<span class="status-badge ${info.cls}">${info.txt}</span>`);
             }
 
             function renderForm(data) {
@@ -561,7 +587,11 @@
                     return;
                 }
                 docs.forEach(doc => {
-                    const typeName = MAPS.docType[doc.documentTypeId] || "Attachment";
+                    // [REF_ENUM] ใช้ SystemEnums ดึงชื่อประเภทเอกสาร
+                    const typeName = (typeof SystemEnums !== 'undefined')
+                        ? SystemEnums.getDisplayName('documentType', doc.documentTypeId)
+                        : "Type " + doc.documentTypeId;
+
                     const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
                     const displayFileName = doc.originalFileName || doc.fileName;
                     const item = $(`
@@ -594,7 +624,11 @@
                     else if (step.status === 9 || step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
-                    const stepStatus = MAPS.status[step.status] || "Waiting";
+                    // [REF_ENUM] ดึงชื่อสถานะจาก SystemEnums
+                    const stepStatus = (typeof SystemEnums !== 'undefined')
+                        ? SystemEnums.getDisplayName('approvalStatus', step.status)
+                        : "Waiting";
+
                     let approverDisplay = step.approverName;
                     if (!approverDisplay && step.assignments && step.assignments.length > 0) {
                          approverDisplay = step.assignments.map(a => a.employeeName).join(", ");

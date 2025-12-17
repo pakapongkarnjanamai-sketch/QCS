@@ -5,10 +5,10 @@ namespace QCS.Application.Services
 {
     public interface ICurrentUserService
     {
-        // คืนค่า User Id เช่น "4734" (ตัด Domain ออกแล้ว)
+        // คืนค่า User Id เช่น "N4734" (ตัด Domain ออกแล้ว)
         string UserId { get; }
 
-        // คืนค่าชื่อเต็มจาก AD เช่น "DOMAIN\4734" (เผื่อต้องใช้)
+        // คืนค่าชื่อเต็มจาก AD เช่น "DOMAIN\N4734" (เผื่อต้องใช้)
         string FullName { get; }
 
         // เช็คว่า User Login อยู่จริงไหม
@@ -33,7 +33,7 @@ namespace QCS.Application.Services
                 if (user?.Identity?.IsAuthenticated != true)
                     return "SYSTEM";
 
-                var fullName = user.Identity.Name; // ex: "NIKONOA\4734"
+                var fullName = user.Identity.Name; // ex: "NIKONOA\N4734"
                 if (string.IsNullOrEmpty(fullName))
                     return "SYSTEM";
 

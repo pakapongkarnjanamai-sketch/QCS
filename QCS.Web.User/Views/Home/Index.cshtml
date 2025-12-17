@@ -33,7 +33,6 @@
             min-height: 0;
         }
 
-            /* Force DevExtreme containers to fill height */
             #tabPanel .dx-tabpanel-container,
             #tabPanel .dx-multiview-wrapper,
             #tabPanel .dx-multiview-item-container,
@@ -82,7 +81,6 @@
             padding: 5px;
         }
 
-            /* Force DataGrid to fill wrapper */
             .grid-wrapper .dx-datagrid {
                 height: 100%;
             }
@@ -104,6 +102,38 @@
             color: #2c3e50;
         }
 
+        /* --- Badges (Standardized) --- */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .bg-success-soft {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .bg-warning-soft {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .bg-danger-soft {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .bg-secondary-soft {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .bg-info-soft {
+            background: #cff4fc;
+            color: #055160;
+        }
 
     </style>
 }
@@ -115,7 +145,7 @@
             <h6 class="m-0 fw-bold text-header">
                 <i class="fas fa-clipboard-list text-primary me-2"></i> @ViewData["Title"]
             </h6>
-            
+
             <button id="btnCreateHeader" class="btn btn-primary btn-sm px-3 shadow-sm">
                 <i class="fas fa-plus me-1"></i> สร้างใบเสนอราคาใหม่
             </button>
@@ -140,8 +170,25 @@
         $(function () {
             // === CONFIG ===
             const FORM_URL = '@Url.Action("Form", "Request")';
-            // URL สำหรับหน้า Code
             const CODE_URL = '@Url.Action("Code", "Request")';
+
+            // === HELPER FUNCTION (Standardized Status) ===
+            // [REF_ENUM] ใช้ Logic เดียวกันกับหน้าอื่นๆ เพื่อความสม่ำเสมอ
+            const getStatusBadgeInfo = (status) => {
+                let badgeClass = "bg-secondary-soft"; // Draft (0)
+
+                if (status === 1) badgeClass = "bg-warning-soft"; // Pending
+                else if (status === 2) badgeClass = "bg-success-soft"; // Approved
+                else if (status === 3) badgeClass = "bg-info-soft";    // Completed
+                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft"; // Rejected
+
+                // ดึงชื่อภาษาไทยจาก SystemEnums (Single Source of Truth)
+                const text = (typeof SystemEnums !== 'undefined')
+                    ? SystemEnums.getDisplayName('requestStatus', status)
+                    : "Status " + status;
+
+                return { cls: badgeClass, txt: text };
+            };
 
             // === BUTTON EVENTS ===
             $("#btnCreateHeader").on("click", function() {
@@ -199,6 +246,7 @@
 
                 if (tabs.length === 0 && requestCount === 0) {
                     $("#emptyState").removeClass("d-none");
+                    $("#tabPanel").hide(); // ซ่อน Tab ถ้าไม่มีข้อมูล
                     return;
                 }
 
@@ -210,6 +258,7 @@
                         const container = $("<div>").addClass("d-flex align-items-center gap-2");
                         if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
                         container.append($("<span>").text(itemData.title));
+                  
                         return container;
                     },
                     onContentReady: function(e) {
@@ -254,15 +303,9 @@
                     allowFiltering: false,
                     allowSearch: false,
                     cellTemplate: (container, options) => {
-                        let info = { cls: "status-draft", text: options.value };
-                        if(typeof getStatusInfo === 'function') {
-                             info = getStatusInfo(options.value, options.data.currentStepId);
-                        } else {
-                             if(options.value === 1) info = { cls: "status-pending", text: "Pending" };
-                             else if(options.value === 2) info = { cls: "status-approved", text: "Approved" };
-                             else if(options.value === 9) info = { cls: "status-rejected", text: "Rejected" };
-                        }
-                        $("<span>").addClass("status-badge " + info.cls).text(info.text).appendTo(container);
+                        // [REF_ENUM] เรียกใช้ Helper Function
+                        const info = getStatusBadgeInfo(options.value);
+                        $("<span>").addClass("status-badge " + info.cls).text(info.txt).appendTo(container);
                     }
                 },
                 {
@@ -297,7 +340,7 @@
             }
 
             function renderMyTasksGrid() {
-                // 1. Column Code: เพิ่ม target="_blank"
+                // 1. Column Code: Link ไปหน้า Code และเปิดแท็บใหม่
                 const taskCodeColumn = {
                     dataField: "code",
                     caption: "เลขที่เอกสาร",
@@ -308,29 +351,29 @@
                             .addClass("doc-link")
                             .text(docNo)
                             .attr("href", `${CODE_URL}/${docNo}`)
-                            .attr("target", "_blank") // <--- เปิดแท็บใหม่
+                            .attr("target", "_blank")
                             .appendTo(container);
                     }
                 };
 
-                // 2. Column Button: ใช้ window.open(url, '_blank')
+                // 2. Column Button: เปิดแท็บใหม่
                 const taskButtonColumn = {
                     type: "buttons",
                     width: 70,
                     buttons: [{
                         hint: "เปิดดู",
                         icon: "arrowright",
-                        onClick: (e) => window.open(`${CODE_URL}/${e.row.data.code}`, "_blank") // <--- เปิดแท็บใหม่
+                        onClick: (e) => window.open(`${CODE_URL}/${e.row.data.code}`, "_blank")
                     }]
                 };
 
                 const taskColumns = [
                     taskCodeColumn,
-                    baseColumns[1],
+                    baseColumns[1], // Title
                     { dataField: "requesterName", caption: "ผู้ขอซื้อ (Requester)", width: 180 },
-                    baseColumns[2],
-                    baseColumns[3],
-                    baseColumns[4],
+                    baseColumns[2], // Vendor
+                    baseColumns[3], // Date
+                    baseColumns[4], // Status (ใช้ตัวเดิมเพราะ Logic เหมือนกัน)
                     taskButtonColumn
                 ];
 

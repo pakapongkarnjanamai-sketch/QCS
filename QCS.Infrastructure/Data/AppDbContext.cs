@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-
-
+using QCS.Application.Services;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Services;
 using System.Collections.Generic;
@@ -13,12 +12,14 @@ namespace QCS.Infrastructure.Data
     {
         private readonly IDateTime _dateTime;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICurrentUserService _currentUserService;
 
-        public AppDbContext(DbContextOptions<AppDbContext> options, IDateTime dateTime, IHttpContextAccessor httpContextAccessor)
+        public AppDbContext(DbContextOptions<AppDbContext> options, IDateTime dateTime, IHttpContextAccessor httpContextAccessor,ICurrentUserService currentUserService)
             : base(options)
         {
             _dateTime = dateTime;
             _httpContextAccessor = httpContextAccessor;
+            _currentUserService = currentUserService;
         }
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
         public DbSet<PurchaseRequest> PurchaseRequests { get; set; }
@@ -44,11 +45,11 @@ namespace QCS.Infrastructure.Data
                 {
                     case EntityState.Added:
                         entry.Entity.CreatedAt = _dateTime.Now;
-                        entry.Entity.CreatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+                        entry.Entity.CreatedBy = _currentUserService.UserId;
                         break;
                     case EntityState.Modified:
                         entry.Entity.UpdatedAt = _dateTime.Now;
-                        entry.Entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+                        entry.Entity.UpdatedBy = _currentUserService.UserId;
                         break;
                 }
             }
@@ -64,11 +65,11 @@ namespace QCS.Infrastructure.Data
                 {
                     case EntityState.Added:
                         entry.Entity.CreatedAt = _dateTime.Now;
-                        entry.Entity.CreatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+                        entry.Entity.CreatedBy = _currentUserService.UserId;
                         break;
                     case EntityState.Modified:
                         entry.Entity.UpdatedAt = _dateTime.Now;
-                        entry.Entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+                        entry.Entity.UpdatedBy = _currentUserService.UserId;
                         break;
                 }
             }

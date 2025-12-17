@@ -1,13 +1,14 @@
 ﻿
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using QCS.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
-
+using QCS.Infrastructure.Data;
+using System.Security.Cryptography;
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Hosting;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace QCS.Application.Services
 {
@@ -211,9 +212,9 @@ namespace QCS.Application.Services
         public async Task<IEnumerable<object>> GetMyRequestsAsync()
         {
             // TODO: ถ้ามี Field CreatedBy ให้ Uncomment
-            // var userId = _currentUserService.UserId;
+            var userId = _currentUserService.UserId;
             return await _context.PurchaseRequests
-                //.Where(r => r.CreatedBy == userId) 
+                .Where(r => r.CreatedBy == userId)
                 .Where(r => r.Status != (int)RequestStatus.Approved)
                 .OrderByDescending(r => r.RequestDate)
                 .Select(r => new
@@ -267,9 +268,9 @@ namespace QCS.Application.Services
 
         public async Task<IEnumerable<object>> GetApprovedListAsync()
         {
+            var userId = _currentUserService.UserId;
             return await _context.PurchaseRequests
-                .Where(r => r.Status == (int)RequestStatus.Approved ||
-                            r.Status == (int)RequestStatus.Completed)
+                .Where(r => r.CreatedBy == userId && r.Status == (int)RequestStatus.Approved)
                 .OrderByDescending(r => r.RequestDate)
                 .Select(r => new
                 {
