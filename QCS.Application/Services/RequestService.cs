@@ -12,26 +12,22 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace QCS.Application.Services
 {
-   
-        public interface IRequestService
-        {
-            // 1. ส่งเป็น IQueryable เพื่อให้ Controller เอาไปใส่ DataSourceLoader ได้
-            IQueryable<Request> GetMyRequestsQuery();
 
-            // 2. สำหรับงานที่ต้องอนุมัติ (Logic ซับซ้อน)
-            Task<IQueryable<Request>> GetMyTasksQueryAsync();
+    public interface IRequestService
+    {
+        // เปลี่ยน Return Type เป็น RequestGridDto
+        IQueryable<RequestGridDto> GetMyRequestsQuery();
+        Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync();
+        IQueryable<RequestGridDto> GetApprovedListQuery();
 
-            // 3. สำหรับรายการที่อนุมัติแล้ว
-            IQueryable<Request> GetApprovedListQuery();
-
-            // ส่วน CRUD เดิมคงไว้
-            Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code);
-            Task<PurchaseRequestDetailDto?> GetByIdAsync(int id);
-            Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit);
-            Task UpdateAsync(UpdatePurchaseRequestDto input, bool isSubmit);
-            Task DeleteAsync(int id);
-            Task<AttachmentResultDto?> GetAttachmentAsync(int id);
-        }
+        // Methods อื่นๆ เหมือนเดิม...
+        Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code);
+        Task<PurchaseRequestDetailDto?> GetByIdAsync(int id);
+        Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit);
+        Task UpdateAsync(UpdatePurchaseRequestDto input, bool isSubmit);
+        Task DeleteAsync(int id);
+        Task<AttachmentResultDto?> GetAttachmentAsync(int id);
+    }
 
     public class RequestService : IRequestService
     {
@@ -47,26 +43,46 @@ namespace QCS.Application.Services
         }
 
         // ==========================================================
-        // ⚡ OPTIMIZED QUERIES (IQueryable)
+        // ⚡ OPTIMIZED QUERIES
         // ==========================================================
 
-        public IQueryable<Request> GetMyRequestsQuery()
+        public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
-            return _context.Requests
+            var query = _context.Requests
                 .AsNoTracking()
-                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status != (int)RequestStatus.Approved)
-                .OrderByDescending(r => r.CreatedAt);
+                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status != (int)RequestStatus.Approved);
+
+            return query.Select(r => new RequestGridDto
+            {
+                Id = r.Id,
+                Code = r.Code,
+                Title = r.Title,
+                VendorName = r.VendorName,
+                RequestDate = r.RequestDate,
+                Status = r.Status,
+             
+            });
         }
 
-        public IQueryable<Request> GetApprovedListQuery()
+        public IQueryable<RequestGridDto> GetApprovedListQuery()
         {
-            return _context.Requests
+            var query = _context.Requests
                 .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Approved)
-                .OrderByDescending(r => r.UpdatedAt);
+                .Where(r => r.Status == (int)RequestStatus.Approved);
+
+            return query.Select(r => new RequestGridDto
+            {
+                Id = r.Id,
+                Code = r.Code,
+                Title = r.Title,
+                VendorName = r.VendorName,
+                RequestDate = r.RequestDate,
+                Status = r.Status,
+           
+            });
         }
 
-        public async Task<IQueryable<Request>> GetMyTasksQueryAsync()
+        public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
         {
             var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
             var myStepSequences = new List<int>();
@@ -81,14 +97,28 @@ namespace QCS.Application.Services
 
             if (!myStepSequences.Any())
             {
-                return _context.Requests.AsNoTracking().Where(r => false);
+                // คืนค่า Query ว่างๆ ถ้าไม่มี Task
+                return _context.Requests.AsNoTracking().Where(r => false).Select(r => new RequestGridDto());
             }
 
-            return _context.Requests
+            var query = _context.Requests
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Pending &&
-                            myStepSequences.Contains(r.CurrentStepId))
-                .OrderBy(r => r.CreatedAt);
+                            myStepSequences.Contains(r.CurrentStepId));
+
+            return query.Select(r => new RequestGridDto
+            {
+                Id = r.Id,
+                Code = r.Code,
+                Title = r.Title,
+                VendorName = r.VendorName,
+                RequestDate = r.RequestDate,
+                Status = r.Status,
+                RequesterName = r.ApprovalSteps
+                        .Where(s => s.Sequence == 1)
+                        .Select(s => s.ApproverName)
+                        .FirstOrDefault() ?? "Unknown"
+            });
         }
 
         // ==========================================================

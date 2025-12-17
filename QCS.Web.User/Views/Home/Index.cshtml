@@ -169,12 +169,11 @@
     <script>
         $(function () {
             // === CONFIG ===
+     
             const FORM_URL = '@Url.Action("Form", "Request")';
-            const CODE_URL = '@Url.Action("Code", "Request")';
 
-            // === HELPER FUNCTION (Standardized Status) ===
-            // [REF_ENUM] ใช้ Logic เดียวกันกับหน้าอื่นๆ เพื่อความสม่ำเสมอ
-            const getStatusBadgeInfo = (status) => {
+            // === HELPER: Status Badge ===
+             const getStatusBadgeInfo = (status) => {
                 let badgeClass = "bg-secondary-soft"; // Draft (0)
 
                 if (status === 1) badgeClass = "bg-warning-soft"; // Pending
@@ -190,229 +189,186 @@
                 return { cls: badgeClass, txt: text };
             };
 
-            // === BUTTON EVENTS ===
-            $("#btnCreateHeader").on("click", function() {
-                window.location.href = FORM_URL;
-            });
-            $("#btnCreateEmpty").on("click", function() {
-                window.location.href = FORM_URL;
-            });
-
-            // === MAIN LOGIC ===
-            loadSummaryData();
-
-            function loadSummaryData() {
-                $.ajax({
-                    url: `${API_BASE}/Dashboard/Summary`,
-                    method: "GET",
-                    xhrFields: { withCredentials: true },
-                    success: function (data) {
-                        initTabPanel(data.myRequestCount, data.myTaskCount, data.approvedCount);
-                    },
-                    error: function(err) {
-                        console.error("Failed to load summary", err);
-                        initTabPanel(0, 0, 0);
+            // === HELPER: สร้าง DataSourceStore ===
+            function createRemoteStore(actionName) {
+                return DevExpress.data.AspNet.createStore({
+                    key: "id",
+                    loadUrl: `${API_BASE}/Request/${actionName}`, // ตรวจสอบ Path API ให้ถูกต้อง
+                    onBeforeSend: (method, ajaxOptions) => {
+                        ajaxOptions.xhrFields = { withCredentials: true };
                     }
                 });
             }
 
-            function initTabPanel(requestCount, taskCount, approvedCount) {
-                const tabs = [];
-                // Tab 1: My Tasks
-                if (taskCount > 0) {
-                    tabs.push({
-                        title: "งานรออนุมัติ (My Tasks)",
-                        icon: "check",
-                        badge: taskCount,
-                        template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyTasks"))
-                    });
-                }
-                // Tab 2: My Requests
-                tabs.push({
-                    title: "เอกสารของฉัน (My Requests)",
-                    icon: "file",
-                    badge: requestCount,
-                    template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridMyRequests"))
-                });
-                // Tab 3: Approved List
-                if (approvedCount > 0) {
-                    tabs.push({
-                        title: "เอกสารที่อนุมัติแล้ว (Approved)",
-                        icon: "activefolder",
-                        badge: approvedCount,
-                        template: () => $("<div>").addClass("grid-wrapper").append($("<div>").attr("id", "gridApproved"))
-                    });
-                }
-
-                if (tabs.length === 0 && requestCount === 0) {
-                    $("#emptyState").removeClass("d-none");
-                    $("#tabPanel").hide(); // ซ่อน Tab ถ้าไม่มีข้อมูล
-                    return;
-                }
-
-                $("#tabPanel").dxTabPanel({
-                    items: tabs,
+            // === HELPER: สร้าง Grid Configuration (แก้ไขเพิ่ม Sort) ===
+            function createGridConfig(store, columns, placeholderText) {
+                return {
+                    // ✅ 1. ปรับปรุง dataSource เพื่อเพิ่มการ Sort ตาม code
+                    dataSource: {
+                        store: store,
+                        sort: [{ selector: "code", desc: true }] // true = ล่าสุดขึ้นก่อน (Z-A), false = เรียงตามตัวเลข (A-Z)
+                    },
+                    remoteOperations: true,
                     height: "100%",
-                    deferRendering: false,
-                    itemTitleTemplate: function(itemData) {
-                        const container = $("<div>").addClass("d-flex align-items-center gap-2");
-                        if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
-                        container.append($("<span>").text(itemData.title));
-                  
-                        return container;
-                    },
-                    onContentReady: function(e) {
-                        if ($("#gridMyRequests").length && !$("#gridMyRequests").data("dxDataGrid")) renderMyRequestsGrid();
-                        if ($("#gridMyTasks").length && !$("#gridMyTasks").data("dxDataGrid")) renderMyTasksGrid();
-                        if ($("#gridApproved").length && !$("#gridApproved").data("dxDataGrid")) renderApprovedGrid();
+                    showBorders: true,
+                    rowAlternationEnabled: true,
+                    hoverStateEnabled: true,
+                    columnAutoWidth: true,
+                    allowColumnResizing: true,
+                    dateSerializationFormat: "yyyy-MM-ddTHH:mm:ss",
+                    filterRow: { visible: true },
+                    headerFilter: { visible: true },
+                    scrolling: { mode: "virtual" },
+                    paging: { pageSize: 20 },
+                    searchPanel: { visible: true, width: 300, placeholder: placeholderText },
+                    columns: columns,
+                    onRowDblClick: function(e) {
+                        window.location.href = `${FORM_URL}?id=${e.data.id}&mode=view`;
                     }
-                });
+                };
             }
 
-            // === GRID COLUMNS & CONFIG ===
-            const baseColumns = [
+            // === COLUMN DEFINITIONS ===
+            const commonColumns = [
                 {
                     dataField: "code",
                     caption: "เลขที่เอกสาร",
-                    width: 150,
+                    width: 160,
                     cellTemplate: (container, options) => {
                         const docNo = options.value || "(Draft)";
-                        $("<a>")
-                            .addClass("doc-link")
+                        $("<a>").addClass("doc-link")
                             .text(docNo)
-                            .attr("href", `${FORM_URL}/${options.data.id}`)
+                            .attr("href", `${FORM_URL}?id=${options.data.id}&mode=view`)
+                            .on("click", (e) => e.stopPropagation())
                             .appendTo(container);
                     }
                 },
+                { dataField: "title", caption: "หัวข้อ", minWidth: 200 },
+                { dataField: "vendorName", caption: "ผู้ขาย", width: 200 },
                 {
-                    dataField: "title",
-                    caption: "หัวข้อ",
-                    minWidth: 180,
-                    allowSorting: false,
-                    allowFiltering: false,
-                    allowSearch: false
+                    dataField: "requestDate",
+                    caption: "วันที่ขอ",
+                    dataType: "date",
+                    format: "dd/MM/yyyy",
+                    width: 120,
+                    alignment: "center"
                 },
-                { dataField: "vendorName", caption: "ผู้ขาย", width: 300 },
-                { dataField: "requestDate", caption: "วันที่ขอ", dataType: "date", format: "yyyy-MM-dd", width: 120, alignment: "center" },
                 {
                     dataField: "status",
                     caption: "สถานะ",
                     width: 140,
                     alignment: "center",
-                    allowSorting: false,
-                    allowFiltering: false,
-                    allowSearch: false,
+                    lookup: {
+                        dataSource: [
+                            { id: 0, name: "Draft" },
+                            { id: 1, name: "Pending" },
+                            { id: 2, name: "Approved" },
+                            { id: 3, name: "Rejected" }
+                        ],
+                        valueExpr: "id", displayExpr: "name"
+                    },
                     cellTemplate: (container, options) => {
-                        // [REF_ENUM] เรียกใช้ Helper Function
                         const info = getStatusBadgeInfo(options.value);
                         $("<span>").addClass("status-badge " + info.cls).text(info.txt).appendTo(container);
                     }
                 },
                 {
-                    type: "buttons",
-                    width: 70,
+                    type: "buttons", width: 70,
                     buttons: [{
-                        hint: "เปิดดู",
-                        icon: "arrowright",
-                        onClick: (e) => window.location.href = `${FORM_URL}/${e.row.data.id}`
+                        hint: "เปิดดู", icon: "find",
+                        onClick: (e) => window.location.href = `${FORM_URL}?id=${e.row.data.id}&mode=view`
                     }]
                 }
             ];
 
-            function renderMyRequestsGrid() {
-                $("#gridMyRequests").dxDataGrid({
-                    dataSource: DevExpress.data.AspNet.createStore({
-                        key: "id",
-                        loadUrl: `${API_BASE}/Request/MyRequests`,
-                        onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
-                    }),
-                    height: "100%",
-                    showBorders: true,
-                    rowAlternationEnabled: true,
-                    hoverStateEnabled: true,
-                    columnAutoWidth: true,
-                    filterRow: { visible: true },
-                    headerFilter: { visible: true },
-                    scrolling: { mode: "virtual" },
-                    searchPanel: { visible: true, width: 350, placeholder: "ค้นหาเอกสาร..." },
-                    columns: baseColumns
-                });
+            const taskColumns = [
+                ...commonColumns.slice(0, 2),
+                { dataField: "requesterName", caption: "ผู้ขอซื้อ", width: 180 },
+                ...commonColumns.slice(2)
+            ];
+
+            // === MAIN LOGIC ===
+            loadSummaryData();
+
+            $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
+                window.location.href = FORM_URL;
+            });
+
+            function loadSummaryData() {
+                // จำลองการเรียก API Summary (หรือเปิด Comment เพื่อเรียกจริง)
+                 $.ajax({
+                     url: `${API_BASE}/Dashboard/Summary`,
+                     method: "GET",
+                     xhrFields: { withCredentials: true },
+                     success: function (data) {
+                         initTabPanel(data.myRequestCount, data.myTaskCount, data.approvedCount);
+                     },
+                     error: function(err) {
+                         // Fallback กรณี Error
+                         initTabPanel(0, 0, 0);
+                     }
+                 });
             }
 
-            function renderMyTasksGrid() {
-                // 1. Column Code: Link ไปหน้า Code และเปิดแท็บใหม่
-                const taskCodeColumn = {
-                    dataField: "code",
-                    caption: "เลขที่เอกสาร",
-                    width: 150,
-                    cellTemplate: (container, options) => {
-                        const docNo = options.value;
-                        $("<a>")
-                            .addClass("doc-link")
-                            .text(docNo)
-                            .attr("href", `${CODE_URL}/${docNo}`)
-                            .attr("target", "_blank")
-                            .appendTo(container);
+            function initTabPanel(requestCount, taskCount, approvedCount) {
+                const tabs = [];
+
+                // Tab 1: My Tasks
+                tabs.push({
+                    title: "งานรออนุมัติ (My Tasks)",
+                    icon: "todo",
+                    badge: taskCount,
+                    template: () => {
+                        const grid = $("<div>").attr("id", "gridMyTasks");
+                        const store = createRemoteStore("GetMyTasks");
+                        grid.dxDataGrid(createGridConfig(store, taskColumns, "ค้นหางานที่ต้องอนุมัติ..."));
+                        return $("<div>").addClass("grid-wrapper").append(grid);
                     }
-                };
-
-                // 2. Column Button: เปิดแท็บใหม่
-                const taskButtonColumn = {
-                    type: "buttons",
-                    width: 70,
-                    buttons: [{
-                        hint: "เปิดดู",
-                        icon: "arrowright",
-                        onClick: (e) => window.open(`${CODE_URL}/${e.row.data.code}`, "_blank")
-                    }]
-                };
-
-                const taskColumns = [
-                    taskCodeColumn,
-                    baseColumns[1], // Title
-                    { dataField: "requesterName", caption: "ผู้ขอซื้อ (Requester)", width: 180 },
-                    baseColumns[2], // Vendor
-                    baseColumns[3], // Date
-                    baseColumns[4], // Status (ใช้ตัวเดิมเพราะ Logic เหมือนกัน)
-                    taskButtonColumn
-                ];
-
-                $("#gridMyTasks").dxDataGrid({
-                    dataSource: DevExpress.data.AspNet.createStore({
-                        key: "id",
-                        loadUrl: `${API_BASE}/Request/PendingApprovals`,
-                        onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
-                    }),
-                    height: "100%",
-                    showBorders: true,
-                    rowAlternationEnabled: true,
-                    hoverStateEnabled: true,
-                    columnAutoWidth: true,
-                    filterRow: { visible: true },
-                    headerFilter: { visible: true },
-                    scrolling: { mode: "virtual" },
-                    searchPanel: { visible: true, width: 350, placeholder: "ค้นหางาน..." },
-                    columns: taskColumns
                 });
-            }
 
-            function renderApprovedGrid() {
-                $("#gridApproved").dxDataGrid({
-                    dataSource: DevExpress.data.AspNet.createStore({
-                        key: "id",
-                        loadUrl: `${API_BASE}/Request/ApprovedList`,
-                        onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
-                    }),
+                // Tab 2: My Requests
+                tabs.push({
+                    title: "เอกสารของฉัน (My Requests)",
+                    icon: "user",
+                    badge: requestCount,
+                    template: () => {
+                        const grid = $("<div>").attr("id", "gridMyRequests");
+                        const store = createRemoteStore("GetMyRequests");
+                        grid.dxDataGrid(createGridConfig(store, commonColumns, "ค้นหาเอกสารของฉัน..."));
+                        return $("<div>").addClass("grid-wrapper").append(grid);
+                    }
+                });
+
+                // Tab 3: Approved List
+                tabs.push({
+                    title: "อนุมัติแล้ว (Approved)",
+                    icon: "check",
+                    badge: approvedCount,
+                    template: () => {
+                        const grid = $("<div>").attr("id", "gridApproved");
+                        const store = createRemoteStore("ApprovedList");
+                        grid.dxDataGrid(createGridConfig(store, commonColumns, "ค้นหาเอกสารที่อนุมัติแล้ว..."));
+                        return $("<div>").addClass("grid-wrapper").append(grid);
+                    }
+                });
+
+                // Render TabPanel
+                $("#tabPanel").dxTabPanel({
+                    items: tabs,
                     height: "100%",
-                    showBorders: true,
-                    rowAlternationEnabled: true,
-                    hoverStateEnabled: true,
-                    columnAutoWidth: true,
-                    filterRow: { visible: true },
-                    headerFilter: { visible: true },
-                    scrolling: { mode: "virtual" },
-                    searchPanel: { visible: true, width: 350, placeholder: "ค้นหาเอกสารที่อนุมัติแล้ว..." },
-                    columns: baseColumns
+
+                    // ✅ 2. เปลี่ยนเป็น true เพื่อให้โหลด Content เฉพาะตอนกด Tab
+                    deferRendering: true,
+
+                    itemTitleTemplate: function(itemData) {
+                        const container = $("<div>").addClass("d-flex align-items-center gap-2");
+                        if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
+                        container.append($("<span>").text(itemData.title));
+                        if (itemData.badge > 0) {
+                            container.append($("<span>").addClass("badge bg-danger rounded-pill ms-2").text(itemData.badge));
+                        }
+                        return container;
+                    }
                 });
             }
         });
