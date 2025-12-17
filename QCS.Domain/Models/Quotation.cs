@@ -6,7 +6,7 @@ namespace QCS.Domain.Models
     {
         public int PurchaseRequestId { get; set; }
         [ForeignKey("PurchaseRequestId")]
-        public virtual PurchaseRequest PurchaseRequest { get; set; }
+        public virtual Request PurchaseRequest { get; set; }
 
         public string FileName { get; set; } // Map to 'originalFileName'
         public string FilePath { get; set; } // เก็บ Path จริงใน Server/Blob

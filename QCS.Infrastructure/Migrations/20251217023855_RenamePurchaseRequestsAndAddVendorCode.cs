@@ -5,28 +5,25 @@
 namespace QCS.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class RenameCommentToRemark : Migration
+    public partial class RenamePurchaseRequestsAndAddVendorCode : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.RenameColumn(
-                name: "Comment",
+            migrationBuilder.AddColumn<string>(
+                name: "VendorCode",
                 table: "Requests",
-                newName: "Remark");
-
-          
+                type: "nvarchar(max)",
+                nullable: false,
+                defaultValue: "");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.RenameColumn(
-                name: "Remark",
-                table: "Requests",
-                newName: "Comment");
-
-          
+            migrationBuilder.DropColumn(
+                name: "VendorCode",
+                table: "Requests");
         }
     }
 }

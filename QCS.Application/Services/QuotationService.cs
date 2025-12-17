@@ -12,7 +12,7 @@ namespace QCS.Application.Services
 {
     public interface IQuotationService
     {
-        IQueryable<PurchaseRequest> GetQueryable();
+        IQueryable<Request> GetQueryable();
         Task<AttachmentResultDto?> GetAttachmentAsync(int id);
         Task<AttachmentResultDto> GenerateStampedPdfAsync(int purchaseRequestId);
     }
@@ -36,9 +36,9 @@ namespace QCS.Application.Services
             _configuration = configuration;
         }
 
-        public IQueryable<PurchaseRequest> GetQueryable()
+        public IQueryable<Request> GetQueryable()
         {
-            return _context.PurchaseRequests
+            return _context.Requests
                 .Include(x => x.Quotations)
                 .Include(x => x.ApprovalSteps)
                 .AsNoTracking();
@@ -88,7 +88,7 @@ namespace QCS.Application.Services
         public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int purchaseRequestId)
         {
             // 1. ดึงข้อมูล Request (PR) พร้อม Vendor, Quotations และ ApprovalSteps
-            var request = await _context.PurchaseRequests
+            var request = await _context.Requests
                          // ต้องการชื่อ Vendor ไปแสดง
                 .Include(x => x.Quotations)
                 .ThenInclude(q => q.AttachmentFile) // ดึงไฟล์ PDF

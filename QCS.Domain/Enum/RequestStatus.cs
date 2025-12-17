@@ -18,9 +18,7 @@ namespace QCS.Domain.Enum
         [Display(Name = "อนุมัติครบถ้วน")]
         [Description("อนุมัติครบถ้วน")]
         Approved = 2,
-        [Display(Name = "จบกระบวนการ")]
-        [Description("จบกระบวนการ")]
-        Completed = 3,
+
         [Display(Name = "ไม่อนุมัติ")]
         [Description("ไม่อนุมัติ")]
         Rejected = 9,
@@ -47,7 +45,7 @@ namespace QCS.Domain.Enum
         }
 
         /// <summary>
-        /// ตรวจสอบว่า PurchaseRequest อยู่ในสถานะที่ยังดำเนินการได้หรือไม่
+        /// ตรวจสอบว่า Request อยู่ในสถานะที่ยังดำเนินการได้หรือไม่
         /// </summary>
         public static bool IsActive(this RequestStatus status)
         {
@@ -56,12 +54,11 @@ namespace QCS.Domain.Enum
         }
 
         /// <summary>
-        /// ตรวจสอบว่า PurchaseRequest จบกระบวนการแล้วหรือไม่
+        /// ตรวจสอบว่า Request จบกระบวนการแล้วหรือไม่
         /// </summary>
         public static bool IsFinal(this RequestStatus status)
         {
             return status == RequestStatus.Approved ||
-                   status == RequestStatus.Completed ||
                    status == RequestStatus.Rejected ||
                    status == RequestStatus.Cancelled;
         }

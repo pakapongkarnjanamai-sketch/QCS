@@ -54,7 +54,7 @@ namespace QCS.Application.Services
         /// </summary>
         /// <param name="input">ข้อมูลจาก Form</param>
         /// <param name="isSubmit">true = ส่งอนุมัติเลย, false = บันทึกร่าง</param>
-        Task<PurchaseRequest> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit);
+        Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit);
 
         /// <summary>
         /// แก้ไขเอกสาร (เฉพาะสถานะ Draft หรือโดน Reject กลับมาแก้)
@@ -105,7 +105,7 @@ namespace QCS.Application.Services
         public async Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code)
         {
             // ค้นหา ID จาก Code ก่อน
-            var id = await _context.PurchaseRequests
+            var id = await _context.Requests
                 .AsNoTracking()
                 .Where(r => r.Code == code)
                 .Select(r => r.Id)
@@ -119,7 +119,7 @@ namespace QCS.Application.Services
 
         public async Task<PurchaseRequestDetailDto?> GetByIdAsync(int id)
         {
-            var request = await _context.PurchaseRequests
+            var request = await _context.Requests
                 .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .AsNoTracking()
@@ -213,7 +213,7 @@ namespace QCS.Application.Services
         {
             // TODO: ถ้ามี Field CreatedBy ให้ Uncomment
             var userId = _currentUserService.UserId;
-            return await _context.PurchaseRequests
+            return await _context.Requests
                 .Where(r => r.CreatedBy == userId)
                 .Where(r => r.Status != (int)RequestStatus.Approved)
                 .OrderByDescending(r => r.RequestDate)
@@ -245,7 +245,7 @@ namespace QCS.Application.Services
 
             if (!myStepSequences.Any()) return new List<object>();
 
-            return await _context.PurchaseRequests
+            return await _context.Requests
                 .Where(r => r.Status == (int)RequestStatus.Pending &&
                             myStepSequences.Contains(r.CurrentStepId))
                 .OrderByDescending(r => r.RequestDate)
@@ -269,7 +269,7 @@ namespace QCS.Application.Services
         public async Task<IEnumerable<object>> GetApprovedListAsync()
         {
             var userId = _currentUserService.UserId;
-            return await _context.PurchaseRequests
+            return await _context.Requests
                 .Where(r => r.CreatedBy == userId && r.Status == (int)RequestStatus.Approved)
                 .OrderByDescending(r => r.RequestDate)
                 .Select(r => new
@@ -289,7 +289,7 @@ namespace QCS.Application.Services
         // 💾 COMMAND METHODS (Create / Update / Delete)
         // ==========================================================
 
-        public async Task<PurchaseRequest> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit)
+        public async Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -313,7 +313,7 @@ namespace QCS.Application.Services
                 }
 
                 // 3. Create Entity
-                var pr = new PurchaseRequest
+                var pr = new Request
                 {
                     Code = newDocNo,
                     Title = input.Title,
@@ -373,7 +373,7 @@ namespace QCS.Application.Services
                 // 5. Handle Files
                 await HandleFileUploadsAsync(input, pr);
 
-                await _context.PurchaseRequests.AddAsync(pr);
+                await _context.Requests.AddAsync(pr);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -391,7 +391,7 @@ namespace QCS.Application.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var pr = await _context.PurchaseRequests
+                var pr = await _context.Requests
                     .Include(r => r.Quotations)
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == input.Id);
@@ -470,11 +470,11 @@ namespace QCS.Application.Services
 
         public async Task DeleteAsync(int id)
         {
-            var pr = await _context.PurchaseRequests.FindAsync(id);
+            var pr = await _context.Requests.FindAsync(id);
             if (pr != null)
             {
                 // Soft Delete or Hard Delete based on policy
-                _context.PurchaseRequests.Remove(pr);
+                _context.Requests.Remove(pr);
                 await _context.SaveChangesAsync();
             }
         }
@@ -525,7 +525,7 @@ namespace QCS.Application.Services
         {
             var todayStr = DateTime.Now.ToString("yyyyMMdd");
             var prefix = $"QC-{todayStr}-";
-            var countToday = await _context.PurchaseRequests.CountAsync(x => x.Code.StartsWith(prefix));
+            var countToday = await _context.Requests.CountAsync(x => x.Code.StartsWith(prefix));
             return $"{prefix}{(countToday + 1):D3}";
         }
 
@@ -535,7 +535,7 @@ namespace QCS.Application.Services
             return !string.IsNullOrEmpty(name) ? name : nId;
         }
 
-        private async Task HandleFileUploadsAsync(dynamic input, PurchaseRequest pr)
+        private async Task HandleFileUploadsAsync(dynamic input, Request pr)
         {
             // Reflection to get Attachments from both Create and Update DTOs
             var files = (input.GetType().GetProperty("Attachments")?.GetValue(input) as List<IFormFile>)

@@ -10,9 +10,9 @@ namespace QCS.Api.Controllers
            : base(repository, logger) { }
     }
 
-    public class CRUDPurchaseRequestsController : GenericController<PurchaseRequest>
+    public class CRUDPurchaseRequestsController : GenericController<Request>
     {
-        public CRUDPurchaseRequestsController(IRepository<PurchaseRequest> repository, ILogger<GenericController<PurchaseRequest>> logger)
+        public CRUDPurchaseRequestsController(IRepository<Request> repository, ILogger<GenericController<Request>> logger)
            : base(repository, logger) { }
     }
 

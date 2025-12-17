@@ -22,7 +22,7 @@ namespace QCS.Infrastructure.Data
             _currentUserService = currentUserService;
         }
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
-        public DbSet<PurchaseRequest> PurchaseRequests { get; set; }
+        public DbSet<Request> Requests { get; set; }
         public DbSet<Quotation> Quotations { get; set; }
         public DbSet<AttachmentFile> AttachmentFiles { get; set; }
         public DbSet<Role> Roles { get; set; }

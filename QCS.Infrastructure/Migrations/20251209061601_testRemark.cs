@@ -12,7 +12,7 @@ namespace QCS.Infrastructure.Migrations
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "nvarchar(max)",
                 nullable: false,
                 defaultValue: "",
@@ -26,7 +26,7 @@ namespace QCS.Infrastructure.Migrations
         {
             migrationBuilder.AlterColumn<string>(
                 name: "Remark",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "nvarchar(max)",
                 nullable: true,
                 oldClrType: typeof(string),

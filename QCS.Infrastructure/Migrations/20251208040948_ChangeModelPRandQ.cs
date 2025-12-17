@@ -15,14 +15,14 @@ namespace QCS.Infrastructure.Migrations
             // [Manual Fix] 1. แปลงข้อมูล Status เก่า (String) ให้เป็นตัวเลข (String) ก่อนเปลี่ยน Type
             // ==========================================================================================
 
-            // 1.1 ตาราง PurchaseRequests
+            // 1.1 ตาราง Requests
             // Map: Draft=0, Pending=1, Approved=2, Completed=3, Rejected=9
-            migrationBuilder.Sql("UPDATE PurchaseRequests SET Status = '0' WHERE Status = 'Draft'");
-            migrationBuilder.Sql("UPDATE PurchaseRequests SET Status = '1' WHERE Status = 'Pending'");
-            migrationBuilder.Sql("UPDATE PurchaseRequests SET Status = '2' WHERE Status = 'Approved'");
-            migrationBuilder.Sql("UPDATE PurchaseRequests SET Status = '9' WHERE Status = 'Rejected'");
+            migrationBuilder.Sql("UPDATE Requests SET Status = '0' WHERE Status = 'Draft'");
+            migrationBuilder.Sql("UPDATE Requests SET Status = '1' WHERE Status = 'Pending'");
+            migrationBuilder.Sql("UPDATE Requests SET Status = '2' WHERE Status = 'Approved'");
+            migrationBuilder.Sql("UPDATE Requests SET Status = '9' WHERE Status = 'Rejected'");
             // กรณีข้อมูลอื่นๆ ที่ไม่ตรงเงื่อนไข ให้ Default เป็น 0 (Draft) เพื่อกัน Error
-            migrationBuilder.Sql("UPDATE PurchaseRequests SET Status = '0' WHERE ISNUMERIC(Status) = 0");
+            migrationBuilder.Sql("UPDATE Requests SET Status = '0' WHERE ISNUMERIC(Status) = 0");
 
             // 1.2 ตาราง ApprovalSteps (ถ้ามีข้อมูล)
             // Map: Pending=1, Approved=2, Rejected=9
@@ -82,7 +82,7 @@ namespace QCS.Infrastructure.Migrations
 
             migrationBuilder.RenameColumn(
                 name: "DocumentNo",
-                table: "PurchaseRequests",
+                table: "Requests",
                 newName: "VendorName");
 
             migrationBuilder.RenameColumn(
@@ -114,7 +114,7 @@ namespace QCS.Infrastructure.Migrations
             // ตรงนี้คือจุดที่เคย Error ตอนนี้จะผ่านแล้วเพราะข้อมูลใน DB เป็น "1", "2" ซึ่งแปลงเป็น int ได้
             migrationBuilder.AlterColumn<int>(
                 name: "Status",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "int",
                 nullable: false,
                 oldClrType: typeof(string),
@@ -122,40 +122,40 @@ namespace QCS.Infrastructure.Migrations
 
             migrationBuilder.AddColumn<string>(
                 name: "Code",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "nvarchar(max)",
                 nullable: false,
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
                 name: "Remark",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "nvarchar(max)",
                 nullable: false,
                 defaultValue: "");
 
             migrationBuilder.AddColumn<int>(
                 name: "CurrentStepId",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "int",
                 nullable: false,
                 defaultValue: 0);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "ValidFrom",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "datetime2",
                 nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "ValidUntil",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "datetime2",
                 nullable: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "VendorId",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "int",
                 nullable: false,
                 defaultValue: 0);
@@ -212,27 +212,27 @@ namespace QCS.Infrastructure.Migrations
 
             migrationBuilder.DropColumn(
                 name: "Code",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.DropColumn(
                 name: "Remark",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.DropColumn(
                 name: "CurrentStepId",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.DropColumn(
                 name: "ValidFrom",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.DropColumn(
                 name: "ValidUntil",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.DropColumn(
                 name: "VendorId",
-                table: "PurchaseRequests");
+                table: "Requests");
 
             migrationBuilder.RenameColumn(
                 name: "FilePath",
@@ -241,7 +241,7 @@ namespace QCS.Infrastructure.Migrations
 
             migrationBuilder.RenameColumn(
                 name: "VendorName",
-                table: "PurchaseRequests",
+                table: "Requests",
                 newName: "DocumentNo");
 
             migrationBuilder.RenameColumn(
@@ -302,7 +302,7 @@ namespace QCS.Infrastructure.Migrations
 
             migrationBuilder.AlterColumn<string>(
                 name: "Status",
-                table: "PurchaseRequests",
+                table: "Requests",
                 type: "nvarchar(max)",
                 nullable: false,
                 oldClrType: typeof(int),

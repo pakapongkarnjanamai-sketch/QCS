@@ -12,8 +12,8 @@ using QCS.Infrastructure.Data;
 namespace QCS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251204100713_EditApStepCommentNull")]
-    partial class EditApStepCommentNull
+    [Migration("20251217023855_RenamePurchaseRequestsAndAddVendorCode")]
+    partial class RenamePurchaseRequestsAndAddVendorCode
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,13 +33,16 @@ namespace QCS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ApprovalDate")
+                    b.Property<DateTime?>("ActionDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ApproverNId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ApproverName")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Remark")
+                    b.Property<string>("Comment")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -55,13 +58,14 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int>("PurchaseRequestId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Role")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
 
-                    b.Property<string>("Status")
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StepName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -163,51 +167,6 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("DocumentNo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("RequestDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Requests");
-                });
-
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
                     b.Property<int>("Id")
@@ -219,7 +178,8 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int?>("AttachmentFileId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Remark")
+                    b.Property<string>("ContentType")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -232,21 +192,76 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int>("DocumentTypeId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsSelected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("OriginalFileName")
+                    b.Property<string>("FileName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<int>("PurchaseRequestId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18, 2)");
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttachmentFileId");
+
+                    b.HasIndex("PurchaseRequestId");
+
+                    b.ToTable("Quotations");
+                });
+
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CurrentStepId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Remark")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RequestDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -261,19 +276,20 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<DateTime?>("ValidUntil")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("VendorCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("VendorId")
                         .HasColumnType("int");
 
                     b.Property<string>("VendorName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AttachmentFileId");
-
-                    b.HasIndex("PurchaseRequestId");
-
-                    b.ToTable("Quotations");
+                    b.ToTable("Requests");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Role", b =>
@@ -453,13 +469,13 @@ namespace QCS.Infrastructure.Migrations
 
             modelBuilder.Entity("QCS.Domain.Models.ApprovalStep", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.Request", "Request")
+                    b.HasOne("QCS.Domain.Models.Request", "PurchaseRequest")
                         .WithMany("ApprovalSteps")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Request");
+                    b.Navigation("PurchaseRequest");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
@@ -468,13 +484,15 @@ namespace QCS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("AttachmentFileId");
 
-                    b.HasOne("QCS.Domain.Models.Request", null)
+                    b.HasOne("QCS.Domain.Models.Request", "PurchaseRequest")
                         .WithMany("Quotations")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("AttachmentFile");
+
+                    b.Navigation("PurchaseRequest");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.UserDepartment", b =>

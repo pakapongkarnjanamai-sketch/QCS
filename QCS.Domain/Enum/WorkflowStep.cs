@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,15 +10,21 @@ namespace QCS.Domain.Enum
     public enum WorkflowStep
     {
         // สถานะเริ่มต้น (ยังไม่ส่ง Workflow)
+        [Display(Name = "Draft")]
         Draft = 0,
 
         // ขั้นตอนตาม Workflow Route (ID ต้องตรงกับ Database Workflow)
-        Purchaser = 1,  // จัดซื้อตรวจสอบ
-        Verifier = 2,   // ผู้ตรวจสอบ
-        Manager = 3,    // ผู้จัดการอนุมัติ
+        [Display(Name = "บันทึก")]
+        Purchaser = 1,  
+        [Display(Name = "รอตรวจสอบ")]
+        Verifier = 2,   
+        [Display(Name = "รออนุมัติ")]
+        Manager = 3,   
 
         // สถานะจบการทำงาน
-        Completed = 99,  // อนุมัติครบทุกขั้นตอนแล้ว
-        Rejected = -1    // ถูกไม่อนุมัติ (ถ้าต้องการเก็บแยก)
+        [Display(Name = "อนุมัติครบถ้วน")]
+        Completed = 99, 
+        [Display(Name = "ไม่อนุมัติ")]
+        Rejected = -1   
     }
 }

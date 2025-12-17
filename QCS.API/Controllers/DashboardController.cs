@@ -35,7 +35,7 @@ namespace QCS.API.Controllers
 
                 // 1. My Requests Stats (เอกสารที่ฉันสร้าง)
 
-                var Query = _context.PurchaseRequests.AsQueryable();
+                var Query = _context.Requests.AsQueryable();
                 var myRequestsQuery = Query.Where(r => r.Status != (int)RequestStatus.Approved);
 
                 // .Where(r => r.CreatedBy == nId); // Uncomment เมื่อมี field CreatedBy
@@ -63,7 +63,7 @@ namespace QCS.API.Controllers
 
                     if (myStepSequences.Any())
                     {
-                        myTaskCount = await _context.PurchaseRequests
+                        myTaskCount = await _context.Requests
                             .CountAsync(r => r.Status == (int)RequestStatus.Pending &&
                                            myStepSequences.Contains(r.CurrentStepId));
                     }

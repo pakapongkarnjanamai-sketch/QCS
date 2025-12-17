@@ -82,7 +82,7 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("ApprovalSteps");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.PurchaseRequest", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -124,7 +124,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PurchaseRequests");
+                    b.ToTable("Requests");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
@@ -182,7 +182,7 @@ namespace QCS.Infrastructure.Migrations
 
             modelBuilder.Entity("QCS.Domain.Models.ApprovalStep", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.PurchaseRequest", null)
+                    b.HasOne("QCS.Domain.Models.Request", null)
                         .WithMany("ApprovalSteps")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -191,14 +191,14 @@ namespace QCS.Infrastructure.Migrations
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.PurchaseRequest", null)
+                    b.HasOne("QCS.Domain.Models.Request", null)
                         .WithMany("Quotations")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.PurchaseRequest", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
                 {
                     b.Navigation("ApprovalSteps");
 

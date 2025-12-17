@@ -161,7 +161,7 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.PurchaseRequest", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -221,7 +221,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PurchaseRequests");
+                    b.ToTable("Requests");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
@@ -459,13 +459,13 @@ namespace QCS.Infrastructure.Migrations
 
             modelBuilder.Entity("QCS.Domain.Models.ApprovalStep", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.PurchaseRequest", "PurchaseRequest")
+                    b.HasOne("QCS.Domain.Models.Request", "Request")
                         .WithMany("ApprovalSteps")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("PurchaseRequest");
+                    b.Navigation("Request");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
@@ -474,7 +474,7 @@ namespace QCS.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("AttachmentFileId");
 
-                    b.HasOne("QCS.Domain.Models.PurchaseRequest", "PurchaseRequest")
+                    b.HasOne("QCS.Domain.Models.Request", "Request")
                         .WithMany("Quotations")
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -482,7 +482,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.Navigation("AttachmentFile");
 
-                    b.Navigation("PurchaseRequest");
+                    b.Navigation("Request");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.UserDepartment", b =>
@@ -528,7 +528,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Navigation("UserDepartments");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.PurchaseRequest", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
                 {
                     b.Navigation("ApprovalSteps");
 

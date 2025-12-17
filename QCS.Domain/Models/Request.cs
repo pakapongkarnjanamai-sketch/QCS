@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QCS.Domain.Models
 {
-    public class PurchaseRequest : BaseEntity
+    public class Request : BaseEntity
     {
         public string Code { get; set; } // Map to 'documentNo'
         public string Title { get; set; }
@@ -19,6 +19,7 @@ namespace QCS.Domain.Models
             set => CurrentStepId = (int)value;
         }
         public int VendorId { get; set; }
+        public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement

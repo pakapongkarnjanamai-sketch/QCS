@@ -33,7 +33,7 @@ namespace QCS.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var request = await _context.PurchaseRequests
+                var request = await _context.Requests
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
 
@@ -131,7 +131,7 @@ namespace QCS.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var request = await _context.PurchaseRequests
+                var request = await _context.Requests
                     .Include(r => r.ApprovalSteps)
                     .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
 

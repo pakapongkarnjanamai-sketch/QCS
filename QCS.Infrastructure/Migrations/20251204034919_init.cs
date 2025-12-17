@@ -12,7 +12,7 @@ namespace QCS.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "PurchaseRequests",
+                name: "Requests",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -57,7 +57,7 @@ namespace QCS.Infrastructure.Migrations
                     table.ForeignKey(
                         name: "FK_ApprovalSteps_PurchaseRequests_PurchaseRequestId",
                         column: x => x.PurchaseRequestId,
-                        principalTable: "PurchaseRequests",
+                        principalTable: "Requests",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -86,7 +86,7 @@ namespace QCS.Infrastructure.Migrations
                     table.ForeignKey(
                         name: "FK_Quotations_PurchaseRequests_PurchaseRequestId",
                         column: x => x.PurchaseRequestId,
-                        principalTable: "PurchaseRequests",
+                        principalTable: "Requests",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -112,7 +112,7 @@ namespace QCS.Infrastructure.Migrations
                 name: "Quotations");
 
             migrationBuilder.DropTable(
-                name: "PurchaseRequests");
+                name: "Requests");
         }
     }
 }
