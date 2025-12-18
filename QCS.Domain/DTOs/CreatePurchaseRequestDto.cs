@@ -10,9 +10,9 @@ namespace QCS.Domain.DTOs
         public string Title { get; set; }
 
         // ข้อมูล Header ที่ย้ายมา
-        public int VendorId { get; set; }
+        //public int VendorId { get; set; }
         public string VendorName { get; set; }
-
+        public string? VendorCode { get; set; }
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
         public string? Remark { get; set; }

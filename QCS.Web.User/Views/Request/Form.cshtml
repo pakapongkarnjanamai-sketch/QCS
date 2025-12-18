@@ -5,7 +5,6 @@
 
 @section Styles {
     <style>
-        /* --- Layout & Cards --- */
         .qcs-card {
             background: #fff;
             border-radius: 12px;
@@ -28,7 +27,6 @@
             gap: 10px;
         }
 
-        /* --- Attachments --- */
         .attachments-container {
             padding: 20px;
             background: #f8f9fa;
@@ -43,19 +41,18 @@
             font-weight: 500;
         }
 
-        .file-info i {
-            color: #f05b41; /* Adobe PDF Red */
-            font-size: 1.3em;
-        }
+            .file-info i {
+                color: #f05b41;
+                font-size: 1.3em;
+            }
 
-        /* --- Workflow Status Colors --- */
         .current-user-row {
             font-weight: 700;
             color: #2190F7;
         }
 
         .row-current-step {
-            background-color: #f0f9ff !important; /* Soft Blue */
+            background-color: #f0f9ff !important;
         }
 
         .unauthorized-overlay {
@@ -72,7 +69,6 @@
             color: #2190F7;
         }
 
-        /* Status Badge Colors */
         .status-badge {
             padding: 4px 10px;
             border-radius: 15px;
@@ -80,22 +76,29 @@
             font-weight: 600;
         }
 
-        .status-draft { background-color: #e9ecef; color: #495057; }
-        .status-pending { background-color: #fff3cd; color: #856404; }
-        .status-approved { background-color: #d4edda; color: #155724; }
-        .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .status-draft {
+            background-color: #e9ecef;
+            color: #495057;
+        }
 
-        /* PDF Preview */
-        #pdfPreviewFrame {
-            width: 100%;
-            height: 100%;
-            border: none;
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 }
 
 <div class="container mt-4 mb-5">
-
     <div class="qcs-card">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="m-0 d-flex align-items-center text-nowrap text-primary-header">
@@ -112,16 +115,12 @@
     </div>
 
     <div class="qcs-card" id="formContainer">
-        <div class="section-header">
-            <i class="fas fa-info-circle"></i> ข้อมูลใบเสนอราคา (Comparison Info)
-        </div>
+        <div class="section-header"><i class="fas fa-info-circle"></i> ข้อมูลใบเสนอราคา (Comparison Info)</div>
         <div id="quotationForm"></div>
     </div>
 
     <div class="qcs-card">
-        <div class="section-header">
-            <i class="fas fa-route"></i> เส้นทางการอนุมัติ (Approval Route)
-        </div>
+        <div class="section-header"><i class="fas fa-route"></i> เส้นทางการอนุมัติ (Approval Route)</div>
         <div id="workflowRouteGrid"></div>
     </div>
 </div>
@@ -136,30 +135,17 @@
         </div>
     </div>
 </div>
-
-<div id="pdfPopup">
-    <div id="pdfContent" style="height: 100%; width: 100%; display: flex; justify-content: center; align-items: center;">
-        <span class="text-muted">Loading PDF...</span>
-    </div>
-</div>
-
 <div id="loadingIndicator"></div>
 
 @section Scripts {
     <script>
         $(function () {
-            // ==========================================
-            // 1. CONFIGURATION & CONSTANTS
-            // ==========================================
-            const PR_ID = @(Model.HasValue ? Model.Value : "null");
+            const PR_ID = @(Model.HasValue? Model.Value: "null");
             const MODE = PR_ID ? "EDIT" : "CREATE";
-
             const CONFIG = {
-                API_BASE_URL: API_BASE, // ตรวจสอบว่า API_BASE ถูกประกาศไว้ใน _Layout หรือ site.js แล้ว
-                // Endpoints
+                API_BASE_URL: API_BASE,
                 API_GET_DETAIL: `/Request/Detail/${PR_ID}`,
                 API_WORKFLOW_ROUTE_INIT: '/Workflow/route/1',
-                // Actions
                 API_CREATE_SAVE: '/Request/Save',
                 API_CREATE_SUBMIT: '/Request/Submit',
                 API_UPDATE_SAVE: '/Request/Update',
@@ -168,37 +154,23 @@
                 API_REJECT: `/Approval/Reject`,
                 VENDOR_API_URL: "/Vendor"
             };
+            const docTypesSource = (typeof SystemEnums !== 'undefined' && SystemEnums.documentType) ? SystemEnums.documentType : [];
 
-            // ดึงข้อมูล Enum DocumentType
-            const docTypesSource = (typeof SystemEnums !== 'undefined' && SystemEnums.documentType)
-                                    ? SystemEnums.documentType
-                                    : [{ id: 10, displayName: "Main Quotation" }, { id: 20, displayName: "Comparative Quotation" }]; // Fallback
-
-            // Local State
-            let fileList = [];          // Files to upload
-            let deletedFileIds = [];    // IDs to delete
-            let prData = {};            // Loaded Data
-            let currentActionType = ""; // For Popup action
-
-            // UI Instances
-            let formInstance, toolbarInstance, attachmentGridInstance, actionPopupInstance, pdfPopupInstance;
+            let fileList = [], deletedFileIds = [], prData = {}, currentActionType = "";
+            let formInstance, toolbarInstance, attachmentGridInstance, actionPopupInstance;
 
             const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
                 shadingColor: "rgba(0,0,0,0.4)", position: { of: "window" }, visible: false,
                 showIndicator: true, showPane: true, shading: true, message: "Processing..."
             }).dxLoadPanel("instance");
 
-            // --- IMPROVED VENDOR STORE ---
+            // --- [แก้ไข] Key ของ Store เป็น "code" ---
             const vendorStore = DevExpress.data.AspNet.createStore({
-                key: "id",
+                key: "code",
                 loadUrl: CONFIG.API_BASE_URL + CONFIG.VENDOR_API_URL,
-                loadMode: "raw", // โหลดครั้งเดียวเพื่อความเร็วในการค้นหา (สำหรับข้อมูล < 5000 รายการ)
                 onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
             });
 
-            // ==========================================
-            // 2. HELPER FUNCTIONS
-            // ==========================================
             const formatDateTime = (dateStr) => {
                 if (!dateStr) return "-";
                 const d = new Date(dateStr);
@@ -211,16 +183,10 @@
                 if (status === 1) cls = "status-pending";
                 else if (status === 2) cls = "status-approved";
                 else if (status === 3 || status === 9) cls = "status-rejected";
-
-                let txt = (typeof SystemEnums !== 'undefined')
-                          ? SystemEnums.getDisplayName('approvalStatus', status)
-                          : "Status " + status;
+                let txt = (typeof SystemEnums !== 'undefined') ? SystemEnums.getDisplayName('approvalStatus', status) : "Status " + status;
                 return { cls, txt };
             };
 
-            // ==========================================
-            // 3. INITIALIZATION
-            // ==========================================
             initUI();
             if (MODE === "CREATE") loadCreateModeData();
             else loadEditModeData();
@@ -229,35 +195,16 @@
                 initToolbar();
                 initForm();
                 initActionPopup();
-                initPdfPopup();
             }
 
             function initToolbar() {
                 const items = [
-                    {
-                        location: 'after', widget: 'dxButton', visible: (MODE === "EDIT"),
-                        options: { text: 'ประวัติ (History)', icon: 'clock', stylingMode: 'text', onClick: showHistoryPopup }
-                    },
-                    {
-                        location: 'after', widget: 'dxButton',
-                        options: { text: 'กลับ (Back)', stylingMode: 'outlined', icon: 'arrowleft', onClick: () => window.location.href = '@Url.Action("Index", "Home")' }
-                    },
-                    {
-                        location: 'after', widget: 'dxButton', visible: false,
-                        options: { elementAttr: { id: "btnSave" }, text: 'บันทึก (Save Draft)', icon: 'save', type: 'default', stylingMode: 'outlined', onClick: () => handleSaveOrSubmit(false) }
-                    },
-                    {
-                        location: 'after', widget: 'dxButton', visible: false,
-                        options: { elementAttr: { id: "btnSubmit" }, text: 'ส่งอนุมัติ (Submit)', icon: 'check', type: 'default', stylingMode: 'contained', onClick: () => handleSaveOrSubmit(true) }
-                    },
-                    {
-                        location: 'after', widget: 'dxButton', visible: false,
-                        options: { elementAttr: { id: "btnReject" }, text: 'ไม่อนุมัติ (Reject)', type: 'danger', stylingMode: 'contained', onClick: () => openActionPopup('Reject') }
-                    },
-                    {
-                        location: 'after', widget: 'dxButton', visible: false,
-                        options: { elementAttr: { id: "btnApprove" }, text: 'อนุมัติ (Approve)', type: 'success', stylingMode: 'contained', onClick: () => openActionPopup('Approve') }
-                    }
+                    { location: 'after', widget: 'dxButton', visible: (MODE === "EDIT"), options: { text: 'ประวัติ (History)', icon: 'clock', stylingMode: 'text', onClick: showHistoryPopup } },
+                    { location: 'after', widget: 'dxButton', options: { text: 'กลับ (Back)', stylingMode: 'outlined', icon: 'arrowleft', onClick: () => window.location.href = '@Url.Action("Index", "Home")' } },
+                    { location: 'after', widget: 'dxButton', visible: false, options: { elementAttr: { id: "btnSave" }, text: 'บันทึก (Save Draft)', icon: 'save', type: 'default', stylingMode: 'outlined', onClick: () => handleSaveOrSubmit(false) } },
+                    { location: 'after', widget: 'dxButton', visible: false, options: { elementAttr: { id: "btnSubmit" }, text: 'ส่งอนุมัติ (Submit)', icon: 'check', type: 'default', stylingMode: 'contained', onClick: () => handleSaveOrSubmit(true) } },
+                    { location: 'after', widget: 'dxButton', visible: false, options: { elementAttr: { id: "btnReject" }, text: 'ไม่อนุมัติ (Reject)', type: 'danger', stylingMode: 'contained', onClick: () => openActionPopup('Reject') } },
+                    { location: 'after', widget: 'dxButton', visible: false, options: { elementAttr: { id: "btnApprove" }, text: 'อนุมัติ (Approve)', type: 'success', stylingMode: 'contained', onClick: () => openActionPopup('Approve') } }
                 ];
                 toolbarInstance = $("#actionButtons").dxToolbar({ items: items }).dxToolbar("instance");
             }
@@ -271,58 +218,40 @@
                             itemType: "group", colSpan: 2, colCount: 2,
                             items: [
                                 { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 1, validationRules: [{ type: "required" }] },
-                                // --- IMPROVED VENDOR SELECTBOX ---
+
+                                // --- [แก้ไข] Field เป็น vendorCode และ valueExpr เป็น code ---
                                 {
-                                    dataField: "vendorId",
+                                    dataField: "vendorCode",
                                     label: { text: "ผู้ขาย (Vendor)" },
                                     colSpan: 1,
                                     editorType: "dxSelectBox",
                                     editorOptions: {
                                         dataSource: vendorStore,
-                                        valueExpr: "id",
-                                        // แสดงผลแบบ "Code : Name"
+                                        valueExpr: "code",
                                         displayExpr: (item) => item ? `${item.code} : ${item.name}` : "",
-                                        // ค้นหาได้ทั้ง Code และ Name
                                         searchExpr: ["code", "name"],
                                         searchEnabled: true,
-                                        searchMode: "contains",
-                                        placeholder: "พิมพ์รหัส หรือ ชื่อร้านค้า...",
+                                        placeholder: "พิมพ์รหัส หรือ ชื่อผู้ขาย...",
                                         showClearButton: true
                                     },
                                     validationRules: [{ type: "required", message: "กรุณาเลือกผู้ขาย" }]
                                 },
-                                // ---------------------------------
-                                {
-                                    dataField: "validFrom", label: { text: "วันที่เริ่ม (Valid From)" },
-                                    editorType: "dxDateBox",
-                                    editorOptions: { displayFormat: "yyyy-MM-dd" },
-                                    validationRules: [{ type: "required" }]
-                                },
-                                {
-                                    dataField: "validUntil", label: { text: "ถึงวันที่ (Valid Until)" },
-                                    editorType: "dxDateBox",
-                                    editorOptions: { displayFormat: "yyyy-MM-dd" },
-                                    validationRules: [{ type: "required" }]
-                                },
+                                // -------------------------------------------------------------
+
+                                { dataField: "validFrom", label: { text: "วันที่เริ่ม (Valid From)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
+                                { dataField: "validUntil", label: { text: "ถึงวันที่ (Valid Until)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
                                 { dataField: "remark", label: { text: "หมายเหตุ (Remark)" }, editorType: "dxTextArea", editorOptions: { height: 80 }, colSpan: 2 }
                             ]
                         },
-                        {
-                            itemType: "group", caption: "เอกสารแนบ (Attachments)", colSpan: 2,
-                            items: [{ template: (d, item) => renderAttachmentsSection([], item, true) }]
-                        }
+                        { itemType: "group", caption: "เอกสารแนบ (Attachments)", colSpan: 2, items: [{ template: (d, item) => renderAttachmentsSection([], item, true) }] }
                     ]
                 }).dxForm("instance");
             }
 
-            // ==========================================
-            // 4. DATA LOADING
-            // ==========================================
             function loadCreateModeData() {
                 loadingIndicator.show();
                 $.ajax({
-                    url: CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE_INIT,
-                    type: 'GET', xhrFields: { withCredentials: true },
+                    url: CONFIG.API_BASE_URL + CONFIG.API_WORKFLOW_ROUTE_INIT, type: 'GET', xhrFields: { withCredentials: true },
                     success: function (data) {
                         if (data) {
                             renderWorkflowRouteGrid(data, 1);
@@ -330,7 +259,7 @@
                             const canInitiate = data.canInitiate;
                             updateButtonVisibility(items, "btnSave", canInitiate);
                             updateButtonVisibility(items, "btnSubmit", canInitiate);
-                            if(!canInitiate) $("#formContainer").addClass("unauthorized-overlay");
+                            if (!canInitiate) $("#formContainer").addClass("unauthorized-overlay");
                             toolbarInstance.option("items", items);
                         }
                     },
@@ -345,29 +274,36 @@
                     if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
                     const data = await response.json();
 
-                    // Handle Vendor Pre-selection logic if needed
-                    if ((!data.vendorId || data.vendorId === 0) && data.vendorName) {
-                        // Logic to find vendor by name if ID is missing (Optional)
-                    }
+                    // --- [ลบ Logic ซ่อม ID ออก] เพราะใช้ Code โดยตรงแล้ว ---
 
                     prData = data;
                     $("#lblDocNo").text(data.docNo || data.documentNo || "-");
 
                     const canEdit = data.permissions && data.permissions.canEdit;
-                    formInstance.option("formData", data);
+                    formInstance.option("formData", data); // Data ต้องมี vendorCode มาจาก API
                     formInstance.option("readOnly", !canEdit);
 
-                    // Update Grid Permissions
                     if (attachmentGridInstance) {
                         const files = data.quotations || [];
                         attachmentGridInstance.option("dataSource", files);
                         attachmentGridInstance.option("editing.allowUpdating", canEdit);
-                        // Update visibility of uploader
-                        if(canEdit) $("#uploaderSection").show(); else $("#uploaderSection").hide();
+                        attachmentGridInstance.columnOption(2, "buttons", [
+                            { hint: "View", icon: "eyeopen", onClick: (e) => { if (e.row.data.id) viewPdf(e.row.data.id); } },
+                            { name: "delete", visible: canEdit, icon: "trash", onClick: (e) => {
+                                if (confirm("ยืนยันการลบไฟล์?")) {
+                                    const row = e.row.data;
+                                    if (row.id && row.id > 0) deletedFileIds.push(row.id);
+                                    else { const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName)); if (idx > -1) fileList.splice(idx, 1); }
+                                    const ds = attachmentGridInstance.option("dataSource");
+                                    const index = ds.indexOf(row);
+                                    if (index > -1) { ds.splice(index, 1); attachmentGridInstance.refresh(); }
+                                }
+                            }}
+                        ]);
+                        if (canEdit) $("#uploaderSection").show(); else $("#uploaderSection").hide();
                     }
 
                     renderWorkflowRouteGrid(data.workflowRoute, data.currentStepId);
-
                     const items = toolbarInstance.option("items");
                     const setBtn = (id, v) => { const idx = items.findIndex(i => i.options?.elementAttr?.id === id); if (idx >= 0) items[idx].visible = v; };
                     setBtn("btnSave", canEdit);
@@ -375,10 +311,8 @@
                     setBtn("btnApprove", data.permissions.canApprove);
                     setBtn("btnReject", data.permissions.canReject);
                     toolbarInstance.option("items", items);
-
                 } catch (err) {
                     console.error("Load Error:", err);
-                    DevExpress.ui.notify("Error loading data", "error", 3000);
                 } finally {
                     loadingIndicator.hide();
                 }
@@ -389,9 +323,6 @@
                 if (btn) btn.visible = visible;
             }
 
-            // ==========================================
-            // 5. ATTACHMENTS HANDLING
-            // ==========================================
             function renderAttachmentsSection(files, itemElement, canEdit) {
                 const $container = $("<div>").addClass("attachments-container").attr("id", "attachmentsContainer");
                 const $uploaderDiv = $("<div>").attr("id", "uploaderSection").appendTo($container);
@@ -403,18 +334,12 @@
                         if (!e.value || e.value.length === 0) return;
                         let currentData = attachmentGridInstance.option("dataSource") || [];
                         const filesToAdd = [];
-
                         e.value.forEach(f => {
                             if (f.type !== "application/pdf") { DevExpress.ui.notify(`ไฟล์ ${f.name} ไม่ใช่ PDF`, "error", 3000); return; }
                             if (currentData.some(row => (row.originalFileName || row.fileName) === f.name)) { DevExpress.ui.notify(`ไฟล์ ${f.name} มีอยู่แล้ว`, "warning", 2000); return; }
-
                             fileList.push(f);
-                            filesToAdd.push({
-                                id: -1 * (new Date().getTime() + Math.floor(Math.random() * 1000)),
-                                originalFileName: f.name, fileName: f.name, isNew: true, fileSize: f.size, documentTypeId: 10
-                            });
+                            filesToAdd.push({ id: -1 * (new Date().getTime() + Math.floor(Math.random() * 1000)), originalFileName: f.name, fileName: f.name, isNew: true, fileSize: f.size, documentTypeId: 10 });
                         });
-
                         if (filesToAdd.length > 0) attachmentGridInstance.option("dataSource", [...currentData, ...filesToAdd]);
                         setTimeout(() => { e.component.reset(); }, 100);
                     }
@@ -426,78 +351,35 @@
                     dataSource: files, showBorders: true, columnAutoWidth: true, noDataText: "ไม่มีไฟล์แนบ", keyExpr: "id",
                     editing: { mode: "cell", allowUpdating: canEdit, allowDeleting: false },
                     columns: [
-                        {
-                            dataField: "originalFileName", caption: "ชื่อไฟล์ (File Name)", allowEditing: false,
-                            calculateDisplayValue: (r) => r.originalFileName || r.fileName,
-                            cellTemplate: (c, o) => {
-                                const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : '';
-                                $("<div>").addClass("file-info")
-                                    .append($("<i>").addClass("fas fa-file-pdf"))
-                                    .append($("<span>").html(o.displayValue + isNew))
-                                    .appendTo(c);
-                            }
+                        { dataField: "originalFileName", caption: "ชื่อไฟล์ (File Name)", allowEditing: false, calculateDisplayValue: (r) => r.originalFileName || r.fileName,
+                            cellTemplate: (c, o) => { const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : ''; $("<div>").addClass("file-info").append($("<i>").addClass("fas fa-file-pdf")).append($("<span>").html(o.displayValue + isNew)).appendTo(c); }
                         },
-                        {
-                            dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250,
-                            lookup: {
-                                dataSource: docTypesSource,
-                                valueExpr: "id", displayExpr: "displayName"
-                            },
-                            validationRules: [{ type: "required" }]
-                        },
-                        {
-                            type: "buttons", width: 100,
-                            buttons: [
-                                {
-                                    hint: "Preview", icon: "eyeopen",
-                                    onClick: (e) => {
-                                        if (e.row.data.id && e.row.data.id > 0) viewPdf(e.row.data.id, e.row.data.originalFileName || "Document");
-                                        else DevExpress.ui.notify("ไฟล์ใหม่ต้องบันทึกก่อน", "warning", 2000);
-                                    }
-                                },
-                                {
-                                    name: "delete", visible: canEdit, icon: "trash",
-                                    onClick: (e) => {
-                                        if (confirm("ยืนยันการลบไฟล์?")) {
-                                            const row = e.row.data;
-                                            if (row.id && row.id > 0) deletedFileIds.push(row.id);
-                                            else {
-                                                const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName));
-                                                if (idx > -1) fileList.splice(idx, 1);
-                                            }
-                                            const ds = attachmentGridInstance.option("dataSource");
-                                            const index = ds.findIndex(r => r.id === row.id);
-                                            if (index > -1) { ds.splice(index, 1); attachmentGridInstance.refresh(); }
-                                        }
-                                    }
+                        { dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250, lookup: { dataSource: docTypesSource, valueExpr: "id", displayExpr: "displayName" }, validationRules: [{ type: "required" }] },
+                        { type: "buttons", width: 100, buttons: [
+                            { hint: "View", icon: "eyeopen", onClick: (e) => { if (e.row.data.id && e.row.data.id > 0) viewPdf(e.row.data.id); else DevExpress.ui.notify("ไฟล์ใหม่ต้องบันทึกก่อน", "warning", 2000); } },
+                            { name: "delete", visible: canEdit, icon: "trash", onClick: (e) => {
+                                if (confirm("ยืนยันการลบไฟล์?")) {
+                                    const row = e.row.data;
+                                    if (row.id && row.id > 0) deletedFileIds.push(row.id);
+                                    else { const idx = fileList.findIndex(f => f.name === (row.originalFileName || row.fileName)); if (idx > -1) fileList.splice(idx, 1); }
+                                    const ds = attachmentGridInstance.option("dataSource");
+                                    const index = ds.findIndex(r => r.id === row.id);
+                                    if (index > -1) { ds.splice(index, 1); attachmentGridInstance.refresh(); }
                                 }
-                            ]
-                        }
+                            }}
+                        ]}
                     ]
                 }).dxDataGrid("instance");
-
                 attachmentGridInstance.element().appendTo($container);
                 $container.appendTo(itemElement);
             }
 
-            // ==========================================
-            // 6. ACTIONS (Save, Submit, Approve, Reject)
-            // ==========================================
             async function handleSaveOrSubmit(isSubmit) {
-                if (!formInstance.validate().isValid) {
-                    DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000);
-                    return;
-                }
-
+                if (!formInstance.validate().isValid) { DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000); return; }
                 const ds = attachmentGridInstance.option("dataSource") || [];
                 if (ds.length === 0) { DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารประกอบ", "error", 3000); return; }
-
-                // Check required document types
-                const hasMain = ds.some(f => f.documentTypeId === 10);
-                if (!hasMain) { DevExpress.ui.notify("ขาด 'ใบเสนอราคาหลัก (Main Quotation)'", "error", 4000); return; }
-
-                const hasCompare = ds.some(f => f.documentTypeId === 20);
-                if (!hasCompare) { DevExpress.ui.notify("ขาด 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)'", "error", 4000); return; }
+                if (!ds.some(f => f.documentTypeId === 10)) { DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
+                if (!ds.some(f => f.documentTypeId === 20)) { DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
 
                 if (isSubmit) openActionPopup('Submit');
                 else executeSaveOrSubmit(false, null);
@@ -505,43 +387,28 @@
 
             function openActionPopup(action) {
                 currentActionType = action;
-                let title = "ยืนยัน (Confirm)";
-                let btnType = "default";
-                let ph = "ความคิดเห็นเพิ่มเติม (Optional)...";
-
-                if (action === 'Reject') {
-                    title = "ระบุเหตุผลไม่อนุมัติ (Reject Reason)";
-                    btnType = "danger";
-                    ph = "ต้องระบุเหตุผล (Required)...";
-                } else if (action === 'Approve') {
-                    title = "ยืนยันอนุมัติ (Confirm Approve)";
-                    btnType = "success";
-                } else if (action === 'Submit') {
-                    title = "ยืนยันส่งอนุมัติ (Confirm Submit)";
-                }
+                let title = "ยืนยัน (Confirm)", btnType = "default", ph = "ความคิดเห็นเพิ่มเติม (Optional)...";
+                if (action === 'Reject') { title = "ระบุเหตุผลไม่อนุมัติ (Reject Reason)"; btnType = "danger"; ph = "ต้องระบุเหตุผล (Required)..."; }
+                else if (action === 'Approve') { title = "ยืนยันอนุมัติ (Confirm Approve)"; btnType = "success"; }
+                else if (action === 'Submit') { title = "ยืนยันส่งอนุมัติ (Confirm Submit)"; btnType = "default"; }
 
                 actionPopupInstance.option("title", title);
                 actionPopupInstance.show().done(() => {
                     const textArea = $("#actionReasonBox").dxTextArea("instance");
-                    textArea.reset();
-                    textArea.option("placeholder", ph);
-                    setTimeout(() => textArea.focus(), 100);
-
+                    if (textArea) { textArea.reset(); textArea.option("placeholder", ph); setTimeout(() => textArea.focus(), 100); }
                     const btnConfirm = $("#btnConfirmAction").dxButton("instance");
-                    btnConfirm.option({
-                        type: btnType,
-                        onClick: () => {
-                            const comment = textArea.option("value");
-                            if (currentActionType === 'Reject' && !comment) {
-                                DevExpress.ui.notify("กรุณาระบุเหตุผล", "error", 2000);
-                                textArea.focus();
-                                return;
+                    if (btnConfirm) {
+                        btnConfirm.option({
+                            type: btnType,
+                            onClick: () => {
+                                const comment = textArea ? textArea.option("value") : "";
+                                if (currentActionType === 'Reject' && !comment) { DevExpress.ui.notify("กรุณาระบุเหตุผล", "error", 2000); textArea.focus(); return; }
+                                actionPopupInstance.hide();
+                                if (currentActionType === 'Submit') executeSaveOrSubmit(true, comment);
+                                else sendApprovalAction(currentActionType, comment);
                             }
-                            actionPopupInstance.hide();
-                            if (currentActionType === 'Submit') executeSaveOrSubmit(true, comment);
-                            else sendApprovalAction(currentActionType, comment);
-                        }
-                    });
+                        });
+                    }
                 });
             }
 
@@ -554,39 +421,43 @@
                     if (MODE === "EDIT") formData.append("Id", PR_ID);
                     formData.append("Title", data.title);
 
-                    const vendorEditor = formInstance.getEditor("vendorId");
-                    formData.append("VendorId", vendorEditor.option("value"));
-                    formData.append("VendorName", vendorEditor.option("displayValue") || ""); // อาจจะได้ค่า Code : Name
+                    // --- [แก้ไข] ส่ง VendorCode โดยตรง ---
+                    // data.vendorCode จะมีค่าจากการเลือก Dropdown อัตโนมัติ เพราะ bind กับ dataField
+                    formData.append("VendorCode", data.vendorCode);
+
+                    const vendorEditor = formInstance.getEditor("vendorCode");
+                    const selectedVendor = vendorEditor.option("selectedItem");
+                    if (selectedVendor) formData.append("VendorName", selectedVendor.name);
+                    else formData.append("VendorName", data.vendorName || "");
+                    // ------------------------------------
 
                     if (data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
                     if (data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
                     formData.append("Remark", data.remark || "");
-
                     if (isSubmit && comment) formData.append("Comment", comment);
 
                     const gridFiles = attachmentGridInstance.option("dataSource") || [];
-                    const newFilesMeta = gridFiles.filter(f => f.isNew).map(f => ({ FileName: f.fileName || f.originalFileName, DocumentTypeId: f.documentTypeId }));
-                    const existingUpdates = gridFiles.filter(f => f.id && !f.isNew).map(f => ({ Id: f.id, DocumentTypeId: f.documentTypeId }));
-
+                    const newFilesMeta = [], existingUpdates = [];
+                    gridFiles.forEach(f => {
+                        if (f.isNew) newFilesMeta.push({ FileName: f.fileName || f.originalFileName, DocumentTypeId: f.documentTypeId });
+                        else if (f.id) existingUpdates.push({ Id: f.id, DocumentTypeId: f.documentTypeId });
+                    });
                     formData.append("QuotationsJson", JSON.stringify(newFilesMeta));
-
                     if (MODE === "EDIT") {
                         formData.append("UpdatedQuotationsJson", JSON.stringify(existingUpdates));
                         if (deletedFileIds.length > 0) formData.append("DeletedFileIds", deletedFileIds.join(","));
                     }
-
                     fileList.forEach(f => formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f));
 
-                    const endpoint = (MODE === "CREATE")
-                        ? (isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE)
-                        : (isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE);
+                    let endpoint = "";
+                    if (MODE === "CREATE") endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
+                    else endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
 
                     const res = await fetch(CONFIG.API_BASE_URL + endpoint, { method: 'POST', body: formData, credentials: 'include' });
                     if (!res.ok) throw new Error(await res.text());
 
                     DevExpress.ui.notify("บันทึกข้อมูลสำเร็จ", "success", 1500);
                     setTimeout(() => window.location.href = '@Url.Action("Index", "Home")', 1000);
-
                 } catch (err) {
                     console.error("Execute Error:", err.message);
                     DevExpress.ui.notify("เกิดข้อผิดพลาด: " + err.message, "error", 5000);
@@ -605,17 +476,9 @@
                     });
                     if (!res.ok) throw new Error(await res.text());
                     setTimeout(() => location.reload(), 500);
-                } catch (err) {
-                    console.error("Approval Error:", err.message);
-                    DevExpress.ui.notify("เกิดข้อผิดพลาดในการอนุมัติ", "error", 3000);
-                } finally {
-                    loadingIndicator.hide();
-                }
+                } catch (err) { console.error("Approval Error:", err.message); } finally { loadingIndicator.hide(); }
             }
 
-            // ==========================================
-            // 7. WORKFLOW GRID
-            // ==========================================
             function renderWorkflowRouteGrid(routeData, currentStepId) {
                 const gridData = (routeData && routeData.steps) ? routeData.steps.map(s => ({
                     sequenceNo: s.sequenceNo, stepName: s.stepName, rawAssignments: s.assignments,
@@ -625,37 +488,17 @@
 
                 $("#workflowRouteGrid").dxDataGrid({
                     dataSource: gridData, showBorders: true, showRowLines: true, columnAutoWidth: true, paging: { enabled: false },
-                    onRowPrepared: (e) => {
-                        if (e.rowType === "data" && e.data.sequenceNo === currentStepId) e.rowElement.addClass("row-current-step");
-                    },
+                    onRowPrepared: (e) => { if (e.rowType === "data" && e.data.sequenceNo === currentStepId) e.rowElement.addClass("row-current-step"); },
                     columns: [
                         { dataField: "sequenceNo", caption: "#", width: 50, alignment: "center" },
                         { dataField: "stepName", caption: "ขั้นตอน (Step)", width: 200 },
-                        {
-                            dataField: "assignees", caption: "ผู้มีสิทธิ์อนุมัติ (Assignees)",
-                            cellTemplate: (c, o) => {
-                                const list = o.data.rawAssignments || [];
-                                if(list.length === 0) return $("<span>").text("Any").appendTo(c);
-                                list.forEach(a => $("<div>").html(a.isCurrentUser ?
-                                    `<span class="current-user-row"><i class="fas fa-user-circle"></i> ${a.employeeName} (You)</span>` :
-                                    `<span class="text-muted"><i class="fas fa-user"></i> ${a.employeeName}</span>`).appendTo(c));
-                            }
-                        },
-                        {
-                            dataField: "status", caption: "สถานะ", width: 130, alignment: "center",
-                            cellTemplate: (c, o) => {
-                                const b = getStatusBadge(o.value);
-                                $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c);
-                            }
-                        },
-                        {
-                            dataField: "approverName", caption: "ผู้ดำเนินการ",
-                            cellTemplate: (c, o) => {
-                                const name = o.data.approverName;
-                                const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-";
-                                $("<span>").text(txt).appendTo(c);
-                            }
-                        },
+                        { dataField: "assignees", caption: "ผู้มีสิทธิ์อนุมัติ (Assignees)", cellTemplate: (c, o) => {
+                            const list = o.data.rawAssignments || [];
+                            if (list.length === 0) return $("<span>").text("Any").appendTo(c);
+                            list.forEach(a => $("<div>").html(a.isCurrentUser ? `<span class="current-user-row"><i class="fas fa-user-circle"></i> ${a.employeeName} (You)</span>` : `<span class="text-muted"><i class="fas fa-user"></i> ${a.employeeName}</span>`).appendTo(c));
+                        }},
+                        { dataField: "status", caption: "สถานะ", width: 130, alignment: "center", cellTemplate: (c, o) => { const b = getStatusBadge(o.value); $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c); }},
+                        { dataField: "approverName", caption: "ผู้ดำเนินการ", cellTemplate: (c, o) => { const name = o.data.approverName; const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-"; $("<span>").text(txt).appendTo(c); }},
                         { dataField: "actionDate", caption: "วันที่", width: 140, alignment: "center", customizeText: (c) => formatDateTime(c.value) },
                         { dataField: "comment", caption: "ความเห็น", customizeText: (c) => c.value || "-" }
                     ]
@@ -672,22 +515,9 @@
                             columns: [
                                 { caption: "#", width: 50, alignment: "center", cellTemplate: (cnt, opt) => cnt.text(opt.rowIndex + 1) },
                                 { dataField: "stepName", caption: "Step" },
-                                {
-                                    dataField: "approverName", caption: "Approver",
-                                    cellTemplate: (c, o) => {
-                                        const name = o.data.approverName;
-                                        const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-";
-                                        $("<span>").text(txt).appendTo(c);
-                                    }
-                                },
+                                { dataField: "approverName", caption: "Approver", cellTemplate: (c, o) => { const name = o.data.approverName; const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-"; $("<span>").text(txt).appendTo(c); } },
                                 { dataField: "actionDate", caption: "Date", width: 140, alignment: "center", customizeText: (info) => formatDateTime(info.value) },
-                                {
-                                    dataField: "status", caption: "Status", width: 130,
-                                    cellTemplate: (cnt, opt) => {
-                                        const b = getStatusBadge(opt.value);
-                                        $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(cnt);
-                                    }
-                                },
+                                { dataField: "status", caption: "Status", width: 130, cellTemplate: (cnt, opt) => { const b = getStatusBadge(opt.value); $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(cnt); } },
                                 { dataField: "comment", caption: "Remark", customizeText: (info) => info.value || "-" }
                             ]
                         }).appendTo(c);
@@ -695,49 +525,34 @@
                 }).dxPopup("instance").show();
             }
 
-            // ==========================================
-            // 8. PDF PREVIEW POPUP (Replaces window.open)
-            // ==========================================
             function initActionPopup() {
                 actionPopupInstance = $("#actionPopup").dxPopup({
                     width: 400, height: "auto", visible: false, dragEnabled: true, hideOnOutsideClick: false, showCloseButton: true, title: "Action",
+                    contentTemplate: function(contentElement) {
+                        const container = $("<div>").addClass("p-2");
+                        $("<div>").attr("id", "actionReasonBox").appendTo(container).dxTextArea({ height: 100, value: "", stylingMode: "outlined" });
+                        const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
+                        $("<div>").appendTo(btnGroup).dxButton({ text: "ยกเลิก (Cancel)", stylingMode: "text", onClick: () => actionPopupInstance.hide() });
+                        $("<div>").attr("id", "btnConfirmAction").appendTo(btnGroup).dxButton({ text: "ยืนยัน (Confirm)", stylingMode: "contained" });
+                        return container;
+                    }
                 }).dxPopup("instance");
             }
 
-            function initPdfPopup() {
-                pdfPopupInstance = $("#pdfPopup").dxPopup({
-                    width: "80%", height: "90%", visible: false, dragEnabled: true,
-                    hideOnOutsideClick: true, showCloseButton: true, title: "Preview Document",
-                    shading: true, shadingColor: "rgba(0,0,0,0.7)"
-                }).dxPopup("instance");
-            }
-
-            async function viewPdf(id, fileName) {
-                loadingIndicator.show();
+            async function viewPdf(id) {
+                const loadingHtml = `<div style="text-align:center; padding-top:20px;"><h3>Processing PDF...</h3><p>Please wait...</p></div>`;
+                const loadingUrl = URL.createObjectURL(new Blob([loadingHtml], { type: 'text/html' }));
+                const newWindow = window.open(loadingUrl, '_blank');
+                if (!newWindow) { alert("Pop-up blocked!"); return; }
                 try {
                     const response = await fetch(`${CONFIG.API_BASE_URL}/Request/ViewFile/${id}`, { method: 'GET', credentials: 'include' });
                     if (!response.ok) throw new Error("Cannot download file.");
                     const pdfBlob = await response.blob();
                     if (pdfBlob.type !== 'application/pdf') throw new Error("Invalid PDF");
-
-                    const blobUrl = window.URL.createObjectURL(pdfBlob);
-
-                    // Show in Popup instead of new window
-                    pdfPopupInstance.option("title", `Preview: ${fileName}`);
-                    pdfPopupInstance.option("contentTemplate", (content) => {
-                        content.empty();
-                        $("<iframe>")
-                            .attr("src", blobUrl)
-                            .attr("id", "pdfPreviewFrame")
-                            .appendTo(content);
-                    });
-                    pdfPopupInstance.show();
-
+                    newWindow.location.href = window.URL.createObjectURL(pdfBlob);
                 } catch (error) {
+                    if (newWindow && !newWindow.closed) newWindow.close();
                     console.error("View PDF Error:", error.message);
-                    DevExpress.ui.notify("ไม่สามารถเปิดไฟล์ได้: " + error.message, "error", 3000);
-                } finally {
-                    loadingIndicator.hide();
                 }
             }
         });

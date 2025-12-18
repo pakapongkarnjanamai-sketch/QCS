@@ -188,11 +188,16 @@
                         caption: "หัวข้อ/รายการ",
                         minWidth: 180
                     },
-                    {
-                        dataField: "vendorName",
-                        caption: "ผู้ขาย (Vendor)",
-                        width: 300
-                    },
+                           {
+            dataField: "vendorName",
+            caption: "ผู้ขาย (Vendor)",
+            width: 300,
+            calculateDisplayValue: (rowData) => {
+                 return rowData.vendorCode
+                    ? `${rowData.vendorCode} : ${rowData.vendorName}`
+                    : rowData.vendorName;
+            }
+        },
                     {
                         dataField: "requestDate",
                         caption: "วันที่ขอ",

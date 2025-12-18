@@ -19,8 +19,8 @@ namespace QCS.Domain.Enum
         [Display(Name = "รอพิจารณา")]
         [Description("รอพิจารณา")]
         InReview = 1,
-        [Display(Name = "อนุมัติผ่าน")]
-        [Description("อนุมัติผ่าน")]
+        [Display(Name = "อนุมัติ")]
+        [Description("อนุมัติ")]
         Approved = 2,
         [Display(Name = "ข้าม")]
         [Description("ข้าม")]

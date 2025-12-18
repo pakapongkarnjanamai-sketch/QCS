@@ -58,6 +58,7 @@ namespace QCS.Application.Services
                 Id = r.Id,
                 Code = r.Code,
                 Title = r.Title,
+                VendorCode = r.VendorCode,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
                 CurrentStepId = r.CurrentStepId,
@@ -76,6 +77,7 @@ namespace QCS.Application.Services
                 Id = r.Id,
                 Code = r.Code,
                 Title = r.Title,
+                VendorCode = r.VendorCode,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
                 CurrentStepId = r.CurrentStepId,
@@ -112,6 +114,7 @@ namespace QCS.Application.Services
                 Id = r.Id,
                 Code = r.Code,
                 Title = r.Title,
+                VendorCode = r.VendorCode,
                 VendorName = r.VendorName,
                 RequestDate = r.RequestDate,
                 CurrentStepId = r.CurrentStepId,
@@ -191,7 +194,7 @@ namespace QCS.Application.Services
                 RequestDate = request.RequestDate,
                 Status = request.Status.ToString(),
                 CurrentStepId = request.CurrentStepId,
-                VendorId = request.VendorId,
+                VendorCode = request.VendorCode,
                 VendorName = request.VendorName,
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
@@ -296,7 +299,8 @@ namespace QCS.Application.Services
                     RequestDate = DateTime.Now,
                     Status = docStatus,
                     CurrentStepId = currentStepId,
-                    VendorId = input.VendorId,
+                    //VendorId = input.VendorId,
+                    VendorCode = input.VendorCode,
                     VendorName = input.VendorName,
                     ValidFrom = input.ValidFrom,
                     ValidUntil = input.ValidUntil,
@@ -377,7 +381,8 @@ namespace QCS.Application.Services
 
                 // Update Fields
                 pr.Title = input.Title;
-                pr.VendorId = input.VendorId;
+                //pr.VendorId = input.VendorId;
+                pr.VendorCode = input.VendorCode;
                 pr.VendorName = input.VendorName;
                 pr.ValidFrom = input.ValidFrom;
                 pr.ValidUntil = input.ValidUntil;

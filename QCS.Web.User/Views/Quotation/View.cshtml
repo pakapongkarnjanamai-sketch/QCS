@@ -408,7 +408,16 @@
                     items: [
                         { dataField: "code", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
-                        { dataField: "vendorName", label: { text: "Vendor" }, colSpan: 2 },
+                        {
+                dataField: "vendorCode",
+                label: { text: "Vendor Code" },
+                colSpan: 2
+            },
+            {
+                dataField: "vendorName",
+                label: { text: "Vendor Name" },
+                colSpan: 2
+            },
                         {
                             dataField: "validFrom", label: { text: "Valid From" },
                             editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }

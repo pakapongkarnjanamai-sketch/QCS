@@ -18,8 +18,8 @@ namespace QCS.Domain.Models
             get => (WorkflowStep)CurrentStepId;
             set => CurrentStepId = (int)value;
         }
-        public int VendorId { get; set; }
-        public string? VendorCode { get; set; }
+ 
+        public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement

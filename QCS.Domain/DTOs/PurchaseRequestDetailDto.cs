@@ -16,8 +16,8 @@ namespace QCS.Domain.DTOs
         public string Status { get; set; }
         public string RequesterName { get; set; }
         public int CurrentStepId { get; set; }
-
-        public int VendorId { get; set; }
+       
+        public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
         public DateTime? ValidFrom { get; set; }

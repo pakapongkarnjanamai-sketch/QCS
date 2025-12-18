@@ -214,7 +214,7 @@
             return { cls: badgeClass, txt: text };
         };
 
-        // ... (ส่วน handleDocClick, createRemoteStore, createGridConfig เหมือนเดิม) ...
+    
         const handleDocClick = (paramValue, baseUrl, openInNewWindow) => {
             const url = `${baseUrl}?id=${encodeURIComponent(paramValue)}&mode=view`;
             if (openInNewWindow) window.open(url, '_blank');
@@ -280,7 +280,17 @@
                     }
                 },
                 { dataField: "title", caption: "หัวข้อ", minWidth: 200 },
-                { dataField: "vendorName", caption: "ผู้ขาย", width: 200 },
+                    {
+        dataField: "vendorName",
+        caption: "ผู้ขาย (Vendor)",
+        width: 250,
+        calculateDisplayValue: function(rowData) {
+            // ถ้ามี Code ให้แสดง Code : Name ถ้าไม่มีแสดง Name อย่างเดียว
+            return rowData.vendorCode
+                ? `${rowData.vendorCode} : ${rowData.vendorName}`
+                : rowData.vendorName;
+        }
+    },
                 {
                     dataField: "requestDate",
                     caption: "วันที่ขอ",
@@ -335,7 +345,7 @@
             return baseColumns;
         };
 
-        // ... (ส่วน loadSummaryData และ initTabPanel เหมือนเดิม) ...
+    
         loadSummaryData();
 
         $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
