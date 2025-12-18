@@ -162,7 +162,7 @@
                 <i class="fas fa-plus me-2"></i>สร้างใบเสนอราคาใหม่
             </button>
         </div>
-
+        <div id="loadingIndicator"></div>
     </div>
 </div>
 <script>
@@ -214,7 +214,16 @@
             return { cls: badgeClass, txt: text };
         };
 
-    
+    const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
+        shadingColor: "rgba(0,0,0,0.4)",
+        position: { of: "window" },
+        visible: false,
+        showIndicator: true,
+        showPane: true,
+        shading: true,
+        message: "กำลังโหลดข้อมูล..." // ปรับข้อความให้เหมาะกับหน้า Dashboard
+    }).dxLoadPanel("instance");
+
         const handleDocClick = (paramValue, baseUrl, openInNewWindow) => {
             const url = `${baseUrl}?id=${encodeURIComponent(paramValue)}&mode=view`;
             if (openInNewWindow) window.open(url, '_blank');
@@ -353,14 +362,17 @@
         });
 
         function loadSummaryData() {
+            loadingIndicator.show();
             $.ajax({
                 url: `${API_BASE}/Dashboard/Summary`,
                 method: "GET",
                 xhrFields: { withCredentials: true },
                 success: function (data) {
+                    loadingIndicator.hide();
                     initTabPanel(data.myRequestCount, data.myTaskCount, data.approvedCount);
                 },
                 error: function(err) {
+                    loadingIndicator.hide();
                     initTabPanel(0, 0, 0);
                 }
             });
