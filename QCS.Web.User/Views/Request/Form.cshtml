@@ -472,7 +472,7 @@
                     const endpoint = (action === 'Approve') ? CONFIG.API_APPROVE : CONFIG.API_REJECT;
                     const res = await fetch(CONFIG.API_BASE_URL + endpoint, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ purchaseRequestId: PR_ID, comment: comment }), credentials: 'include'
+                        body: JSON.stringify({ requestId: PR_ID, comment: comment }), credentials: 'include'
                     });
                     if (!res.ok) throw new Error(await res.text());
                     setTimeout(() => location.reload(), 500);

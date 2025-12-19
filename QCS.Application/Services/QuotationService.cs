@@ -13,7 +13,7 @@ namespace QCS.Application.Services
     {
         IQueryable<Request> GetQueryable();
         Task<AttachmentResultDto?> GetAttachmentAsync(int id);
-        Task<AttachmentResultDto> GenerateStampedPdfAsync(int purchaseRequestId);
+        Task<AttachmentResultDto> GenerateStampedPdfAsync(int requestId);
     }
 
     public class QuotationService : IQuotationService
@@ -81,12 +81,12 @@ namespace QCS.Application.Services
             return null;
         }
 
-        public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int purchaseRequestId)
+        public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int requestId)
         {
             var request = await _requestRepository.GetAll()
                 .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
-                .FirstOrDefaultAsync(r => r.Id == purchaseRequestId);
+                .FirstOrDefaultAsync(r => r.Id == requestId);
 
             if (request == null) throw new KeyNotFoundException("Request not found");
 

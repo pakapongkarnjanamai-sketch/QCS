@@ -22,6 +22,9 @@ namespace QCS.Application.Services
         Task UpdateAsync(UpdateRequestDto input, bool isSubmit);
         Task DeleteAsync(int id);
         Task<AttachmentResultDto?> GetAttachmentAsync(int id);
+
+        Task ApproveAsync(ApprovalActionDto input);
+        Task RejectAsync(ApprovalActionDto input);
     }
 
     public class RequestService : IRequestService
@@ -45,7 +48,79 @@ namespace QCS.Application.Services
             _currentUserService = currentUserService;
             _env = env;
         }
+        public async Task ApproveAsync(ApprovalActionDto input)
+        {
+            var request = await _requestRepository.GetAll()
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == input.RequestId);
 
+            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
+
+            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
+
+            var currentUserId = _currentUserService.UserId;
+            string approverName = await GetApproverNameAsync(1, currentUserId);
+
+            // Update Step ปัจจุบัน
+            currentStepObj.Status = (int)RequestStatus.Approved;
+            currentStepObj.ActionDate = DateTime.Now;
+            currentStepObj.Comment = input.Comment;
+            currentStepObj.ApproverNId = currentUserId;
+            currentStepObj.ApproverName = approverName;
+
+            // หา Step ถัดไป
+            var nextStep = request.ApprovalSteps
+                .Where(s => s.Sequence > currentStepObj.Sequence)
+                .OrderBy(s => s.Sequence)
+                .FirstOrDefault();
+
+            if (nextStep != null)
+            {
+                request.CurrentStepId = nextStep.Sequence;
+                nextStep.Status = (int)RequestStatus.Pending;
+            }
+            else
+            {
+                request.Status = (int)RequestStatus.Approved;
+                //request.CurrentStepId = (int)WorkflowStep.Completed; // จบกระบวนการ
+                request.CurrentStep = WorkflowStep.Completed;
+            }
+
+            await _requestRepository.UpdateAsync(request);
+            await _requestRepository.SaveChangesAsync();
+        }
+
+        public async Task RejectAsync(ApprovalActionDto input)
+        {
+            var request = await _requestRepository.GetAll()
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == input.RequestId);
+
+            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
+
+            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
+
+            var currentUserId = _currentUserService.UserId;
+            string approverName = await GetApproverNameAsync(1, currentUserId);
+
+            currentStepObj.Status = (int)RequestStatus.Rejected;
+            currentStepObj.ActionDate = DateTime.Now;
+            currentStepObj.Comment = input.Comment;
+            currentStepObj.ApproverNId = currentUserId;
+            currentStepObj.ApproverName = approverName;
+
+            request.Status = (int)RequestStatus.Rejected;
+            //request.CurrentStepId = (int)WorkflowStep.Rejected;
+            request.CurrentStep = WorkflowStep.Rejected;
+
+            var remainingSteps = request.ApprovalSteps.Where(s => s.Sequence > currentStepObj.Sequence);
+            foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
+
+            await _requestRepository.UpdateAsync(request);
+            await _requestRepository.SaveChangesAsync();
+        }
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
             return _requestRepository.GetAll()

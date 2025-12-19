@@ -409,7 +409,7 @@
                     const data = await res.json();
                     if (!data) throw new Error("No data returned.");
 
-                    currentDocId = data.purchaseRequestId;
+                    currentDocId = data.requestId;
 
                     renderHeader(data);
                     renderActionButtons(data);
@@ -545,7 +545,7 @@
                     const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ purchaseRequestId: currentDocId, comment: comment }),
+                        body: JSON.stringify({ requestId: currentDocId, comment: comment }),
                         credentials: 'include'
                     });
                     if (!res.ok) throw new Error(await res.text());
