@@ -6,10 +6,10 @@ namespace QCS.Domain.Models
 {
     public class ApprovalStep : BaseEntity
     {
-        public int PurchaseRequestId { get; set; }
+        public int RequestId { get; set; }
         
         [ForeignKey("RequestId")]
-        public virtual Request PurchaseRequest { get; set; }
+        public virtual Request Request { get; set; }
 
         public int Sequence { get; set; }
         public string StepName { get; set; } = string.Empty;

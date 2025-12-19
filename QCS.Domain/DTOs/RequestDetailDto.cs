@@ -9,7 +9,7 @@ namespace QCS.Domain.DTOs
 {
     public class RequestDetailDto
     {
-        public int PurchaseRequestId { get; set; }
+        public int RequestId { get; set; }
         public string DocumentNo { get; set; }
         public string Title { get; set; }
         public DateTime RequestDate { get; set; }

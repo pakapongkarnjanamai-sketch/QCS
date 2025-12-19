@@ -1,26 +1,20 @@
-﻿
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
-using System.Security.Cryptography;
 using System.Text.Json;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace QCS.Application.Services
 {
-
     public interface IRequestService
     {
-        // เปลี่ยน Return Type เป็น RequestGridDto
         IQueryable<RequestGridDto> GetMyRequestsQuery();
         Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync();
         IQueryable<RequestGridDto> GetApprovedListQuery();
         IQueryable<RequestGridDto> GetRejectedRequestsQuery();
-        // Methods อื่นๆ เหมือนเดิม...
         Task<RequestDetailDto?> GetByCodeAsync(string code);
         Task<RequestDetailDto?> GetByIdAsync(int id);
         Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit);
@@ -35,6 +29,7 @@ namespace QCS.Application.Services
         private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
         private readonly IWebHostEnvironment _env;
+
         public RequestService(AppDbContext context, WorkflowService workflowService, ICurrentUserService currentUserService, IWebHostEnvironment env)
         {
             _context = context;
@@ -43,65 +38,57 @@ namespace QCS.Application.Services
             _env = env;
         }
 
-        // ==========================================================
-        // ⚡ OPTIMIZED QUERIES
-        // ==========================================================
-
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
-            var query = _context.Requests
-        .AsNoTracking()
-        .Where(r => r.CreatedBy == _currentUserService.UserId
-                 && r.Status != (int)RequestStatus.Approved
-                 && r.Status != (int)RequestStatus.Rejected);
-
-            return query.Select(r => new RequestGridDto
-            {
-                Id = r.Id,
-                Code = r.Code,
-                Title = r.Title,
-                VendorCode = r.VendorCode,
-                VendorName = r.VendorName,
-                RequestDate = r.RequestDate,
-                CurrentStepId = r.CurrentStepId,
-             
-            });
+            return _context.Requests
+                .AsNoTracking()
+                .Where(r => r.CreatedBy == _currentUserService.UserId
+                         && r.Status != (int)RequestStatus.Approved
+                         && r.Status != (int)RequestStatus.Rejected)
+                .Select(r => new RequestGridDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId,
+                });
         }
+
         public IQueryable<RequestGridDto> GetRejectedRequestsQuery()
         {
-            // ดึงเฉพาะเอกสารที่ CreatedBy เป็นเรา และมี Status เป็น Rejected (-1)
-            var query = _context.Requests
+            return _context.Requests
                 .AsNoTracking()
-                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Rejected);
-
-            return query.Select(r => new RequestGridDto
-            {
-                Id = r.Id,
-                Code = r.Code,
-                Title = r.Title,
-                VendorCode = r.VendorCode,
-                VendorName = r.VendorName,
-                RequestDate = r.RequestDate,
-                CurrentStepId = r.CurrentStepId
-            });
+                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Rejected)
+                .Select(r => new RequestGridDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId
+                });
         }
+
         public IQueryable<RequestGridDto> GetApprovedListQuery()
         {
-            var query = _context.Requests
+            return _context.Requests
                 .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Approved);
-
-            return query.Select(r => new RequestGridDto
-            {
-                Id = r.Id,
-                Code = r.Code,
-                Title = r.Title,
-                VendorCode = r.VendorCode,
-                VendorName = r.VendorName,
-                RequestDate = r.RequestDate,
-                CurrentStepId = r.CurrentStepId,
-           
-            });
+                .Where(r => r.Status == (int)RequestStatus.Approved)
+                .Select(r => new RequestGridDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId,
+                });
         }
 
         public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
@@ -119,34 +106,27 @@ namespace QCS.Application.Services
 
             if (!myStepSequences.Any())
             {
-                // คืนค่า Query ว่างๆ ถ้าไม่มี Task
                 return _context.Requests.AsNoTracking().Where(r => false).Select(r => new RequestGridDto());
             }
 
-            var query = _context.Requests
+            return _context.Requests
                 .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Pending &&
-                            myStepSequences.Contains(r.CurrentStepId));
-
-            return query.Select(r => new RequestGridDto
-            {
-                Id = r.Id,
-                Code = r.Code,
-                Title = r.Title,
-                VendorCode = r.VendorCode,
-                VendorName = r.VendorName,
-                RequestDate = r.RequestDate,
-                CurrentStepId = r.CurrentStepId,
-                RequesterName = r.ApprovalSteps
-                        .Where(s => s.Sequence == 1)
-                        .Select(s => s.ApproverName)
-                        .FirstOrDefault() ?? "Unknown"
-            });
+                .Where(r => r.Status == (int)RequestStatus.Pending && myStepSequences.Contains(r.CurrentStepId))
+                .Select(r => new RequestGridDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId,
+                    RequesterName = r.ApprovalSteps
+                            .Where(s => s.Sequence == 1)
+                            .Select(s => s.ApproverName)
+                            .FirstOrDefault() ?? "Unknown"
+                });
         }
-
-        // ==========================================================
-        // 🔍 GET DETAILS (Mapped to RequestDetailDto)
-        // ==========================================================
 
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
@@ -158,10 +138,8 @@ namespace QCS.Application.Services
 
             if (request == null) return null;
 
-            // 1. ดึง Workflow Template เพื่อเช็คสิทธิ์
-            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1); // ควรย้าย 1 ไป Config
+            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1);
 
-            // 2. Merge ข้อมูล History ลงใน Route (เพื่อแสดง Timeline)
             if (workflowRoute?.Steps != null)
             {
                 foreach (var routeStep in workflowRoute.Steps)
@@ -175,39 +153,12 @@ namespace QCS.Application.Services
                         routeStep.ApproverName = actualStep.ApproverName;
                         routeStep.ApproverNId = actualStep.ApproverNId;
                     }
-
-                    // Mark Current User Assignment
-                    if (routeStep.Assignments != null)
-                    {
-                        foreach (var assign in routeStep.Assignments)
-                        {
-                            if (string.Equals(assign.NId, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
-                            {
-                                assign.IsCurrentUser = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. คำนวณ Permission
-            bool canApprove = false;
-            bool canReject = false;
-            bool canEdit = request.Status == (int)RequestStatus.Draft;
-
-            if (request.Status == (int)RequestStatus.Pending && workflowRoute?.Steps != null)
-            {
-                var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
-                if (currentStepConfig?.Assignments != null && currentStepConfig.Assignments.Any(a => a.IsCurrentUser))
-                {
-                    canApprove = true;
-                    canReject = true;
                 }
             }
 
             return new RequestDetailDto
             {
-                PurchaseRequestId = request.Id,
+                RequestId = request.Id,
                 DocumentNo = request.Code,
                 Title = request.Title,
                 RequestDate = request.RequestDate,
@@ -225,19 +176,13 @@ namespace QCS.Application.Services
                     OriginalFileName = q.FileName,
                     FilePath = q.FilePath
                 }).ToList(),
-                Permissions = new PermissionDto
-                {
-                    CanApprove = canApprove,
-                    CanReject = canReject,
-                    CanEdit = canEdit
-                },
+                Permissions = _workflowService.GetPermissions(request, workflowRoute),
                 WorkflowRoute = workflowRoute
             };
         }
 
         public async Task<RequestDetailDto?> GetByCodeAsync(string code)
         {
-            // ค้นหา ID จาก Code ก่อน
             var id = await _context.Requests
                 .AsNoTracking()
                 .Where(r => r.Code == code)
@@ -245,30 +190,20 @@ namespace QCS.Application.Services
                 .FirstOrDefaultAsync();
 
             if (id == 0) return null;
-
-            // Reuse Logic เดิมของ GetByIdAsync เพื่อให้ Return Data Structure เดียวกันเป๊ะ
             return await GetByIdAsync(id);
         }
-
-       
-
-        // ==========================================================
-        // 📝 CRUD OPERATIONS
-        // ==========================================================
 
         public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. Prepare Workflow & Doc No
                 var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
                 if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
 
                 var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
                 var newDocNo = await GenerateDocNoAsync();
 
-                // 2. Determine Status
                 int currentStepId = 1;
                 int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
 
@@ -279,7 +214,6 @@ namespace QCS.Application.Services
                     if (currentStepId == 99) docStatus = (int)RequestStatus.Approved;
                 }
 
-                // 3. Create Entity
                 var pr = new Request
                 {
                     Code = newDocNo,
@@ -287,17 +221,13 @@ namespace QCS.Application.Services
                     RequestDate = DateTime.Now,
                     Status = docStatus,
                     CurrentStepId = currentStepId,
-                    //VendorId = input.VendorId,
                     VendorCode = input.VendorCode,
                     VendorName = input.VendorName,
                     ValidFrom = input.ValidFrom,
                     ValidUntil = input.ValidUntil,
-                    Remark = input.Remark,
-                    ApprovalSteps = new List<ApprovalStep>(),
-                    Quotations = new List<Quotation>()
+                    Remark = input.Remark
                 };
 
-                // 4. Create Approval Steps History
                 foreach (var step in sortedSteps)
                 {
                     int stepStatus = (int)RequestStatus.Draft;
@@ -306,7 +236,7 @@ namespace QCS.Application.Services
                     string? comment = null;
                     DateTime? actionDate = null;
 
-                    if (step.SequenceNo == 1) // Step 1 = Requester
+                    if (step.SequenceNo == 1)
                     {
                         if (isSubmit)
                         {
@@ -318,12 +248,12 @@ namespace QCS.Application.Services
                         }
                         else
                         {
-                            stepStatus = (int)RequestStatus.Pending; // Draft mode
+                            stepStatus = (int)RequestStatus.Pending;
                         }
                     }
                     else if (step.SequenceNo == 2 && isSubmit)
                     {
-                        stepStatus = (int)RequestStatus.Pending; // Waiting for Step 2
+                        stepStatus = (int)RequestStatus.Pending;
                     }
 
                     pr.ApprovalSteps.Add(new ApprovalStep
@@ -338,9 +268,7 @@ namespace QCS.Application.Services
                     });
                 }
 
-                // 5. Handle Files
                 await HandleFileUploadsAsync(input, pr);
-
                 await _context.Requests.AddAsync(pr);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -367,9 +295,7 @@ namespace QCS.Application.Services
                 if (pr == null) throw new KeyNotFoundException("Document not found");
                 if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
 
-                // Update Fields
                 pr.Title = input.Title;
-                //pr.VendorId = input.VendorId;
                 pr.VendorCode = input.VendorCode;
                 pr.VendorName = input.VendorName;
                 pr.ValidFrom = input.ValidFrom;
@@ -380,7 +306,6 @@ namespace QCS.Application.Services
                 {
                     pr.Status = (int)RequestStatus.Pending;
 
-                    // Update Step 1 (Requester) -> Approved
                     var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
                     if (step1 != null)
                     {
@@ -391,18 +316,16 @@ namespace QCS.Application.Services
                         step1.Comment = input.Comment;
                     }
 
-                    // Activate Step 2 -> Pending
                     var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
                     if (step2 != null)
                     {
                         step2.Status = (int)RequestStatus.Pending;
-                        step2.ApproverNId = null; // Clear old data if rejected
+                        step2.ApproverNId = null;
                         step2.ApproverName = null;
                         pr.CurrentStepId = 2;
                     }
                 }
 
-                // Handle Files Updates (Metadata)
                 if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
                 {
                     var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -416,7 +339,6 @@ namespace QCS.Application.Services
                     }
                 }
 
-                // Handle Files Delete
                 if (!string.IsNullOrEmpty(input.DeletedFileIds))
                 {
                     var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
@@ -424,9 +346,7 @@ namespace QCS.Application.Services
                     _context.Quotations.RemoveRange(toRemove);
                 }
 
-                // Handle New Files
                 await HandleFileUploadsAsync(input, pr);
-
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
@@ -442,21 +362,16 @@ namespace QCS.Application.Services
             var pr = await _context.Requests.FindAsync(id);
             if (pr != null)
             {
-                // Soft Delete or Hard Delete based on policy
                 _context.Requests.Remove(pr);
                 await _context.SaveChangesAsync();
             }
         }
-
-
-
 
         public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
         {
             var q = await _context.Quotations.Include(x => x.AttachmentFile).FirstOrDefaultAsync(x => x.Id == fileId);
             if (q == null) return null;
 
-            // 1. Try DB
             if (q.AttachmentFile?.Data != null)
             {
                 return new AttachmentResultDto
@@ -467,7 +382,6 @@ namespace QCS.Application.Services
                 };
             }
 
-            // 2. Try Disk (Legacy Support)
             if (!string.IsNullOrEmpty(q.FilePath) && q.FilePath != "Database")
             {
                 var path = Path.Combine(_env.WebRootPath, q.FilePath);
@@ -485,10 +399,6 @@ namespace QCS.Application.Services
             return null;
         }
 
-        // ==========================================================
-        // 🛠 PRIVATE HELPERS
-        // ==========================================================
-
         private async Task<string> GenerateDocNoAsync()
         {
             var todayStr = DateTime.Now.ToString("yyyyMMdd");
@@ -505,7 +415,6 @@ namespace QCS.Application.Services
 
         private async Task HandleFileUploadsAsync(dynamic input, Request pr)
         {
-            // Reflection to get Attachments from both Create and Update DTOs
             var files = (input.GetType().GetProperty("Attachments")?.GetValue(input) as List<IFormFile>)
                      ?? (input.GetType().GetProperty("NewAttachments")?.GetValue(input) as List<IFormFile>);
 
@@ -536,7 +445,7 @@ namespace QCS.Application.Services
                     };
 
                     var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
-                    int typeId = meta != null ? meta.DocumentTypeId : 10; // Default 10 = Other
+                    int typeId = meta != null ? meta.DocumentTypeId : 10;
 
                     pr.Quotations.Add(new Quotation
                     {

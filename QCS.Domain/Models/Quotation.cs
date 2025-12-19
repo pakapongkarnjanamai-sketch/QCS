@@ -4,9 +4,9 @@ namespace QCS.Domain.Models
 {
     public class Quotation : BaseEntity
     {
-        public int PurchaseRequestId { get; set; }
+        public int RequestId { get; set; }
         [ForeignKey("RequestId")]
-        public virtual Request PurchaseRequest { get; set; }
+        public virtual Request Request { get; set; }
 
         public string FileName { get; set; } // Map to 'originalFileName'
         public string FilePath { get; set; } // เก็บ Path จริงใน Server/Blob

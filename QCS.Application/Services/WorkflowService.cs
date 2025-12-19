@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using QCS.Domain.DTOs;
+using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using System.Text.Json;
 
@@ -23,7 +25,35 @@ namespace QCS.Application.Services
             _currentUserService = currentUserService;
             _workflowApiBaseUrl = configuration["WorkflowApi:BaseUrl"] ?? "http://ap-ntc2138-qawb/WorkflowApi/";
         }
+        // ใน QCS.Application/Services/WorkflowService.cs
 
+        public PermissionDto GetPermissions(Request request, WorkflowRouteDetailDto? workflowRoute)
+        {
+            bool canApprove = false;
+            bool canReject = false;
+            bool canEdit = request.Status == (int)RequestStatus.Draft;
+
+            // ตรวจสอบสิทธิ์การ Approve/Reject
+            if (request.Status == (int)RequestStatus.Pending && workflowRoute?.Steps != null)
+            {
+                // ค้นหาการตั้งค่าของ Step ปัจจุบันที่เอกสารค้างอยู่
+                var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
+
+                // เช็คว่า User ปัจจุบันอยู่ในรายชื่อคนที่มีสิทธิ์ใน Step นี้หรือไม่
+                if (currentStepConfig?.Assignments != null && currentStepConfig.Assignments.Any(a => a.IsCurrentUser))
+                {
+                    canApprove = true;
+                    canReject = true;
+                }
+            }
+
+            return new PermissionDto
+            {
+                CanApprove = canApprove,
+                CanReject = canReject,
+                CanEdit = canEdit
+            };
+        }
         public async Task<WorkflowRouteDetailDto?> GetWorkflowRouteDetailAsync(int routeId)
         {
             try
