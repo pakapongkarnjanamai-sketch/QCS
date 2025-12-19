@@ -171,6 +171,10 @@ namespace QCS.Application.Services
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
                     CurrentStepId = r.CurrentStepId,
+                    RequesterName = r.ApprovalSteps
+                            .Where(s => s.Sequence == 1)
+                            .Select(s => s.ApproverName)
+                            .FirstOrDefault() ?? "Unknown"
                 });
         }
 

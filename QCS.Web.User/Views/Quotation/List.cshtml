@@ -172,7 +172,7 @@
                     {
                         dataField: "code",
                         caption: "เลขที่เอกสาร",
-                        width: 160,
+                          width: 120,
                         sortOrder: "desc",
                         cellTemplate: (container, options) => {
                             $("<a>")
@@ -187,17 +187,18 @@
                         dataField: "title",
                         caption: "หัวข้อ/รายการ",
                         minWidth: 180
-                    },
+                    },{ dataField: "requesterName", caption: "ผู้ขอ", width: 180 },
                            {
             dataField: "vendorName",
             caption: "ผู้ขาย (Vendor)",
-            width: 300,
+             width: 320,
             calculateDisplayValue: (rowData) => {
                  return rowData.vendorCode
                     ? `${rowData.vendorCode} : ${rowData.vendorName}`
                     : rowData.vendorName;
             }
         },
+        
                     {
                         dataField: "requestDate",
                         caption: "วันที่ขอ",
@@ -209,7 +210,7 @@
                     {
                     dataField: "currentStepId",
                     caption: "สถานะ",
-                    width: 160, // ขยายความกว้างเล็กน้อย
+                    width: 150, // ขยายความกว้างเล็กน้อย
                     alignment: "center",
                     lookup: {
                         // ปรับ DataSource ให้ตรงกับ Enum WorkflowStep
@@ -231,7 +232,7 @@
               
                     {
                         type: "buttons",
-                        width: 80,
+                        width: 70,
                         buttons: [{
                             hint: "ดูรายละเอียด",
                             icon: "find",

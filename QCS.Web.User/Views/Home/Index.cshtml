@@ -305,7 +305,7 @@
                     dataField: "requestDate",
                     caption: "วันที่ขอ",
                     dataType: "date",
-                    format: "dd/MM/yyyy",
+                    format: "yyyy-MM-dd",
                     width: 120,
                     alignment: "center"
                 },
@@ -382,8 +382,8 @@
 
             function initTabPanel(taskCount) {
         const tabs = [];
-
-        // Tab 1: My Tasks (แสดง Badge เฉพาะอันนี้)
+        if (taskCount > 0) {
+              // Tab 1: My Tasks (แสดง Badge เฉพาะอันนี้)
         tabs.push({
             title: "งานรออนุมัติ (My Tasks)",
             icon: "todo",
@@ -397,6 +397,8 @@
                 return $("<div>").addClass("grid-wrapper").append(grid);
             }
         });
+        }
+      
 
         // Tab 2: My Requests (ไม่แสดง Badge)
         tabs.push({
@@ -434,7 +436,7 @@
             const grid = $("<div>").attr("id", "gridRejected");
             const store = createRemoteStore("GetRejectedRequests"); // ใช้ Endpoint ที่สร้างใหม่
             const columns = createColumns(FORM_URL, false, false, 'id');
-            grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ถูกตีกลับ...", FORM_URL, false, 'id'));
+            grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ไม่อนุมัติ...", FORM_URL, false, 'id'));
             return $("<div>").addClass("grid-wrapper").append(grid);
         }
     });
