@@ -46,6 +46,12 @@ namespace QCS.API.Controllers
             var query = _service.GetApprovedListQuery();
             return DataSourceLoader.Load(query, loadOptions);
         }
+        [HttpGet("MyApprovedList")]
+        public object GetMyApprovedList(DataSourceLoadOptions loadOptions)
+        {
+            var query = _service.GetMyApprovedListQuery();
+            return DataSourceLoader.Load(query, loadOptions);
+        }
 
         // ==========================================================
         // 📥 Detail & Actions

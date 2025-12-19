@@ -14,6 +14,7 @@ namespace QCS.Application.Services
     {
         IQueryable<RequestGridDto> GetMyRequestsQuery();
         Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync();
+        IQueryable<RequestGridDto> GetMyApprovedListQuery();
         IQueryable<RequestGridDto> GetApprovedListQuery();
         IQueryable<RequestGridDto> GetRejectedRequestsQuery();
         Task<RequestDetailDto?> GetByCodeAsync(string code);
@@ -209,7 +210,23 @@ namespace QCS.Application.Services
                             .FirstOrDefault() ?? "Unknown"
                 });
         }
-
+        public IQueryable<RequestGridDto> GetMyApprovedListQuery()
+        {
+            return _requestRepository.GetAll()
+                .AsNoTracking()
+                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Approved)
+                .Select(r => new RequestGridDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId
+                
+                });
+        }
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
             var request = await _requestRepository.GetAll()

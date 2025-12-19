@@ -421,7 +421,7 @@
            
             template: () => {
                 const grid = $("<div>").attr("id", "gridApproved");
-                const store = createRemoteStore("ApprovedList");
+                const store = createRemoteStore("MyApprovedList");
                 const columns = createColumns(FORM_URL, false, false, 'id');
                 grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
                 return $("<div>").addClass("grid-wrapper").append(grid);
