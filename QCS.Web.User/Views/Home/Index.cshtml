@@ -225,7 +225,7 @@
     }).dxLoadPanel("instance");
 
         const handleDocClick = (paramValue, baseUrl, openInNewWindow) => {
-            const url = `${baseUrl}?id=${encodeURIComponent(paramValue)}&mode=view`;
+            const url = `${baseUrl}/${encodeURIComponent(paramValue)}`;
             if (openInNewWindow) window.open(url, '_blank');
             else window.location.href = url;
         };
@@ -244,7 +244,7 @@
             return {
                 dataSource: {
                     store: store,
-                    sort: [{ selector: "code", desc: true }]
+                    sort: [{ selector: "code", desc: true }],
                 },
                 remoteOperations: true,
                 height: "100%",
@@ -361,80 +361,86 @@
             window.location.href = FORM_URL;
         });
 
-        function loadSummaryData() {
-            loadingIndicator.show();
-            $.ajax({
-                url: `${API_BASE}/Dashboard/Summary`,
-                method: "GET",
-                xhrFields: { withCredentials: true },
-                success: function (data) {
-                    loadingIndicator.hide();
-                    initTabPanel(data.myRequestCount, data.myTaskCount, data.approvedCount);
-                },
-                error: function(err) {
-                    loadingIndicator.hide();
-                    initTabPanel(0, 0, 0);
-                }
-            });
-        }
+           function loadSummaryData() {
+        loadingIndicator.show();
+        $.ajax({
+            url: `${API_BASE}/Dashboard/Summary`,
+            method: "GET",
+            xhrFields: { withCredentials: true },
+            success: function (data) {
+                loadingIndicator.hide();
+                // ส่งเฉพาะ myTaskCount เข้าไป
+                initTabPanel(data.myTaskCount);
+            },
+            error: function(err) {
+                loadingIndicator.hide();
+                initTabPanel(0);
+            }
+        });
+    }
 
-        function initTabPanel(requestCount, taskCount, approvedCount) {
-            const tabs = [];
+            function initTabPanel(taskCount) {
+        const tabs = [];
 
-            // Tab 1: My Tasks
-            tabs.push({
-                title: "งานรออนุมัติ (My Tasks)",
-                icon: "todo",
-                badge: taskCount,
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridMyTasks");
-                    const store = createRemoteStore("GetMyTasks");
-                    const columns = createColumns(CODE_URL, true, true, 'code');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหางานที่ต้องอนุมัติ...", CODE_URL, true, 'code'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
+        // Tab 1: My Tasks (แสดง Badge เฉพาะอันนี้)
+        tabs.push({
+            title: "งานรออนุมัติ (My Tasks)",
+            icon: "todo",
+            badge: taskCount, // แสดงจำนวนงานที่เหลือ
+            template: () => {
+                const grid = $("<div>").attr("id", "gridMyTasks");
+                const store = createRemoteStore("GetMyTasks");
+                const columns = createColumns(CODE_URL, true, true, 'code');
+                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหางานที่ต้องอนุมัติ...", CODE_URL, true, 'code'));
+                return $("<div>").addClass("grid-wrapper").append(grid);
+            }
+        });
 
-            // Tab 2: My Requests
-            tabs.push({
-                title: "เอกสารของฉัน (My Requests)",
-                icon: "user",
-                badge: requestCount,
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridMyRequests");
-                    const store = createRemoteStore("GetMyRequests");
-                    const columns = createColumns(FORM_URL, false, false, 'id');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารของฉัน...", FORM_URL, false, 'id'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
+        // Tab 2: My Requests (ไม่แสดง Badge)
+        tabs.push({
+            title: "เอกสารของฉัน (My Requests)",
+            icon: "user",
+           
+            template: () => {
+                const grid = $("<div>").attr("id", "gridMyRequests");
+                const store = createRemoteStore("GetMyRequests");
+                const columns = createColumns(FORM_URL, false, false, 'id');
+                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารของฉัน...", FORM_URL, false, 'id'));
+                return $("<div>").addClass("grid-wrapper").append(grid);
+            }
+        });
 
-            // Tab 3: Approved List
-            tabs.push({
-                title: "อนุมัติแล้ว (Approved)",
-                icon: "check",
-                badge: approvedCount,
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridApproved");
-                    const store = createRemoteStore("ApprovedList");
-                    const columns = createColumns(FORM_URL, false, false, 'id');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
+        // Tab 3: Approved List (ไม่แสดง Badge)
+        tabs.push({
+            title: "อนุมัติแล้ว (Approved)",
+            icon: "check",
+           
+            template: () => {
+                const grid = $("<div>").attr("id", "gridApproved");
+                const store = createRemoteStore("ApprovedList");
+                const columns = createColumns(FORM_URL, false, false, 'id');
+                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
+                return $("<div>").addClass("grid-wrapper").append(grid);
+            }
+        });
 
-            $("#tabPanel").dxTabPanel({
-                items: tabs,
-                height: "100%",
-                deferRendering: true,
-                itemTitleTemplate: function(itemData) {
-                    const container = $("<div>").addClass("d-flex align-items-center gap-2");
-                    if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
-                    container.append($("<span>").text(itemData.title));
-                
-                    return container;
-                }
-            });
-        }
+        $("#tabPanel").dxTabPanel({
+            items: tabs,
+            height: "100%",
+            deferRendering: true,
+            itemTitleTemplate: function(itemData) {
+                const container = $("<div>").addClass("d-flex align-items-center gap-2");
+                if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
+                container.append($("<span>").text(itemData.title));
+
+                // // แสดง Badge เฉพาะที่มีการส่งค่า badge มาเท่านั้น
+                // if (itemData.badge !== undefined && itemData.badge > 0) {
+                //     container.append($("<span>").addClass("badge bg-danger rounded-pill").text(itemData.badge));
+                // }
+
+                return container;
+            }
+        });
+    }
     });
 </script>
