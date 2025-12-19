@@ -19,7 +19,7 @@ namespace QCS.Application.Services
         IQueryable<RequestGridDto> GetMyRequestsQuery();
         Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync();
         IQueryable<RequestGridDto> GetApprovedListQuery();
-
+        IQueryable<RequestGridDto> GetRejectedRequestsQuery();
         // Methods อื่นๆ เหมือนเดิม...
         Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code);
         Task<PurchaseRequestDetailDto?> GetByIdAsync(int id);
@@ -50,8 +50,10 @@ namespace QCS.Application.Services
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
             var query = _context.Requests
-                .AsNoTracking()
-                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status != (int)RequestStatus.Approved);
+        .AsNoTracking()
+        .Where(r => r.CreatedBy == _currentUserService.UserId
+                 && r.Status != (int)RequestStatus.Approved
+                 && r.Status != (int)RequestStatus.Rejected);
 
             return query.Select(r => new RequestGridDto
             {
@@ -65,7 +67,24 @@ namespace QCS.Application.Services
              
             });
         }
+        public IQueryable<RequestGridDto> GetRejectedRequestsQuery()
+        {
+            // ดึงเฉพาะเอกสารที่ CreatedBy เป็นเรา และมี Status เป็น Rejected (-1)
+            var query = _context.Requests
+                .AsNoTracking()
+                .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Rejected);
 
+            return query.Select(r => new RequestGridDto
+            {
+                Id = r.Id,
+                Code = r.Code,
+                Title = r.Title,
+                VendorCode = r.VendorCode,
+                VendorName = r.VendorName,
+                RequestDate = r.RequestDate,
+                CurrentStepId = r.CurrentStepId
+            });
+        }
         public IQueryable<RequestGridDto> GetApprovedListQuery()
         {
             var query = _context.Requests
@@ -231,38 +250,7 @@ namespace QCS.Application.Services
             return await GetByIdAsync(id);
         }
 
-        //private async Task<PurchaseRequestDetailDto> MapToDetailDto(Request r)
-        //{
-        //    // Fix: Map fields according to PurchaseRequestDetailDto definition
-        //    return new PurchaseRequestDetailDto
-        //    {
-        //        PurchaseRequestId = r.Id,      // Fix: Id -> PurchaseRequestId
-        //        DocumentNo = r.Code,           // Fix: Code -> DocumentNo
-        //        Title = r.Title,               // Fix: Subject -> Title
-        //                                       // Amount = r.Amount,          // Removed: No Amount in Entity/DTO
-        //                                       // Description = r.Description,// Removed: No Description in Entity/DTO
-
-        //        VendorId = r.VendorId,
-        //        VendorName = r.VendorName,
-        //        ValidFrom = r.ValidFrom,
-        //        ValidUntil = r.ValidUntil,
-        //        Remark = r.Remark,
-
-        //        Status = ((RequestStatus)r.Status).ToString(), // Fix: Convert int to string
-        //        CurrentStepId = r.CurrentStepId,
-
-        //        // RequesterName logic (Assuming CreatedBy is NId, might need lookup)
-        //        RequesterName = r.CreatedBy,
-        //        RequestDate = r.RequestDate, // Fix: CreatedAt -> RequestDate
-
-        //        Quotations = r.Quotations.Select(q => new QuotationItemDto
-        //        {
-        //            Id = q.Id,
-        //            FileName = q.FileName,
-        //            DocumentTypeId = q.DocumentTypeId
-        //        }).ToList()
-        //    };
-        //}
+       
 
         // ==========================================================
         // 📝 CRUD OPERATIONS

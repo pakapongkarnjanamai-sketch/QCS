@@ -274,7 +274,8 @@
                 {
                     dataField: "code",
                     caption: "เลขที่เอกสาร",
-                    width: 160,
+                    
+                    width: 120,
                     cellTemplate: (container, options) => {
                         const docNo = options.value || "(Draft)";
                         const val = options.data[paramField];
@@ -288,11 +289,11 @@
                             .appendTo(container);
                     }
                 },
-                { dataField: "title", caption: "หัวข้อ", minWidth: 200 },
+                { dataField: "title", caption: "หัวข้อ", minWidth: 150 },
                     {
         dataField: "vendorName",
         caption: "ผู้ขาย (Vendor)",
-        width: 250,
+        width: 320,
         calculateDisplayValue: function(rowData) {
             // ถ้ามี Code ให้แสดง Code : Name ถ้าไม่มีแสดง Name อย่างเดียว
             return rowData.vendorCode
@@ -311,7 +312,7 @@
                 {
                     dataField: "currentStepId",
                     caption: "สถานะ",
-                    width: 160, // ขยายความกว้างเล็กน้อย
+                    width: 150, // ขยายความกว้างเล็กน้อย
                     alignment: "center",
                     lookup: {
                         // ปรับ DataSource ให้ตรงกับ Enum WorkflowStep
@@ -343,7 +344,7 @@
             ];
 
             if (isTaskGrid) {
-                const requesterCol = { dataField: "requesterName", caption: "ผู้ขอซื้อ", width: 180 };
+                const requesterCol = { dataField: "requesterName", caption: "ผู้ขอ", width: 180 };
                 return [
                     ...baseColumns.slice(0, 2),
                     requesterCol,
@@ -386,7 +387,8 @@
         tabs.push({
             title: "งานรออนุมัติ (My Tasks)",
             icon: "todo",
-            badge: taskCount, // แสดงจำนวนงานที่เหลือ
+            badgeCount: taskCount, // แสดงจำนวนงานที่เหลือ
+     
             template: () => {
                 const grid = $("<div>").attr("id", "gridMyTasks");
                 const store = createRemoteStore("GetMyTasks");
@@ -423,6 +425,19 @@
                 return $("<div>").addClass("grid-wrapper").append(grid);
             }
         });
+        // Tab 4: Rejected List 
+        tabs.push({
+        title: "ไม่อนุมัติ (Rejected)",
+        icon: "revert",
+    
+        template: () => {
+            const grid = $("<div>").attr("id", "gridRejected");
+            const store = createRemoteStore("GetRejectedRequests"); // ใช้ Endpoint ที่สร้างใหม่
+            const columns = createColumns(FORM_URL, false, false, 'id');
+            grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ถูกตีกลับ...", FORM_URL, false, 'id'));
+            return $("<div>").addClass("grid-wrapper").append(grid);
+        }
+    });
 
         $("#tabPanel").dxTabPanel({
             items: tabs,
@@ -433,10 +448,10 @@
                 if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
                 container.append($("<span>").text(itemData.title));
 
-                // // แสดง Badge เฉพาะที่มีการส่งค่า badge มาเท่านั้น
-                // if (itemData.badge !== undefined && itemData.badge > 0) {
-                //     container.append($("<span>").addClass("badge bg-danger rounded-pill").text(itemData.badge));
-                // }
+                // แสดง Badge เฉพาะที่มีการส่งค่า badge มาเท่านั้น
+                if (itemData.badgeCount !== undefined && itemData.badgeCount > 0) {
+                    container.append($("<span>").addClass("badge bg-danger rounded-pill").text(itemData.badgeCount));
+                }
 
                 return container;
             }

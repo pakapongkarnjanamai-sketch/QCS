@@ -119,5 +119,12 @@ namespace QCS.API.Controllers
 
             return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
         }
+
+        [HttpGet("GetRejectedRequests")]
+        public object GetRejectedRequests(DataSourceLoadOptions loadOptions)
+        {
+            var query = _service.GetRejectedRequestsQuery();
+            return DataSourceLoader.Load(query, loadOptions);
+        }
     }
 }
