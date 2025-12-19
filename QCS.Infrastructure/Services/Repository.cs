@@ -1,105 +1,89 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
-using System.Linq.Expressions;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace QCS.Infrastructure.Services
 {
     public interface IRepository<T> where T : class
     {
-        // Sync Methods (เก็บไว้เพราะ DevExtreme LoadOptions บางทีต้องการ IQueryable)
-        IQueryable<T> GetAll();
-        T? GetById(int id);
         T New();
-
-        // ควรใช้ Async สำหรับ Write Operations
-        Task AddAsync(T entity);
-        Task UpdateAsync(T entity); // เพิ่ม Async
-        Task RemoveAsync(T entity); // เปลี่ยนจาก Void เป็น Task
-
-        // Read Methods Async
+        IQueryable<T> GetAll();
         Task<T?> GetByIdAsync(int id);
-        Task<IEnumerable<T>> GetAllAsync();
-        Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> expression);
-        Task<bool> ExistsAsync(int id);
-        Task SaveChangesAsync();
+
+        // สำหรับเพิ่มข้อมูล
+        Task AddAsync(T entity);
+
+        // สำหรับอัปเดตข้อมูล
+        Task UpdateAsync(T entity);
+
+        // สำหรับลบข้อมูล (รองรับทั้งชื่อ RemoveAsync และ DeleteAsync เพื่อความยืดหยุ่น)
+        Task RemoveAsync(T entity);
+        Task DeleteAsync(T entity);
+        Task DeleteRangeAsync(IEnumerable<T> entities);
+
+        // ✅ เพิ่มเมธอดนี้เพื่อให้ GenericController เรียกใช้ได้
+        Task<int> SaveChangesAsync();
     }
 
-    public class Repository<T> : IRepository<T> where T : BaseEntity, new()
+    public class Repository<T> : IRepository<T> where T : class
     {
-        protected readonly AppDbContext _context;
-        protected readonly DbSet<T> _dbSet;
+        private readonly AppDbContext _context;
+        private readonly DbSet<T> _dbSet;
 
         public Repository(AppDbContext context)
         {
             _context = context;
             _dbSet = context.Set<T>();
         }
-
-        // --- Sync Methods (Optimized for Queryable/DevExtreme) ---
-        public virtual IQueryable<T> GetAll()
+        public T New()
         {
-            // แก้ไข: กรอง IsActive ให้เหมือนกับ Async Method
-            return _dbSet.Where(x => x.IsActive);
+            return Activator.CreateInstance<T>();
+        }
+        public IQueryable<T> GetAll()
+        {
+            return _dbSet;
         }
 
-        public virtual T? GetById(int id)
+        public async Task<T?> GetByIdAsync(int id)
         {
-            return _dbSet.FirstOrDefault(x => x.Id == id && x.IsActive);
+            return await _dbSet.FindAsync(id);
         }
 
-        public virtual T New()
+        public async Task AddAsync(T entity)
         {
-            return new T();
-        }
-
-        // --- Async Write Methods (Recommended) ---
-        public virtual async Task AddAsync(T entity)
-        {
-            entity.CreatedAt = DateTime.UtcNow;
-            entity.IsActive = true; // มั่นใจว่าสร้างใหม่ต้อง Active
             await _dbSet.AddAsync(entity);
+            // หมายเหตุ: ไม่ใส่ SaveChanges ที่นี่เพื่อให้ Controller ควบคุมจังหวะการบันทึกเองได้
         }
 
-        public virtual Task UpdateAsync(T entity)
+        public async Task UpdateAsync(T entity)
         {
-            entity.UpdatedAt = DateTime.UtcNow;
             _dbSet.Update(entity);
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
 
-        public virtual Task RemoveAsync(T entity)
+        public async Task RemoveAsync(T entity)
         {
-            // Soft Delete (ถ้า BaseEntity ออกแบบมาเพื่อ Soft Delete ควรแก้ IsActive = false แทนการ Remove)
-            // แต่ถ้าเป็นการลบจริงใช้บรรทัดนี้:
             _dbSet.Remove(entity);
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
 
-        public virtual async Task SaveChangesAsync()
+        public async Task DeleteAsync(T entity)
         {
-            await _context.SaveChangesAsync();
+            await RemoveAsync(entity);
         }
 
-        // --- Async Read Methods ---
-        public virtual async Task<T?> GetByIdAsync(int id)
+        public async Task DeleteRangeAsync(IEnumerable<T> entities)
         {
-            return await _dbSet.FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+            _dbSet.RemoveRange(entities);
+            await Task.CompletedTask;
         }
 
-        public virtual async Task<IEnumerable<T>> GetAllAsync()
+        // ✅ Implementation สำหรับการบันทึกข้อมูลแบบรวมศูนย์
+        public async Task<int> SaveChangesAsync()
         {
-            return await _dbSet.Where(x => x.IsActive).ToListAsync();
-        }
-
-        public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> expression)
-        {
-            return await _dbSet.Where(expression).Where(x => x.IsActive).ToListAsync();
-        }
-
-        public virtual async Task<bool> ExistsAsync(int id)
-        {
-            return await _dbSet.AnyAsync(x => x.Id == id && x.IsActive);
+            return await _context.SaveChangesAsync();
         }
     }
 }
