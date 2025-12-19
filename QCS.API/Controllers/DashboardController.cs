@@ -51,15 +51,10 @@ namespace QCS.API.Controllers
                     }
                 }
 
-                // ส่งกลับเฉพาะ MyTaskCount ส่วนค่าอื่นให้เป็น 0 เพื่อไม่ให้กระทบ DTO เดิม
+         
                 return Ok(new DashboardDto
                 {
                     MyTaskCount = myTaskCount,
-                    MyRequestCount = 0,
-                    ApprovedCount = 0,
-                    TotalCreated = 0,
-                    TotalPending = 0,
-                    TotalCompleted = 0
                 });
             }
             catch (Exception ex)
