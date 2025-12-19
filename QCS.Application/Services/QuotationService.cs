@@ -2,9 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using QCS.Domain.DTOs;
-
 using QCS.Domain.Models;
-using QCS.Infrastructure.Data;
+using QCS.Infrastructure.Services;
 using System.Text;
 using System.Text.Json;
 
@@ -19,18 +18,21 @@ namespace QCS.Application.Services
 
     public class QuotationService : IQuotationService
     {
-        private readonly AppDbContext _context;
+        private readonly IRepository<Request> _requestRepository;
+        private readonly IRepository<Quotation> _quotationRepository;
         private readonly IWebHostEnvironment _env;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
 
         public QuotationService(
-            AppDbContext context,
+            IRepository<Request> requestRepository,
+            IRepository<Quotation> quotationRepository,
             IWebHostEnvironment env,
             HttpClient httpClient,
             IConfiguration configuration)
         {
-            _context = context;
+            _requestRepository = requestRepository;
+            _quotationRepository = quotationRepository;
             _env = env;
             _httpClient = httpClient;
             _configuration = configuration;
@@ -38,22 +40,20 @@ namespace QCS.Application.Services
 
         public IQueryable<Request> GetQueryable()
         {
-            return _context.Requests
+            return _requestRepository.GetAll()
                 .Include(x => x.Quotations)
                 .Include(x => x.ApprovalSteps)
                 .AsNoTracking();
         }
 
-        public async Task<AttachmentResultDto?> GetAttachmentAsync(int id)
+        public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
         {
-            var q = await _context.Quotations
+            var q = await _quotationRepository.GetAll()
                 .Include(x => x.AttachmentFile)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id);
+                .FirstOrDefaultAsync(x => x.Id == fileId);
 
             if (q == null) return null;
 
-            // 1. Try DB
             if (q.AttachmentFile?.Data != null)
             {
                 return new AttachmentResultDto
@@ -64,7 +64,6 @@ namespace QCS.Application.Services
                 };
             }
 
-            // 2. Try Disk (Legacy Support)
             if (!string.IsNullOrEmpty(q.FilePath) && q.FilePath != "Database")
             {
                 var path = Path.Combine(_env.WebRootPath, q.FilePath);
@@ -82,79 +81,50 @@ namespace QCS.Application.Services
             return null;
         }
 
-        // ==========================================================
-        // 📄 GENERATE STAMPED PDF (Call External API)
-        // ==========================================================
         public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int purchaseRequestId)
         {
-            // 1. ดึงข้อมูล Request (PR) พร้อม Vendor, Quotations และ ApprovalSteps
-            var request = await _context.Requests
-                         // ต้องการชื่อ Vendor ไปแสดง
-                .Include(x => x.Quotations)
-                .ThenInclude(q => q.AttachmentFile) // ดึงไฟล์ PDF
-                .Include(x => x.ApprovalSteps)      // ดึงข้อมูลการอนุมัติ
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == purchaseRequestId);
+            var request = await _requestRepository.GetAll()
+                .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == purchaseRequestId);
 
-            if (request == null)
-                throw new Exception("Purchase Request not found.");
+            if (request == null) throw new KeyNotFoundException("Request not found");
 
-            // Validation: ต้องอนุมัติแล้วเท่านั้น (เปิดใช้งานเมื่อระบบ Flow สมบูรณ์)
-            // if (request.Status != RequestStatus.Approved) 
-            //    throw new Exception("Document is not fully approved.");
-
-            // Validation: ต้องมีไฟล์แนบ
-            var quotations = request.Quotations.Where(q => q.AttachmentFile != null && q.AttachmentFile.Data != null).ToList();
-            if (!quotations.Any())
-                throw new Exception("No valid PDF files found in quotations.");
-
-            // 2. เตรียมข้อมูล DTO สำหรับส่งไป PDF Service
+            // ✅ สร้าง Request DTO ตามโครงสร้าง MergeAndStampRequestDto
             var pdfRequest = new MergeAndStampRequestDto
             {
                 DocumentName = request.Title,
-                ReferenceCode = request.Code ?? "Unknown Reference Code",
-
-                // ตั้งค่าการ Stamp (สี, ตำแหน่ง, ขนาดฟอนต์)
-                DrawSetting = new DrawSettingDto
-                {
-                    Color = "#4d759a",      // สีดำ
-                    AlignmentStamp = 7,     // 8 = BottomRight (อิงตาม Enum ของ PDF Service)
-                    FontSize = 8,
-                    Margin = 100
-                },
-
-                // ข้อมูลลำดับการอนุมัติ
+                ReferenceCode = request.Code,
+                PdfFiles = request.Quotations
+                    .Where(q => q.AttachmentFile != null)
+                    .Select(q => new PdfFileDto
+                    {
+                        Name = q.FileName,
+                        DocumentType = MapDocumentType(q.DocumentTypeId),
+                        ContentType = q.ContentType ?? "application/pdf",
+                        Data = q.AttachmentFile.Data,
+                        Length = q.FileSize
+                    }).ToList(),
                 ApprovalData = new ApprovalDataDto
                 {
-                    Name = $"QC Ref: {request.Code}",
+                    Name = request.VendorName,
                     Step = request.ApprovalSteps
+                        .Where(s => s.Status == (int)QCS.Domain.Enum.RequestStatus.Approved)
                         .OrderBy(s => s.Sequence)
                         .Select(s => new StepDto
                         {
-                            StepName = $"{s.StepName}", // หรือใช้ s.RoleName
-                            Approver = s.ApproverName ?? "System Admin", // ชื่อคนอนุมัติ
+                            StepName = s.StepName,
+                            Approver = s.ApproverName ?? s.ApproverNId ?? "Unknown",
                             ApprovalDate = s.ActionDate ?? DateTime.Now
                         }).ToList()
                 },
-
-                // รายการไฟล์ PDF ที่จะนำมารวม
-                PdfFiles = quotations.Select(q => new PdfFileDto
-                {
-                    Name = q.FileName,
-                    ContentType = "application/pdf",
-                    DocumentType = MapDocumentType(q.DocumentTypeId), // แปลง ID เป็นชื่อประเภทเอกสาร
-                    Data = q.AttachmentFile.Data,
-                    Length = q.AttachmentFile.Data.Length
-                }).ToList()
+                DrawSetting = new DrawSettingDto { Color = "#000000", FontSize = 8 }
             };
 
-            // 3. เรียก API ภายนอก (PDF Service)
-            var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = null }; // ส่ง JSON แบบ PascalCase ตาม C#
+            var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
             var jsonContent = new StringContent(JsonSerializer.Serialize(pdfRequest, jsonOptions), Encoding.UTF8, "application/json");
 
-            // ดึง URL จาก appsettings.json (Key: PdfServiceUrl) -> "http://localhost:5226"
             var pdfServiceUrl = _configuration["ExternalServices:PdfServiceUrl"];
-       
             var response = await _httpClient.PostAsync($"{pdfServiceUrl}/api/Pdf/merge-stamp", jsonContent);
 
             if (!response.IsSuccessStatusCode)
@@ -163,7 +133,6 @@ namespace QCS.Application.Services
                 throw new Exception($"PDF Service Error ({response.StatusCode}): {errorMsg}");
             }
 
-            // 4. รับไฟล์ PDF ที่ประมวลผลเสร็จแล้วกลับมา
             var fileBytes = await response.Content.ReadAsByteArrayAsync();
 
             return new AttachmentResultDto
@@ -174,10 +143,8 @@ namespace QCS.Application.Services
             };
         }
 
-        // Helper: แปลง DocumentTypeId เป็น String (ปรับตาม Enum DocumentType ของคุณ)
         private string MapDocumentType(int typeId)
         {
-            // อ้างอิง Enum: 10=Quotation, 20=Comparison, 30=Specs (ตัวอย่าง)
             return typeId switch
             {
                 10 => "Main Quotation",
