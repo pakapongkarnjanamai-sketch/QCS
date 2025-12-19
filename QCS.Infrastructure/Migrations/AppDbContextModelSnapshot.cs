@@ -52,7 +52,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<int>("PurchaseRequestId")
+                    b.Property<int>("RequestId")
                         .HasColumnType("int");
 
                     b.Property<int>("Sequence")
@@ -74,7 +74,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PurchaseRequestId");
+                    b.HasIndex("RequestId");
 
                     b.ToTable("ApprovalSteps");
                 });
@@ -203,7 +203,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<int>("PurchaseRequestId")
+                    b.Property<int>("RequestId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -217,7 +217,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasIndex("AttachmentFileId");
 
-                    b.HasIndex("PurchaseRequestId");
+                    b.HasIndex("RequestId");
 
                     b.ToTable("Quotations");
                 });
@@ -465,7 +465,7 @@ namespace QCS.Infrastructure.Migrations
                 {
                     b.HasOne("QCS.Domain.Models.Request", "PurchaseRequest")
                         .WithMany("ApprovalSteps")
-                        .HasForeignKey("PurchaseRequestId")
+                        .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -480,7 +480,7 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasOne("QCS.Domain.Models.Request", "PurchaseRequest")
                         .WithMany("Quotations")
-                        .HasForeignKey("PurchaseRequestId")
+                        .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

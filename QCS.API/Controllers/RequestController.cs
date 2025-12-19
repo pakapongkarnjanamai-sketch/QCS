@@ -67,14 +67,14 @@ namespace QCS.API.Controllers
             return Ok(result);
         }
         [HttpPost("Save")] // บันทึกเป็น Draft
-        public async Task<IActionResult> Save([FromForm] CreatePurchaseRequestDto input)
+        public async Task<IActionResult> Save([FromForm] CreateRequestDto input)
         {
             // ส่ง flag isSubmit = false ไปให้ Service
             var result = await _service.CreateAsync(input, isSubmit: false);
             return Ok(new { success = true, id = result.Id, docNo = result.Code });
         }
         [HttpPost("Submit")]
-        public async Task<IActionResult> Submit([FromForm] CreatePurchaseRequestDto input)
+        public async Task<IActionResult> Submit([FromForm] CreateRequestDto input)
         {
          
             await _service.CreateAsync(input,  isSubmit: true);
@@ -82,21 +82,21 @@ namespace QCS.API.Controllers
         }
 
         [HttpPost("SubmitCreate")] // Optional: Endpoint for "Save & Submit"
-        public async Task<IActionResult> SubmitCreate([FromForm] CreatePurchaseRequestDto input)
+        public async Task<IActionResult> SubmitCreate([FromForm] CreateRequestDto input)
         {
             await _service.CreateAsync(input,  isSubmit: true);
             return Ok(new { success = true });
         }
 
         [HttpPost("Update")]
-        public async Task<IActionResult> Update([FromForm] UpdatePurchaseRequestDto input)
+        public async Task<IActionResult> Update([FromForm] UpdateRequestDto input)
         {
             await _service.UpdateAsync(input, isSubmit: false);
             return Ok(new { success = true });
         }
 
         [HttpPost("SubmitUpdate")]
-        public async Task<IActionResult> SubmitUpdate([FromForm] UpdatePurchaseRequestDto input)
+        public async Task<IActionResult> SubmitUpdate([FromForm] UpdateRequestDto input)
         {
             await _service.UpdateAsync(input, isSubmit: true);
             return Ok(new { success = true });

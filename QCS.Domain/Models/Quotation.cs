@@ -5,7 +5,7 @@ namespace QCS.Domain.Models
     public class Quotation : BaseEntity
     {
         public int PurchaseRequestId { get; set; }
-        [ForeignKey("PurchaseRequestId")]
+        [ForeignKey("RequestId")]
         public virtual Request PurchaseRequest { get; set; }
 
         public string FileName { get; set; } // Map to 'originalFileName'

@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace QCS.Domain.DTOs
 {
-    public class CreatePurchaseRequestDto
+    public class CreateRequestDto
     {
         [Required]
         public string Title { get; set; }

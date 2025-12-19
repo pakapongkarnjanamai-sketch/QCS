@@ -8,7 +8,7 @@ namespace QCS.Domain.Models
     {
         public int PurchaseRequestId { get; set; }
         
-        [ForeignKey("PurchaseRequestId")]
+        [ForeignKey("RequestId")]
         public virtual Request PurchaseRequest { get; set; }
 
         public int Sequence { get; set; }

@@ -94,12 +94,12 @@ namespace QCS.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_ApprovalSteps_PurchaseRequestId",
                 table: "ApprovalSteps",
-                column: "PurchaseRequestId");
+                column: "RequestId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Quotations_PurchaseRequestId",
                 table: "Quotations",
-                column: "PurchaseRequestId");
+                column: "RequestId");
         }
 
         /// <inheritdoc />

@@ -35,7 +35,7 @@ namespace QCS.API.Controllers
             {
                 var request = await _context.Requests
                     .Include(r => r.ApprovalSteps)
-                    .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
+                    .FirstOrDefaultAsync(r => r.Id == input.RequestId);
 
                 if (request == null) return NotFound("ไม่พบเอกสาร Purchase Request");
 
@@ -133,7 +133,7 @@ namespace QCS.API.Controllers
             {
                 var request = await _context.Requests
                     .Include(r => r.ApprovalSteps)
-                    .FirstOrDefaultAsync(r => r.Id == input.PurchaseRequestId);
+                    .FirstOrDefaultAsync(r => r.Id == input.RequestId);
 
                 if (request == null) return NotFound("ไม่พบเอกสาร");
 

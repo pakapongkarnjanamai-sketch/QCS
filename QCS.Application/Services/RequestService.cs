@@ -21,10 +21,10 @@ namespace QCS.Application.Services
         IQueryable<RequestGridDto> GetApprovedListQuery();
         IQueryable<RequestGridDto> GetRejectedRequestsQuery();
         // Methods อื่นๆ เหมือนเดิม...
-        Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code);
-        Task<PurchaseRequestDetailDto?> GetByIdAsync(int id);
-        Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit);
-        Task UpdateAsync(UpdatePurchaseRequestDto input, bool isSubmit);
+        Task<RequestDetailDto?> GetByCodeAsync(string code);
+        Task<RequestDetailDto?> GetByIdAsync(int id);
+        Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit);
+        Task UpdateAsync(UpdateRequestDto input, bool isSubmit);
         Task DeleteAsync(int id);
         Task<AttachmentResultDto?> GetAttachmentAsync(int id);
     }
@@ -145,10 +145,10 @@ namespace QCS.Application.Services
         }
 
         // ==========================================================
-        // 🔍 GET DETAILS (Mapped to PurchaseRequestDetailDto)
+        // 🔍 GET DETAILS (Mapped to RequestDetailDto)
         // ==========================================================
 
-        public async Task<PurchaseRequestDetailDto?> GetByIdAsync(int id)
+        public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
             var request = await _context.Requests
              .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
@@ -205,7 +205,7 @@ namespace QCS.Application.Services
                 }
             }
 
-            return new PurchaseRequestDetailDto
+            return new RequestDetailDto
             {
                 PurchaseRequestId = request.Id,
                 DocumentNo = request.Code,
@@ -235,7 +235,7 @@ namespace QCS.Application.Services
             };
         }
 
-        public async Task<PurchaseRequestDetailDto?> GetByCodeAsync(string code)
+        public async Task<RequestDetailDto?> GetByCodeAsync(string code)
         {
             // ค้นหา ID จาก Code ก่อน
             var id = await _context.Requests
@@ -256,7 +256,7 @@ namespace QCS.Application.Services
         // 📝 CRUD OPERATIONS
         // ==========================================================
 
-        public async Task<Request> CreateAsync(CreatePurchaseRequestDto input, bool isSubmit)
+        public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -354,7 +354,7 @@ namespace QCS.Application.Services
             }
         }
 
-        public async Task UpdateAsync(UpdatePurchaseRequestDto input, bool isSubmit)
+        public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try

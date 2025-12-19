@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace QCS.Domain.DTOs
 {
-    public class UpdatePurchaseRequestDto
+    public class UpdateRequestDto
     {
         public int Id { get; set; }
         public string Title { get; set; }

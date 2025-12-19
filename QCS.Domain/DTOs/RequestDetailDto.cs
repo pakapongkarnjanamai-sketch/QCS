@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace QCS.Domain.DTOs
 {
-    public class PurchaseRequestDetailDto
+    public class RequestDetailDto
     {
         public int PurchaseRequestId { get; set; }
         public string DocumentNo { get; set; }
