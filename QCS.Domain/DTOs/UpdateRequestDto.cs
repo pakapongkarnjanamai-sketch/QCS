@@ -6,7 +6,7 @@ namespace QCS.Domain.DTOs
     {
         public int Id { get; set; }
         public string Title { get; set; }
-        public string? VendorCode { get; set; }
+        public string VendorCode { get; set; }
         public string VendorName { get; set; }
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }

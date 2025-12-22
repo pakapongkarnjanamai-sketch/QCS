@@ -120,8 +120,8 @@ namespace QCS.Application.Services
             request.Status = (int)RequestStatus.Rejected;
             request.CurrentStep = WorkflowStep.Rejected;
 
-            var remainingSteps = request.ApprovalSteps.Where(s => s.Sequence > currentStepObj.Sequence);
-            foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
+            //var remainingSteps = request.ApprovalSteps.Where(s => s.Sequence > currentStepObj.Sequence);
+            //foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
 
             await requestRepo.UpdateAsync(request);
             await _unitOfWork.CommitAsync();
@@ -237,7 +237,6 @@ namespace QCS.Application.Services
         {
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations)
-                //.ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == id);
@@ -429,7 +428,7 @@ namespace QCS.Application.Services
                 await quotationRepo.DeleteRangeAsync(toRemove);
             }
 
-            // ✅ ใช้ Helper ที่ปลอดภัยแทน Reflection
+  
             var files = GetFilesFromInput(input);
             if (files != null && files.Any())
             {
@@ -503,9 +502,6 @@ namespace QCS.Application.Services
             return !string.IsNullOrEmpty(name) ? name : nId;
         }
 
-        // ✅ ปรับปรุง Helper Method: ไม่ใช้ dynamic/reflection แล้ว
-        // หมายเหตุ: ควรให้ CreateRequestDto และ UpdateRequestDto สืบทอดจาก IHasAttachments
-        // หรือถ้ายังไม่ได้ทำ สามารถเปลี่ยน input เป็น object แล้ว cast ก็ได้ แต่แนะนำ Interface ดีที่สุด
         private List<IFormFile> GetFilesFromInput(object input)
         {
             if (input is IHasAttachments dto)

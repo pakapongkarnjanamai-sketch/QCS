@@ -13,8 +13,8 @@ namespace QCS.Domain.Enum
     /// </summary>
     public enum approvalStatus
     {
-        [Display(Name = "ยังมาไม่ถึงขั้นตอนนี้")]
-        [Description("ยังมาไม่ถึงขั้นตอนนี้")]
+        [Display(Name = "ไม่ถึงขั้นตอน")]
+        [Description("ไม่ถึงขั้นตอน")]
         Next = 0,
         [Display(Name = "รอพิจารณา")]
         [Description("รอพิจารณา")]
