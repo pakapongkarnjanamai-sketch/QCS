@@ -236,7 +236,8 @@ namespace QCS.Application.Services
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
             var request = await _unitOfWork.Repository<Request>().GetAll()
-                .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
+                .Include(r => r.Quotations)
+                //.ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == id);
