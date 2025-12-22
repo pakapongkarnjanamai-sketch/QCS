@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
-using QCS.Infrastructure.Services; // สมมติว่า IRepository อยู่ที่นี่ (ตามโครงสร้างเดิม)
+using QCS.Infrastructure.Services;
 using System.Text.Json;
 
 namespace QCS.Application.Services
@@ -29,15 +29,15 @@ namespace QCS.Application.Services
 
     public class RequestService : IRequestService
     {
-        // ✅ เปลี่ยนมาใช้ UnitOfWork แทน Repository แยก
         private readonly IUnitOfWork _unitOfWork;
-
         private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
         private readonly IWebHostEnvironment _env;
-
-        // ✅ Service สำหรับจัดการไฟล์ (จากข้อ 2)
         private readonly IFileService _fileService;
+
+        // ✅ กำหนดค่าคงที่ เพื่อให้อ่านง่ายและแก้ที่เดียว
+        private const int MainWorkflowId = 1;
+        private const int CompletedStepId = 99;
 
         public RequestService(
             IUnitOfWork unitOfWork,
@@ -66,7 +66,7 @@ namespace QCS.Application.Services
             if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
 
             var currentUserId = _currentUserService.UserId;
-            string approverName = await GetApproverNameAsync(1, currentUserId);
+            string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId);
 
             // Update Step ปัจจุบัน
             currentStepObj.Status = (int)RequestStatus.Approved;
@@ -93,8 +93,6 @@ namespace QCS.Application.Services
             }
 
             await requestRepo.UpdateAsync(request);
-
-            // ✅ Save ผ่าน UnitOfWork
             await _unitOfWork.CommitAsync();
         }
 
@@ -111,7 +109,7 @@ namespace QCS.Application.Services
             if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
 
             var currentUserId = _currentUserService.UserId;
-            string approverName = await GetApproverNameAsync(1, currentUserId);
+            string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId);
 
             currentStepObj.Status = (int)RequestStatus.Rejected;
             currentStepObj.ActionDate = DateTime.Now;
@@ -126,8 +124,6 @@ namespace QCS.Application.Services
             foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
 
             await requestRepo.UpdateAsync(request);
-
-            // ✅ Save ผ่าน UnitOfWork
             await _unitOfWork.CommitAsync();
         }
 
@@ -190,7 +186,7 @@ namespace QCS.Application.Services
 
         public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
         {
-            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
             var myStepSequences = routeData?.Steps?
                 .Where(s => s.Assignments != null && s.Assignments.Any(a => a.NId == _currentUserService.UserId))
                 .Select(s => s.SequenceNo)
@@ -247,7 +243,7 @@ namespace QCS.Application.Services
 
             if (request == null) return null;
 
-            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(1);
+            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
 
             if (workflowRoute?.Steps != null)
             {
@@ -304,7 +300,7 @@ namespace QCS.Application.Services
         public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
             var requestRepo = _unitOfWork.Repository<Request>();
-            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
             if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
 
             var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
@@ -316,8 +312,8 @@ namespace QCS.Application.Services
             if (isSubmit)
             {
                 var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
-                currentStepId = nextStep != null ? nextStep.SequenceNo : 99;
-                if (currentStepId == 99) docStatus = (int)RequestStatus.Approved;
+                currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
+                if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
             }
 
             var pr = new Request
@@ -351,12 +347,12 @@ namespace QCS.Application.Services
                     Status = stepStatus,
                     ActionDate = actionDate,
                     ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
-                    ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(1, _currentUserService.UserId) : null,
+                    ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId) : null,
                     Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
                 });
             }
 
-            // ✅ ใช้ Helper + IFileService จัดการไฟล์
+            // ✅ ใช้ Helper ที่ปลอดภัยแทน Reflection
             var files = GetFilesFromInput(input);
             if (files != null && files.Any())
             {
@@ -368,8 +364,6 @@ namespace QCS.Application.Services
             }
 
             await requestRepo.AddAsync(pr);
-
-            // ✅ Save ทีเดียวตอนจบ
             await _unitOfWork.CommitAsync();
 
             return pr;
@@ -404,7 +398,7 @@ namespace QCS.Application.Services
                     step1.Status = (int)RequestStatus.Approved;
                     step1.ActionDate = DateTime.Now;
                     step1.ApproverNId = _currentUserService.UserId;
-                    step1.ApproverName = await GetApproverNameAsync(1, _currentUserService.UserId);
+                    step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId);
                     step1.Comment = input.Comment;
                 }
 
@@ -431,12 +425,10 @@ namespace QCS.Application.Services
             {
                 var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
                 var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
-
-                // ✅ ลบผ่าน Repository (แต่ยังไม่ Commit)
                 await quotationRepo.DeleteRangeAsync(toRemove);
             }
 
-            // ✅ ใช้ Helper + IFileService จัดการไฟล์ใหม่
+            // ✅ ใช้ Helper ที่ปลอดภัยแทน Reflection
             var files = GetFilesFromInput(input);
             if (files != null && files.Any())
             {
@@ -448,8 +440,6 @@ namespace QCS.Application.Services
             }
 
             await requestRepo.UpdateAsync(pr);
-
-            // ✅ Save ทีเดียว (Atomic Transaction: ถ้าพังก็ Rollback หมดทั้งไฟล์ทั้งเอกสาร)
             await _unitOfWork.CommitAsync();
         }
 
@@ -502,8 +492,6 @@ namespace QCS.Application.Services
         {
             var todayStr = DateTime.Now.ToString("yyyyMMdd");
             var prefix = $"QC-{todayStr}-";
-
-            // ✅ ใช้ Repository ผ่าน UnitOfWork
             var countToday = await _unitOfWork.Repository<Request>().GetAll().CountAsync(x => x.Code.StartsWith(prefix));
             return $"{prefix}{(countToday + 1):D3}";
         }
@@ -514,32 +502,18 @@ namespace QCS.Application.Services
             return !string.IsNullOrEmpty(name) ? name : nId;
         }
 
-        // ✅ Helper Method: ช่วยดึงไฟล์จาก input (Reflection)
-        private List<IFormFile> GetFilesFromInput(dynamic input)
+        // ✅ ปรับปรุง Helper Method: ไม่ใช้ dynamic/reflection แล้ว
+        // หมายเหตุ: ควรให้ CreateRequestDto และ UpdateRequestDto สืบทอดจาก IHasAttachments
+        // หรือถ้ายังไม่ได้ทำ สามารถเปลี่ยน input เป็น object แล้ว cast ก็ได้ แต่แนะนำ Interface ดีที่สุด
+        private List<IFormFile> GetFilesFromInput(object input)
         {
-            try
+            if (input is IHasAttachments dto)
             {
-                // ลองดึงจาก Property "Attachments" (Create DTO)
-                var propAttachments = input.GetType().GetProperty("Attachments");
-                if (propAttachments != null)
-                {
-                    var val = propAttachments.GetValue(input) as List<IFormFile>;
-                    if (val != null) return val;
-                }
-
-                // ลองดึงจาก Property "NewAttachments" (Update DTO)
-                var propNewAttachments = input.GetType().GetProperty("NewAttachments");
-                if (propNewAttachments != null)
-                {
-                    var val = propNewAttachments.GetValue(input) as List<IFormFile>;
-                    if (val != null) return val;
-                }
-            }
-            catch
-            {
-                return new List<IFormFile>();
+                // เรียกผ่าน Interface กลาง ไม่ต้องเช็คชื่อ Property แล้ว
+                return dto.GetUploadFiles() ?? new List<IFormFile>();
             }
 
+            // Fallback (เผื่อกรณีอื่น)
             return new List<IFormFile>();
         }
     }

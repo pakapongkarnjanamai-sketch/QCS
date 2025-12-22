@@ -14,13 +14,18 @@ namespace QCS.Infrastructure.Data
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ICurrentUserService _currentUserService;
 
-        public AppDbContext(DbContextOptions<AppDbContext> options, IDateTime dateTime, IHttpContextAccessor httpContextAccessor,ICurrentUserService currentUserService)
+        public AppDbContext(
+            DbContextOptions<AppDbContext> options,
+            IDateTime dateTime,
+            IHttpContextAccessor httpContextAccessor,
+            ICurrentUserService currentUserService)
             : base(options)
         {
             _dateTime = dateTime;
             _httpContextAccessor = httpContextAccessor;
             _currentUserService = currentUserService;
         }
+
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
         public DbSet<Request> Requests { get; set; }
         public DbSet<Quotation> Quotations { get; set; }
@@ -29,51 +34,47 @@ namespace QCS.Infrastructure.Data
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<UserDepartment> UserDepartments { get; set; }
-
         public DbSet<User> Users { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
+            // เพิ่ม Configuration อื่นๆ ตรงนี้ถ้ามี
         }
+
         public override int SaveChanges()
         {
-            var entries = ChangeTracker.Entries<BaseEntity>();
-            foreach (var entry in entries)
-            {
-                switch (entry.State)
-                {
-                    case EntityState.Added:
-                        entry.Entity.CreatedAt = _dateTime.Now;
-                        entry.Entity.CreatedBy = _currentUserService.UserId;
-                        break;
-                    case EntityState.Modified:
-                        entry.Entity.UpdatedAt = _dateTime.Now;
-                        entry.Entity.UpdatedBy = _currentUserService.UserId;
-                        break;
-                }
-            }
+            SetAuditFields();
             return base.SaveChanges();
         }
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
+            SetAuditFields();
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        // ✅ แยก Logic ออกมาเป็น Private Method เพื่อลด Code Duplication
+        private void SetAuditFields()
+        {
             var entries = ChangeTracker.Entries<BaseEntity>();
             foreach (var entry in entries)
             {
-                switch (entry.State)
+                if (entry.State == EntityState.Added)
                 {
-                    case EntityState.Added:
-                        entry.Entity.CreatedAt = _dateTime.Now;
-                        entry.Entity.CreatedBy = _currentUserService.UserId;
-                        break;
-                    case EntityState.Modified:
-                        entry.Entity.UpdatedAt = _dateTime.Now;
-                        entry.Entity.UpdatedBy = _currentUserService.UserId;
-                        break;
+                    entry.Entity.CreatedAt = _dateTime.Now;
+                    entry.Entity.CreatedBy = _currentUserService.UserId;
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    entry.Entity.UpdatedAt = _dateTime.Now;
+                    entry.Entity.UpdatedBy = _currentUserService.UserId;
+
+                    // 🛡️ ป้องกันไม่ให้ CreatedAt และ CreatedBy ถูกแก้ไขโดยไม่ตั้งใจตอน Update
+                    entry.Property(x => x.CreatedAt).IsModified = false;
+                    entry.Property(x => x.CreatedBy).IsModified = false;
                 }
             }
-            return await base.SaveChangesAsync(cancellationToken);
         }
     }
 }

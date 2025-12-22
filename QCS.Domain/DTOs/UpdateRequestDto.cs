@@ -1,14 +1,11 @@
-﻿
-
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 
 namespace QCS.Domain.DTOs
 {
-    public class UpdateRequestDto
+    public class UpdateRequestDto : IHasAttachments
     {
         public int Id { get; set; }
         public string Title { get; set; }
-     
         public string? VendorCode { get; set; }
         public string VendorName { get; set; }
         public DateTime? ValidFrom { get; set; }
@@ -17,13 +14,8 @@ namespace QCS.Domain.DTOs
         public string? Comment { get; set; }
         public List<IFormFile>? NewAttachments { get; set; }
         public string? DeletedFileIds { get; set; }
-
-        // === [NEW] สำหรับไฟล์ใหม่ (เหมือนหน้า Create) ===
         public string? QuotationsJson { get; set; }
-
-        // === [NEW] สำหรับอัปเดตไฟล์เดิม (ระบุ ID และ Type ใหม่) ===
         public string? UpdatedQuotationsJson { get; set; }
+        public List<IFormFile>? GetUploadFiles() => NewAttachments;
     }
-
-
 }

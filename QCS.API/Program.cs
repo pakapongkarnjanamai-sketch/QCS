@@ -56,10 +56,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOrAbove", policy =>
         policy.RequireRole("User", "Manager", "Admin", "SuperAdmin"));
 
-    // Domain-based policies
+    var domainPrefix = builder.Configuration["DomainSettings:DomainPrefix"];
     options.AddPolicy("DomainUser", policy =>
         policy.RequireAssertion(context =>
-            context.User.Identity?.Name?.StartsWith("NIKONOA\\", StringComparison.OrdinalIgnoreCase) == true));
+            context.User.Identity?.Name?.StartsWith(domainPrefix, StringComparison.OrdinalIgnoreCase) == true));
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -70,18 +70,18 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IFileService, FileService>();
-// register all services and policies first
+
+var allowedOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("https://localhost:7154", "https://localhost:7105")
+        policy.WithOrigins(allowedOrigins) // อ่านจาก Config
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
     });
 });
-
 builder.Services.AddHttpClient("VendorApi", client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["ExternalServices:VendorApi"]);
