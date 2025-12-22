@@ -1,10 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿
+using Microsoft.EntityFrameworkCore;
 using QCS.Infrastructure.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace QCS.Infrastructure.Services
+namespace QCS.Application.Services
 {
     public interface IRepository<T> where T : class
     {

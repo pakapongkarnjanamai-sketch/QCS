@@ -4,8 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
-using QCS.Infrastructure.Data;
-using QCS.Infrastructure.Services;
+using QCS.Infrastructure.Services; // สมมติว่า IRepository อยู่ที่นี่ (ตามโครงสร้างเดิม)
 using System.Text.Json;
 
 namespace QCS.Application.Services
@@ -30,28 +29,34 @@ namespace QCS.Application.Services
 
     public class RequestService : IRequestService
     {
-        private readonly IRepository<Request> _requestRepository;
-        private readonly IRepository<Quotation> _quotationRepository;
+        // ✅ เปลี่ยนมาใช้ UnitOfWork แทน Repository แยก
+        private readonly IUnitOfWork _unitOfWork;
+
         private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
         private readonly IWebHostEnvironment _env;
 
+        // ✅ Service สำหรับจัดการไฟล์ (จากข้อ 2)
+        private readonly IFileService _fileService;
+
         public RequestService(
-            IRepository<Request> requestRepository,
-            IRepository<Quotation> quotationRepository,
+            IUnitOfWork unitOfWork,
             WorkflowService workflowService,
             ICurrentUserService currentUserService,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            IFileService fileService)
         {
-            _requestRepository = requestRepository;
-            _quotationRepository = quotationRepository;
+            _unitOfWork = unitOfWork;
             _workflowService = workflowService;
             _currentUserService = currentUserService;
             _env = env;
+            _fileService = fileService;
         }
+
         public async Task ApproveAsync(ApprovalActionDto input)
         {
-            var request = await _requestRepository.GetAll()
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var request = await requestRepo.GetAll()
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == input.RequestId);
 
@@ -84,17 +89,19 @@ namespace QCS.Application.Services
             else
             {
                 request.Status = (int)RequestStatus.Approved;
-                //request.CurrentStepId = (int)WorkflowStep.Completed; // จบกระบวนการ
                 request.CurrentStep = WorkflowStep.Completed;
             }
 
-            await _requestRepository.UpdateAsync(request);
-            await _requestRepository.SaveChangesAsync();
+            await requestRepo.UpdateAsync(request);
+
+            // ✅ Save ผ่าน UnitOfWork
+            await _unitOfWork.CommitAsync();
         }
 
         public async Task RejectAsync(ApprovalActionDto input)
         {
-            var request = await _requestRepository.GetAll()
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var request = await requestRepo.GetAll()
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == input.RequestId);
 
@@ -113,18 +120,20 @@ namespace QCS.Application.Services
             currentStepObj.ApproverName = approverName;
 
             request.Status = (int)RequestStatus.Rejected;
-            //request.CurrentStepId = (int)WorkflowStep.Rejected;
             request.CurrentStep = WorkflowStep.Rejected;
 
             var remainingSteps = request.ApprovalSteps.Where(s => s.Sequence > currentStepObj.Sequence);
             foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
 
-            await _requestRepository.UpdateAsync(request);
-            await _requestRepository.SaveChangesAsync();
+            await requestRepo.UpdateAsync(request);
+
+            // ✅ Save ผ่าน UnitOfWork
+            await _unitOfWork.CommitAsync();
         }
+
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
-            return _requestRepository.GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId
                          && r.Status != (int)RequestStatus.Approved
@@ -143,7 +152,7 @@ namespace QCS.Application.Services
 
         public IQueryable<RequestGridDto> GetRejectedRequestsQuery()
         {
-            return _requestRepository.GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Rejected)
                 .Select(r => new RequestGridDto
@@ -160,7 +169,7 @@ namespace QCS.Application.Services
 
         public IQueryable<RequestGridDto> GetApprovedListQuery()
         {
-            return _requestRepository.GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Approved)
                 .Select(r => new RequestGridDto
@@ -192,7 +201,7 @@ namespace QCS.Application.Services
                 return Enumerable.Empty<RequestGridDto>().AsQueryable();
             }
 
-            return _requestRepository.GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Pending && myStepSequences.Contains(r.CurrentStepId))
                 .Select(r => new RequestGridDto
@@ -210,9 +219,10 @@ namespace QCS.Application.Services
                             .FirstOrDefault() ?? "Unknown"
                 });
         }
+
         public IQueryable<RequestGridDto> GetMyApprovedListQuery()
         {
-            return _requestRepository.GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Approved)
                 .Select(r => new RequestGridDto
@@ -224,12 +234,12 @@ namespace QCS.Application.Services
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
                     CurrentStepId = r.CurrentStepId
-                
                 });
         }
+
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
-            var request = await _requestRepository.GetAll()
+            var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .AsNoTracking()
@@ -282,7 +292,7 @@ namespace QCS.Application.Services
 
         public async Task<RequestDetailDto?> GetByCodeAsync(string code)
         {
-            var id = await _requestRepository.GetAll()
+            var id = await _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.Code == code)
                 .Select(r => r.Id)
@@ -293,6 +303,7 @@ namespace QCS.Application.Services
 
         public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
+            var requestRepo = _unitOfWork.Repository<Request>();
             var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
             if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
 
@@ -345,18 +356,31 @@ namespace QCS.Application.Services
                 });
             }
 
-            await HandleFileUploadsAsync(input, pr);
-            await _requestRepository.AddAsync(pr);
+            // ✅ ใช้ Helper + IFileService จัดการไฟล์
+            var files = GetFilesFromInput(input);
+            if (files != null && files.Any())
+            {
+                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                foreach (var q in newQuotations)
+                {
+                    pr.Quotations.Add(q);
+                }
+            }
 
-            // ✅ ต้องสั่ง SaveChanges เพื่อยืนยันการบันทึกลง Database
-            await _requestRepository.SaveChangesAsync();
+            await requestRepo.AddAsync(pr);
+
+            // ✅ Save ทีเดียวตอนจบ
+            await _unitOfWork.CommitAsync();
 
             return pr;
         }
 
         public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
         {
-            var pr = await _requestRepository.GetAll()
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var quotationRepo = _unitOfWork.Repository<Quotation>();
+
+            var pr = await requestRepo.GetAll()
                 .Include(r => r.Quotations)
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == input.Id);
@@ -407,30 +431,42 @@ namespace QCS.Application.Services
             {
                 var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
                 var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
-                await _quotationRepository.DeleteRangeAsync(toRemove);
+
+                // ✅ ลบผ่าน Repository (แต่ยังไม่ Commit)
+                await quotationRepo.DeleteRangeAsync(toRemove);
             }
 
-            await HandleFileUploadsAsync(input, pr);
-            await _requestRepository.UpdateAsync(pr);
+            // ✅ ใช้ Helper + IFileService จัดการไฟล์ใหม่
+            var files = GetFilesFromInput(input);
+            if (files != null && files.Any())
+            {
+                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                foreach (var q in newQuotations)
+                {
+                    pr.Quotations.Add(q);
+                }
+            }
 
-            // ✅ ต้องสั่ง SaveChanges เพื่อยืนยันการอัปเดตข้อมูล
-            await _requestRepository.SaveChangesAsync();
+            await requestRepo.UpdateAsync(pr);
+
+            // ✅ Save ทีเดียว (Atomic Transaction: ถ้าพังก็ Rollback หมดทั้งไฟล์ทั้งเอกสาร)
+            await _unitOfWork.CommitAsync();
         }
 
         public async Task DeleteAsync(int id)
         {
-            var pr = await _requestRepository.GetByIdAsync(id);
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var pr = await requestRepo.GetByIdAsync(id);
             if (pr != null)
             {
-                await _requestRepository.DeleteAsync(pr);
-                // ✅ ต้องสั่ง SaveChanges เพื่อยืนยันการลบข้อมูล
-                await _requestRepository.SaveChangesAsync();
+                await requestRepo.DeleteAsync(pr);
+                await _unitOfWork.CommitAsync();
             }
         }
 
         public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
         {
-            var q = await _quotationRepository.GetAll()
+            var q = await _unitOfWork.Repository<Quotation>().GetAll()
                 .Include(x => x.AttachmentFile)
                 .FirstOrDefaultAsync(x => x.Id == fileId);
 
@@ -466,7 +502,9 @@ namespace QCS.Application.Services
         {
             var todayStr = DateTime.Now.ToString("yyyyMMdd");
             var prefix = $"QC-{todayStr}-";
-            var countToday = await _requestRepository.GetAll().CountAsync(x => x.Code.StartsWith(prefix));
+
+            // ✅ ใช้ Repository ผ่าน UnitOfWork
+            var countToday = await _unitOfWork.Repository<Request>().GetAll().CountAsync(x => x.Code.StartsWith(prefix));
             return $"{prefix}{(countToday + 1):D3}";
         }
 
@@ -476,40 +514,33 @@ namespace QCS.Application.Services
             return !string.IsNullOrEmpty(name) ? name : nId;
         }
 
-        private async Task HandleFileUploadsAsync(dynamic input, Request pr)
+        // ✅ Helper Method: ช่วยดึงไฟล์จาก input (Reflection)
+        private List<IFormFile> GetFilesFromInput(dynamic input)
         {
-            var files = (input.GetType().GetProperty("Attachments")?.GetValue(input) as List<IFormFile>)
-                     ?? (input.GetType().GetProperty("NewAttachments")?.GetValue(input) as List<IFormFile>);
-
-            if (files == null || files.Count == 0) return;
-
-            var metaJson = input.QuotationsJson as string;
-            var metaList = string.IsNullOrEmpty(metaJson)
-                ? new List<QuotationItemDto>()
-                : JsonSerializer.Deserialize<List<QuotationItemDto>>(metaJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            foreach (var file in files.Where(f => f.Length > 0))
+            try
             {
-                using var ms = new MemoryStream();
-                await file.CopyToAsync(ms);
-
-                var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
-                pr.Quotations.Add(new Quotation
+                // ลองดึงจาก Property "Attachments" (Create DTO)
+                var propAttachments = input.GetType().GetProperty("Attachments");
+                if (propAttachments != null)
                 {
-                    FileName = file.FileName,
-                    ContentType = file.ContentType,
-                    FileSize = file.Length,
-                    DocumentTypeId = meta?.DocumentTypeId ?? 10,
-                    FilePath = "Database",
-                    AttachmentFile = new AttachmentFile
-                    {
-                        FileName = file.FileName,
-                        ContentType = file.ContentType,
-                        FileSize = file.Length,
-                        Data = ms.ToArray()
-                    }
-                });
+                    var val = propAttachments.GetValue(input) as List<IFormFile>;
+                    if (val != null) return val;
+                }
+
+                // ลองดึงจาก Property "NewAttachments" (Update DTO)
+                var propNewAttachments = input.GetType().GetProperty("NewAttachments");
+                if (propNewAttachments != null)
+                {
+                    var val = propNewAttachments.GetValue(input) as List<IFormFile>;
+                    if (val != null) return val;
+                }
             }
+            catch
+            {
+                return new List<IFormFile>();
+            }
+
+            return new List<IFormFile>();
         }
     }
 }

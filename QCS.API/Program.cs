@@ -65,9 +65,11 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<IDateTime, DateTimeService>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
+builder.Services.AddScoped<IFileService, FileService>();
 // register all services and policies first
 builder.Services.AddCors(options =>
 {

@@ -18,21 +18,19 @@ namespace QCS.Application.Services
 
     public class QuotationService : IQuotationService
     {
-        private readonly IRepository<Request> _requestRepository;
-        private readonly IRepository<Quotation> _quotationRepository;
+        // ✅ 1. เปลี่ยนมาใช้ UnitOfWork แทน Repository แยก
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IWebHostEnvironment _env;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
 
         public QuotationService(
-            IRepository<Request> requestRepository,
-            IRepository<Quotation> quotationRepository,
+            IUnitOfWork unitOfWork, // ✅ Inject เข้ามาแทน
             IWebHostEnvironment env,
             HttpClient httpClient,
             IConfiguration configuration)
         {
-            _requestRepository = requestRepository;
-            _quotationRepository = quotationRepository;
+            _unitOfWork = unitOfWork;
             _env = env;
             _httpClient = httpClient;
             _configuration = configuration;
@@ -40,7 +38,8 @@ namespace QCS.Application.Services
 
         public IQueryable<Request> GetQueryable()
         {
-            return _requestRepository.GetAll()
+            // ✅ เรียกผ่าน UnitOfWork
+            return _unitOfWork.Repository<Request>().GetAll()
                 .Include(x => x.Quotations)
                 .Include(x => x.ApprovalSteps)
                 .AsNoTracking();
@@ -48,7 +47,8 @@ namespace QCS.Application.Services
 
         public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
         {
-            var q = await _quotationRepository.GetAll()
+            // ✅ เรียกผ่าน UnitOfWork
+            var q = await _unitOfWork.Repository<Quotation>().GetAll()
                 .Include(x => x.AttachmentFile)
                 .FirstOrDefaultAsync(x => x.Id == fileId);
 
@@ -83,14 +83,14 @@ namespace QCS.Application.Services
 
         public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int requestId)
         {
-            var request = await _requestRepository.GetAll()
+            // ✅ เรียกผ่าน UnitOfWork
+            var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == requestId);
 
             if (request == null) throw new KeyNotFoundException("Request not found");
 
-            // ✅ สร้าง Request DTO ตามโครงสร้าง MergeAndStampRequestDto
             var pdfRequest = new MergeAndStampRequestDto
             {
                 DocumentName = request.Title,
