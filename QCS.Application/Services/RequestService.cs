@@ -264,7 +264,7 @@ namespace QCS.Application.Services
             return new RequestDetailDto
             {
                 RequestId = request.Id,
-                DocumentNo = request.Code,
+                Code = request.Code,
                 Title = request.Title,
                 RequestDate = request.RequestDate,
                 Status = request.Status.ToString(),

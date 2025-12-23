@@ -10,13 +10,13 @@ namespace QCS.Domain.DTOs
     public class RequestDetailDto
     {
         public int RequestId { get; set; }
-        public string DocumentNo { get; set; }
+        public string Code { get; set; }
         public string Title { get; set; }
         public DateTime RequestDate { get; set; }
         public string Status { get; set; }
         public string RequesterName { get; set; }
         public int CurrentStepId { get; set; }
-       
+
         public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
@@ -26,19 +26,12 @@ namespace QCS.Domain.DTOs
 
         public PermissionDto Permissions { get; set; } = new();
 
-        // === [NEW] เพิ่มส่วนนี้ครับ ===
         public WorkflowRouteDetailDto WorkflowRoute { get; set; }
-        // ==========================
 
         public List<QuotationItemDto> Quotations { get; set; }
     }
 
-    public class PermissionDto
-    {
-        public bool CanApprove { get; set; }
-        public bool CanReject { get; set; }
-        public bool CanEdit { get; set; }
-    }
+ 
 
    
 }

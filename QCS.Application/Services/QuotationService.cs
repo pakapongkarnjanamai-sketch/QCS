@@ -43,6 +43,7 @@ namespace QCS.Application.Services
                 .Include(x => x.Quotations)
                 .Include(x => x.ApprovalSteps)
                 .AsNoTracking();
+
         }
 
         public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)

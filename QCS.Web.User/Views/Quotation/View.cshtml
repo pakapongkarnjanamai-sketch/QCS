@@ -143,35 +143,35 @@
                     labelLocation: "top",
                     colCount: 2,
                     items: [
-                        { dataField: "code", label: { text: "No." }, colSpan: 2 },
-                        { dataField: "title", label: { text: "Title" }, colSpan: 2 },
-                        {
+                        { dataField: "code", label: { text: "Code." }, colSpan: 2 },
+                        { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 2 },
+                         {
                             dataField: "vendorCode",
-                            label: { text: "Vendor Code" },
-                            colSpan: 2
+                            label: { text: "ผู้ขาย (Vendor Code)" },
+                            colSpan: 2,
                         },
                         {
                             dataField: "vendorName",
-                            label: { text: "Vendor Name" },
+                            label: { text: "ชื่อผู้ขาย (Vendor Name)" },
                             colSpan: 2
                         },
                         {
-                            dataField: "validFrom", 
-                            label: { text: "Valid From" },
-                            editorType: "dxDateBox", 
+                            dataField: "validFrom",
+                            label: { text: "วันที่เริ่ม (Valid From)" },
+                            editorType: "dxDateBox",
                             editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
-                            dataField: "validUntil", 
-                            label: { text: "Valid Until" },
-                            editorType: "dxDateBox", 
+                            dataField: "validUntil",
+                            label: { text: "ถึงวันที่ (Valid Until)" },
+                            editorType: "dxDateBox",
                             editorOptions: { displayFormat: "yyyy-MM-dd" }
                         },
                         {
-                            dataField: "remark", 
-                            label: { text: "Remark" }, 
+                            dataField: "remark",
+                            label: { text: "หมายเหตุ (Remark)" },
                             colSpan: 2,
-                            editorType: "dxTextArea", 
+                            editorType: "dxTextArea",
                             editorOptions: { autoResizeEnabled: true, minHeight: 60 }
                         }
                     ]

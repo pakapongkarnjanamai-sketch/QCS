@@ -182,7 +182,7 @@
                     const data = await response.json();
 
                     prData = data;
-                    $("#lblDocNo").text(data.docNo || data.documentNo || "-");
+                    $("#lblDocNo").text(data.docNo || data.code || "-");
 
                     const canEdit = data.permissions && data.permissions.canEdit;
                     formInstance.option("formData", data);
