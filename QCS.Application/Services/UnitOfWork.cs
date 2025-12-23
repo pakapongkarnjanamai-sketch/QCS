@@ -2,7 +2,6 @@
 using QCS.Infrastructure.Data;
 using System;
 using System.Collections;
-using System.Threading.Tasks;
 
 namespace QCS.Infrastructure.Services
 {

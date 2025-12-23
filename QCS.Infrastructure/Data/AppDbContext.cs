@@ -3,8 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Services;
-using System.Collections.Generic;
-using System.Reflection.Emit;
 
 namespace QCS.Infrastructure.Data
 {

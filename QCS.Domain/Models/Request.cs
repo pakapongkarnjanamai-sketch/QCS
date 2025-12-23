@@ -1,6 +1,5 @@
 ﻿using QCS.Domain.Enum;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QCS.Domain.Models
@@ -18,17 +17,17 @@ namespace QCS.Domain.Models
             get => (WorkflowStep)CurrentStepId;
             set => CurrentStepId = (int)value;
         }
- 
+
         public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
-        public string? Remark { get; set; } 
+        public string? Remark { get; set; }
 
         public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
-        public virtual ICollection<ApprovalStep>  ApprovalSteps  { get; set; } = new List<ApprovalStep>();
+        public virtual ICollection<ApprovalStep> ApprovalSteps { get; set; } = new List<ApprovalStep>();
 
 
     }

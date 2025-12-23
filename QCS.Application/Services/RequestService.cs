@@ -415,7 +415,8 @@ namespace QCS.Application.Services
             if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
             {
                 var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                updates?.ForEach(item => {
+                updates?.ForEach(item =>
+                {
                     var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
                     if (f != null) f.DocumentTypeId = item.DocumentTypeId;
                 });
@@ -428,7 +429,7 @@ namespace QCS.Application.Services
                 await quotationRepo.DeleteRangeAsync(toRemove);
             }
 
-  
+
             var files = GetFilesFromInput(input);
             if (files != null && files.Any())
             {

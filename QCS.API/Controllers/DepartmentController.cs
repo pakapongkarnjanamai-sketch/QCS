@@ -2,11 +2,9 @@
 using DevExtreme.AspNet.Mvc;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using QCS.Api.Controllers;
 using QCS.Application.Services;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
-using QCS.Infrastructure.Services;
 
 namespace QCS.Api.Controllers
 {
