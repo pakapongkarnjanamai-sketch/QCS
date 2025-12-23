@@ -32,169 +32,343 @@
     </environment>
     <script src="~/js/site.js"></script>
     <style>
-        /* === GLOBAL THEME (Based on Code.cshtml) === */
+        /* ==================== GLOBAL RESET ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa; /* สีพื้นหลังตามต้นแบบ */
-            margin: 0;
-            padding-top: 60px;
-            color: #333;
+            background-color: #f5f7fa;
+            color: #2c3e50;
         }
 
-        .navbar {
-            padding-left: 24px;
-            padding-right: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); /* เงาแบบนุ่มนวล */
-            background-color: #fff !important;
+        /* ==================== LAYOUT & CONTAINER ==================== */
+        .full-height-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 20px;
         }
 
-        .navbar-brand {
-            font-size: 1.4rem;
+        .qcs-card,
+        .qcs-card-content {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 20px;
+            border: none;
+            margin-bottom: 20px;
+        }
+
+        .qcs-card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .qcs-card {
+            min-width: 1200px;
+            padding: 25px;
+        }
+
+        /* ==================== HEADERS & SECTIONS ==================== */
+        .text-header,
+        .text-primary-header {
+            color: #2c3e50;
+        }
+
+        .text-highlight {
+            color: #2190F7;
+        }
+
+        .section-header {
+            font-size: 1.1rem;
             font-weight: 700;
-            color: #2c3e50 !important; /* สีหัวข้อเข้ม */
+            color: #2c3e50;
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        /* === 1. Card Container (Formal Style) === */
-        .qcs-card {
-            background-color: #fff;
-            padding: 20px 25px;
-            border-radius: 12px; /* ความโค้งมน 12px */
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); /* เงาแบบ Code.cshtml */
-            margin-bottom: 20px;
-            border: none; /* เอาเส้นขอบออก */
-        }
-
-        /* === 2. Headers === */
-        .page-title {
-            font-size: 1.2rem;
+        /* ==================== LINKS ==================== */
+        .doc-link {
+            color: #258cfb;
+            text-decoration: none;
             font-weight: 600;
-            color: #2c3e50;
+            cursor: pointer;
+            transition: color 0.2s;
         }
 
-        .section-header {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            color: #2c3e50;
-            border-bottom: 2px solid #f1f3f5; /* เส้นแบ่งสีอ่อน */
-            padding-bottom: 8px;
-        }
+            .doc-link:hover {
+                color: #0a58ca;
+                text-decoration: underline;
+            }
 
-        /* === 3. Status Badges === */
+        /* ==================== BADGES (Standardized) ==================== */
         .status-badge {
             padding: 4px 10px;
-            border-radius: 10px;
-            font-size: 10px;
-            font-weight: 500;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
             display: inline-block;
-            min-width: 90px;
             text-align: center;
-            box-shadow: none; /* เอาเงาออกจาก Badge ให้ดู Clean ขึ้น */
+            white-space: nowrap;
         }
 
-        .status-draft {
-            background: #e2e3e5;
-            color: #383d41;
+        .bg-success-soft {
+            background: #d4edda;
+            color: #155724;
         }
 
-        .status-pending {
+        .bg-warning-soft {
             background: #fff3cd;
             color: #856404;
         }
 
-        .status-verify {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-approved {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-rejected {
+        .bg-danger-soft {
             background: #f8d7da;
             color: #721c24;
         }
 
-        .status-cancelled {
+        .bg-secondary-soft {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .bg-info-soft {
+            background: #cff4fc;
+            color: #055160;
+        }
+
+        /* Legacy status classes (for backward compatibility) */
+        .status-draft {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        /* ==================== GRID & CONTENT ==================== */
+        .grid-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            padding: 5px;
+        }
+
+            .grid-wrapper .dx-datagrid {
+                height: 100%;
+            }
+
+        /* ==================== TABPANEL CUSTOMIZATION ==================== */
+        #tabPanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+            #tabPanel .dx-tabpanel-container,
+            #tabPanel .dx-multiview-wrapper,
+            #tabPanel .dx-multiview-item-container,
+            #tabPanel .dx-multiview-item,
+            #tabPanel .dx-multiview-item-content {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+            }
+
+            #tabPanel .dx-tabs {
+                border-bottom: 1px solid #f1f3f5;
+                background-color: transparent;
+                flex-shrink: 0;
+                margin-bottom: 10px;
+            }
+
+            #tabPanel .dx-tab {
+                background-color: transparent !important;
+                padding: 10px 20px;
+            }
+
+            #tabPanel .dx-tab-text {
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 1rem;
+                font-weight: 600;
+                color: #6c757d;
+                text-transform: none;
+            }
+
+            #tabPanel .dx-tab-selected {
+                border-bottom: 3px solid #258cfb;
+                color: #258cfb;
+            }
+
+                #tabPanel .dx-tab-selected .dx-tab-text {
+                    color: #258cfb;
+                }
+
+        /* ==================== WORKFLOW & ATTACHMENTS ==================== */
+        .row-current-step {
+            background-color: #f0f9ff !important;
+        }
+
+        .current-user-row {
+            font-weight: 700;
+            color: #2190F7;
+        }
+
+        .unauthorized-overlay {
+            opacity: 0.6;
+            pointer-events: none;
+            filter: grayscale(100%);
+        }
+
+        .attachments-container {
+            padding: 20px;
             background: #f8f9fa;
-            color: #6c757d;
-            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            border: 1px dashed #dee2e6;
         }
 
-        /* === 4. Links & Buttons === */
-        .doc-no-link {
-            font-weight: 600;
-            color: #2190F7; /* สีฟ้าตามต้นแบบ */
-            text-decoration: none;
-            cursor: pointer;
-            transition: 0.2s;
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
         }
 
-            .doc-no-link:hover {
-                color: #0b5ed7;
-                text-decoration: underline;
+            .file-info i {
+                color: #f05b41;
+                font-size: 1.3em;
             }
 
-        /* Override DevExtreme Buttons to match theme */
-        .dx-button-mode-contained.dx-button-default {
-            background-color: #2190F7;
-            border-color: #2190F7;
+        /* ==================== NAVBAR CUSTOMIZATION ==================== */
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         }
 
-            .dx-button-mode-contained.dx-button-default:hover {
-                background-color: #1976d2;
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: #fff !important;
+        }
+
+        .navbar-nav .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+            .navbar-nav .nav-link:hover {
+                color: #fff !important;
+                transform: translateY(-2px);
             }
 
+        /* ==================== UTILITIES ==================== */
+        .text-nowrap {
+            white-space: nowrap;
+        }
+
+        .opacity-25 {
+            opacity: 0.25;
+        }
+
+        .opacity-50 {
+            opacity: 0.5;
+        }
+
+        .rounded-pill {
+            border-radius: 50rem !important;
+        }
+
+        .shadow-sm {
+            box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @@media (max-width: 1200px) {
+            .qcs-card {
+                min-width: auto;
+            }
+        }
+
+        @@media (max-width: 768px) {
+            .full-height-container {
+                height: auto;
+            }
+
+            .section-header {
+                font-size: 1rem;
+            }
+        }
     </style>
 
     @await RenderSectionAsync("Styles", required: false)
 </head>
 
 <body>
-    <nav class="navbar navbar-light fixed-top navbar-expand-md">
-        <a class="navbar-brand" href="@Url.Action("Index", "Home")">
-            QCS 
-            @* <span class="badge bg-light text-secondary border fs-6 rounded-pill">User Portal</span> *@
-        </a>
-        <div id="menu"></div>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="@Url.Action("Index", "Home")">
+                <i class="fas fa-file-invoice-dollar me-2"></i>
+                QCS
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="@Url.Action("Index", "Home")">
+                            <i class="fas fa-home me-1"></i> หน้าหลัก
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="@Url.Action("List", "Quotation")">
+                            <i class="fas fa-file-alt me-1"></i> ใบเสนอราคา
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-user-circle me-1"></i> @User.Identity.Name
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </nav>
 
-    @RenderBody()
+    <!-- Main Content -->
+    <main>
+        @RenderBody()
+    </main>
+    <footer class="text-center text-muted py-3 mt-auto">
+        <small>&copy; @DateTime.Now.Year - Quotation Comparison System (QCS)</small>
+    </footer>
 
-    <script>
-        $(function () {
-            // 1. Menu Initialization
-            $("#menu").dxMenu({
-                dataSource: [
-                    { text: "หน้าหลัก (My Requests)", icon: "home", path: "@Url.Action("Index", "Home")" },
-                    { text: "ใบเสนอราคา (Quotation)", icon: "file", path: "@Url.Action("List", "Quotation")" },
-                ],
-                displayExpr: "text",
-                showFirstSubmenuMode: "onHover",
-                orientation: "horizontal",
-                hideSubmenuOnMouseLeave: true,
-                selectionMode: "single",
-                onItemClick: function (e) {
-                    if (e.itemData.path && e.itemData.path !== "#") {
-                        window.location.href = e.itemData.path;
-                    }
-                }
-            });
-        });
-
-       
-     
-    </script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

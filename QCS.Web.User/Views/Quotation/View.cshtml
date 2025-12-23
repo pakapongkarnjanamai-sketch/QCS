@@ -5,274 +5,10 @@
     Layout = "_NoNavLayout";
 }
 
-@section Styles {
-    <style>
-        /* --- Layout --- */
-        .viewer-container {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 20px;
-            height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
-            background-color: #f8f9fa;
-        }
-
-        /* --- Left: PDF Viewer --- */
-        .pdf-section {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 1px solid #e0e0e0;
-        }
-
-        .pdf-toolbar {
-            padding: 12px 15px;
-            background: #fff;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .pdf-title {
-            font-weight: 700;
-            color: #2c3e50;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .pdf-body {
-            flex: 1;
-            background: #525659;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .pdf-placeholder {
-            color: #ccc;
-            text-align: center;
-        }
-
-        /* --- Right: Info Panel --- */
-        .info-section {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            height: 100%;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        .info-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            flex-shrink: 0;
-        }
-
-        .card-header-text {
-            font-size: 15px;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        /* --- File List Item --- */
-        .file-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            border: 1px solid #f1f3f5;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: default;
-            background: #fff;
-        }
-
-        .file-icon {
-            font-size: 24px;
-            color: #f05b41;
-            margin-right: 15px;
-        }
-
-        .file-details {
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .file-name {
-            font-weight: 600;
-            font-size: 13px;
-            color: #333;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .file-meta {
-            font-size: 11px;
-            color: #888;
-            margin-top: 2px;
-        }
-
-        /* --- Timeline --- */
-        .timeline {
-            position: relative;
-            padding-left: 25px;
-            margin-top: 10px;
-        }
-
-            .timeline::before {
-                content: '';
-                position: absolute;
-                left: 8px;
-                top: 5px;
-                bottom: 5px;
-                width: 2px;
-                background: #e9ecef;
-            }
-
-        .timeline-item {
-            position: relative;
-            padding-bottom: 25px;
-        }
-
-            .timeline-item:last-child {
-                padding-bottom: 0;
-            }
-
-        .timeline-dot {
-            position: absolute;
-            left: -25px;
-            top: 4px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #fff;
-            border: 3px solid #dee2e6;
-            z-index: 1;
-        }
-
-            .timeline-dot.completed {
-                border-color: #28a745;
-                background: #28a745;
-            }
-
-            .timeline-dot.current {
-                border-color: #ffc107;
-                background: #fff;
-            }
-
-            .timeline-dot.rejected {
-                border-color: #dc3545;
-                background: #dc3545;
-            }
-
-        .timeline-step {
-            font-weight: 600;
-            font-size: 13px;
-            color: #333;
-        }
-
-        .timeline-user {
-            font-size: 12px;
-            color: #555;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 2px;
-        }
-
-        .timeline-date {
-            font-size: 11px;
-            color: #999;
-            margin-top: 2px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .timeline-comment {
-            margin-top: 8px;
-            font-size: 12px;
-            background: #f8f9fa;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border-left: 3px solid #ddd;
-            color: #555;
-            font-style: italic;
-            white-space: pre-wrap;
-            word-break: break-word;
-            overflow-wrap: break-word;
-        }
-
-        /* --- Badges --- */
-        .status-badge {
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .bg-success-soft {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .bg-warning-soft {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .bg-danger-soft {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .bg-secondary-soft {
-            background: #e2e3e5;
-            color: #383d41;
-        }
-
-        /* Responsive */
-        @@media (max-width: 1024px) {
-            .viewer-container
-
-        {
-            grid-template-columns: 1fr;
-            height: auto;
-            overflow-y: auto;
-        }
-
-        .pdf-section {
-            height: 500px;
-        }
-
-        .info-section {
-            height: auto;
-            overflow: visible;
-        }
-
-        }
-    </style>
-}
+@* ไม่ต้องมี @section Styles เพราะใช้จาก _NoNavLayout หมดแล้ว *@
 
 <div class="viewer-container">
-
+    <!-- PDF Section -->
     <div class="pdf-section">
         <div class="pdf-toolbar">
             <div class="pdf-title">
@@ -291,32 +27,36 @@
         </div>
     </div>
 
+    <!-- Info Section -->
     <div class="info-section">
-
-        <div class="info-card">
-            <div class="card-header-text">
-                <span>Request Info</span>
-                <span id="headerStatus"></span>
+        <!-- Scrollable Content (No Action Card for read-only view) -->
+        <div class="info-scroll-wrapper">
+            <!-- Request Info -->
+            <div class="info-card">
+                <div class="card-header-text">
+                    <span>Request Info</span>
+                    <span id="headerStatus"></span>
+                </div>
+                <div id="requestInfoForm"></div>
             </div>
-            <div id="requestInfoForm"></div>
-        </div>
 
-        <div class="info-card" style="min-height: 200px;">
-            <div class="card-header-text">
-                <span>Attachments</span>
-                <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+            <!-- Attachments -->
+            <div class="info-card" style="min-height: 200px;">
+                <div class="card-header-text">
+                    <span>Attachments</span>
+                    <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+                </div>
+                <div id="documentList"></div>
             </div>
-            <div id="documentList"></div>
-        </div>
 
-        <div class="info-card">
-            <div class="card-header-text">Approval Flow</div>
-            <div id="approvalList" class="timeline"></div>
+            <!-- Approval Flow -->
+            <div class="info-card">
+                <div class="card-header-text">Approval Flow</div>
+                <div id="approvalList" class="timeline"></div>
+            </div>
         </div>
-
     </div>
 </div>
-
 @section Scripts {
     <script>
         $(function () {
