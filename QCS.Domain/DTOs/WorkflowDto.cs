@@ -6,6 +6,15 @@ using System.Threading.Tasks;
 
 namespace QCS.Domain.Models
 {
+    public class WorkflowRouteDto
+    {
+        public int Id { get; set; }
+        public string RouteName { get; set; }
+        public bool CanInitiate { get; set; }
+
+        // ใช้ List<WorkflowStepDto> ที่นิยามไว้ด้านล่าง
+        public List<WorkflowStepDto> Steps { get; set; } = new();
+    }
     public class WorkflowRouteDetailDto
     {
         public int Id { get; set; }

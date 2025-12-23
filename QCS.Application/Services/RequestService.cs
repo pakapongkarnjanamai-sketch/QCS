@@ -235,6 +235,7 @@ namespace QCS.Application.Services
 
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
         {
+            // 1. ดึงข้อมูล Request พร้อม History และ Files
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations)
                 .Include(r => r.ApprovalSteps)
@@ -243,22 +244,85 @@ namespace QCS.Application.Services
 
             if (request == null) return null;
 
-            var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
+            // ✅ ตรวจสอบสถานะจบงาน (Approved / Rejected)
+            bool isFinalState = request.Status == (int)RequestStatus.Approved ||
+                                request.Status == (int)RequestStatus.Rejected;
 
-            if (workflowRoute?.Steps != null)
+            // เตรียมตัวแปร
+            WorkflowRouteDetailDto? workflowRoute = null;
+
+            // กำหนดสิทธิ์เริ่มต้นเป็น ReadOnly (สำหรับเคสจบงาน)
+            PermissionDto permissions = new PermissionDto
             {
-                foreach (var routeStep in workflowRoute.Steps)
+                CanEdit = false,
+            
+                CanApprove = false,
+                CanReject = false
+            };
+
+            if (isFinalState)
+            {
+                // =========================================================
+                // ⚡ OPTIMIZATION: จบงานแล้ว -> Map History จาก DB โดยตรง
+                // =========================================================
+
+                // สร้าง Object WorkflowRouteDto หลอกๆ ขึ้นมา เพื่อให้ Frontend มีข้อมูลไปวาด Stepper
+                workflowRoute = new WorkflowRouteDetailDto
                 {
-                    var actualStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == routeStep.SequenceNo);
-                    if (actualStep != null)
+                    Id = 0, // ไม่สำคัญ
+                    RouteName = "History",
+                    CanInitiate = false,
+                    // แปลง ApprovalStep (DB) -> WorkflowStepDto (Display)
+                    Steps = request.ApprovalSteps.Select(step => new WorkflowStepDto
                     {
-                        routeStep.Status = actualStep.Status;
-                        routeStep.ActionDate = actualStep.ActionDate;
-                        routeStep.Comment = actualStep.Comment;
-                        routeStep.ApproverName = actualStep.ApproverName;
-                        routeStep.ApproverNId = actualStep.ApproverNId;
+                        Id = step.Id,
+                        SequenceNo = step.Sequence,
+                        StepName = step.StepName,
+                        Status = step.Status,
+                        ActionDate = step.ActionDate,
+                        ApproverName = step.ApproverName,
+                        ApproverNId = step.ApproverNId,
+                        Comment = step.Comment,
+                        // สร้าง Assignments หลอกๆ (ใส่คนที่อนุมัติไปแล้ว) เพื่อให้ Frontend ไม่ Error หากมีการเรียกใช้
+                        Assignments = !string.IsNullOrEmpty(step.ApproverNId)
+                            ? new List<AssignmentDto>
+                              {
+                          new AssignmentDto
+                          {
+                              NId = step.ApproverNId,
+                              EmployeeName = step.ApproverName ?? "",
+                              IsCurrentUser = step.ApproverNId == _currentUserService.UserId
+                          }
+                              }
+                            : new List<AssignmentDto>()
+                    }).OrderBy(s => s.SequenceNo).ToList()
+                };
+            }
+            else
+            {
+                // =========================================================
+                // 🔄 NORMAL FLOW: ยังไม่จบ -> โหลด Workflow จริงเพื่อเช็คสิทธิ์
+                // =========================================================
+                workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
+
+                if (workflowRoute?.Steps != null)
+                {
+                    foreach (var routeStep in workflowRoute.Steps)
+                    {
+                        var actualStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == routeStep.SequenceNo);
+                        if (actualStep != null)
+                        {
+                            routeStep.Status = actualStep.Status;
+                            routeStep.ActionDate = actualStep.ActionDate;
+                            routeStep.Comment = actualStep.Comment;
+                            routeStep.ApproverName = actualStep.ApproverName;
+                            routeStep.ApproverNId = actualStep.ApproverNId;
+                        }
                     }
                 }
+
+                // คำนวณสิทธิ์ (Edit/Approve/Reject) เฉพาะตอนที่เอกสารยังเดินเรื่องอยู่
+                permissions = _workflowService.GetPermissions(request, workflowRoute);
             }
 
             return new RequestDetailDto
@@ -274,6 +338,8 @@ namespace QCS.Application.Services
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
                 Remark = request.Remark,
+
+                // รายการไฟล์แนบ
                 Quotations = request.Quotations.Select(q => new QuotationItemDto
                 {
                     Id = q.Id,
@@ -281,7 +347,9 @@ namespace QCS.Application.Services
                     OriginalFileName = q.FileName,
                     FilePath = q.FilePath
                 }).ToList(),
-                Permissions = _workflowService.GetPermissions(request, workflowRoute),
+
+                // ส่ง Permissions และ WorkflowRoute ที่เตรียมไว้
+                Permissions = permissions,
                 WorkflowRoute = workflowRoute
             };
         }

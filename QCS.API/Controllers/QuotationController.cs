@@ -11,28 +11,29 @@ namespace QCS.API.Controllers
     [Authorize]
     public class QuotationController : ControllerBase
     {
+        private readonly IRequestService _requestService;
+        // ใช้ QuotationService สำหรับฟังก์ชันเฉพาะ เช่น การสร้าง PDF
         private readonly IQuotationService _quotationService;
-
-
         public QuotationController(
-            IQuotationService quotationService
-           )
+              IRequestService requestService,
+              IQuotationService quotationService)
         {
+            _requestService = requestService;
             _quotationService = quotationService;
-          
         }
 
         // ==========================================================
         // 🔍 GET BY CODE (ย้ายมาจาก RequestController)
         // ==========================================================
         [HttpGet("ByCode")]
-        public object GetByCode(string code, DataSourceLoadOptions loadOptions)
+        public async Task<IActionResult> GetByCode(string code)
         {
-            // ใช้ Service ของ Request ดึงข้อมูล PR ตาม Code (รวม Quotation และ ApprovalSteps แล้ว)
-            var source = _quotationService.GetQueryable().Where(x => x.Code == code);
+            // เรียกใช้ได้เลย Service จะรู้เองว่าถ้า Approved แล้วต้องทำงานเร็วๆ
+            var result = await _requestService.GetByCodeAsync(code);
 
-            // ส่งกลับให้ DevExtreme Grid
-            return DataSourceLoader.Load(source, loadOptions);
+            if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
+
+            return Ok(result);
         }
 
         [HttpGet("ViewFile/{id}")]
