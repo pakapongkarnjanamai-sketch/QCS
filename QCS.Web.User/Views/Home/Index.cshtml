@@ -8,10 +8,10 @@
 
         <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
             <h6 class="m-0 fw-bold text-header">
-                <i class="fas fa-clipboard-list text-primary me-2"></i> @ViewData["Title"]
+                <i class="fas fa-clipboard-list me-2" style="color: var(--dx-primary-color);"></i> @ViewData["Title"]
             </h6>
 
-            <button id="btnCreateHeader" class="btn btn-primary btn-sm px-3 shadow-sm">
+            <button id="btnCreateHeader" class="btn btn-sm px-3 shadow-sm" style="background-color: var(--dx-primary-color); color: white; border: none;">
                 <i class="fas fa-plus me-1"></i> สร้างใบเสนอราคาใหม่
             </button>
         </div>
@@ -23,13 +23,14 @@
                 <i class="fas fa-inbox fa-3x text-muted opacity-50"></i>
             </div>
             <h5 class="text-muted mb-3">ไม่มีข้อมูลเอกสารในขณะนี้</h5>
-            <button id="btnCreateEmpty" class="btn btn-primary px-4 rounded-pill">
+            <button id="btnCreateEmpty" class="btn px-4 rounded-pill" style="background-color: var(--dx-primary-color); color: white; border: none;">
                 <i class="fas fa-plus me-2"></i>สร้างใบเสนอราคาใหม่
             </button>
         </div>
         <div id="loadingIndicator"></div>
     </div>
 </div>
+
 <script>
     $(function () {
         // === CONFIG ===
@@ -43,27 +44,27 @@
 
             switch (status) {
                 case 0: // Draft
-                    badgeClass = "bg-secondary-soft"; // สีเทา (แบบร่าง)
+                    badgeClass = "bg-secondary-soft";
                     text = "บันทึก (Draft)";
                     break;
                 case 1: // Purchaser
-                    badgeClass = "bg-info-soft";      // สีฟ้า (กำลังดำเนินการโดยจัดซื้อ)
+                    badgeClass = "bg-info-soft";
                     text = "บันทึก (Purchaser)";
                     break;
                 case 2: // Verifier
-                    badgeClass = "bg-warning-soft";   // สีเหลือง (รอตรวจสอบ)
+                    badgeClass = "bg-warning-soft";
                     text = "รอตรวจสอบ";
                     break;
                 case 3: // Manager
-                    badgeClass = "bg-warning-soft";   // สีเหลือง (รออนุมัติ - ระดับสูง)
+                    badgeClass = "bg-warning-soft";
                     text = "รออนุมัติ";
                     break;
                 case 99: // Completed
-                    badgeClass = "bg-success-soft";   // สีเขียว (จบงาน)
+                    badgeClass = "bg-success-soft";
                     text = "อนุมัติครบถ้วน";
                     break;
                 case -1: // Rejected
-                    badgeClass = "bg-danger-soft";    // สีแดง (ปฏิเสธ)
+                    badgeClass = "bg-danger-soft";
                     text = "ไม่อนุมัติ";
                     break;
                 default:
@@ -79,15 +80,15 @@
             return { cls: badgeClass, txt: text };
         };
 
-    const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
-        shadingColor: "rgba(0,0,0,0.4)",
-        position: { of: "window" },
-        visible: false,
-        showIndicator: true,
-        showPane: true,
-        shading: true,
-        message: "กำลังโหลดข้อมูล..." // ปรับข้อความให้เหมาะกับหน้า Dashboard
-    }).dxLoadPanel("instance");
+        const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
+            shadingColor: "rgba(0,0,0,0.4)",
+            position: { of: "window" },
+            visible: false,
+            showIndicator: true,
+            showPane: true,
+            shading: true,
+            message: "กำลังโหลดข้อมูล..."
+        }).dxLoadPanel("instance");
 
         const handleDocClick = (paramValue, baseUrl, openInNewWindow) => {
             const url = `${baseUrl}/${encodeURIComponent(paramValue)}`;
@@ -132,14 +133,13 @@
             };
         }
 
-        // === COLUMN DEFINITIONS (ปรับปรุง Lookup DataSource) ===
+        // === COLUMN DEFINITIONS ===
         const createColumns = (targetUrl, openInNewWindow, isTaskGrid = false, paramField = 'id') => {
             
             const baseColumns = [
                 {
                     dataField: "code",
                     caption: "เลขที่เอกสาร",
-                    
                     width: 120,
                     cellTemplate: (container, options) => {
                         const docNo = options.value || "(Draft)";
@@ -155,17 +155,16 @@
                     }
                 },
                 { dataField: "title", caption: "หัวข้อ", minWidth: 150 },
-                    {
-        dataField: "vendorName",
-        caption: "ผู้ขาย (Vendor)",
-        width: 320,
-        calculateDisplayValue: function(rowData) {
-            // ถ้ามี Code ให้แสดง Code : Name ถ้าไม่มีแสดง Name อย่างเดียว
-            return rowData.vendorCode
-                ? `${rowData.vendorCode} : ${rowData.vendorName}`
-                : rowData.vendorName;
-        }
-    },
+                {
+                    dataField: "vendorName",
+                    caption: "ผู้ขาย (Vendor)",
+                    width: 320,
+                    calculateDisplayValue: function(rowData) {
+                        return rowData.vendorCode
+                            ? `${rowData.vendorCode} : ${rowData.vendorName}`
+                            : rowData.vendorName;
+                    }
+                },
                 {
                     dataField: "requestDate",
                     caption: "วันที่ขอ",
@@ -177,10 +176,9 @@
                 {
                     dataField: "currentStepId",
                     caption: "สถานะ",
-                    width: 150, // ขยายความกว้างเล็กน้อย
+                    width: 150,
                     alignment: "center",
                     lookup: {
-                        // ปรับ DataSource ให้ตรงกับ Enum WorkflowStep
                         dataSource: [
                             { id: 0, name: "บันทึก (Draft)" },
                             { id: 1, name: "บันทึก (Purchaser)" },
@@ -189,7 +187,8 @@
                             { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
                             { id: -1, name: "ไม่อนุมัติ (Rejected)" }
                         ],
-                        valueExpr: "id", displayExpr: "name"
+                        valueExpr: "id", 
+                        displayExpr: "name"
                     },
                     cellTemplate: (container, options) => {
                         const info = getStatusBadgeInfo(options.value);
@@ -197,9 +196,11 @@
                     }
                 },
                 {
-                    type: "buttons", width: 70,
+                    type: "buttons", 
+                    width: 70,
                     buttons: [{
-                        hint: "เปิดดู", icon: "find",
+                        hint: "เปิดดู", 
+                        icon: "find",
                         onClick: (e) => {
                             const val = e.row.data[paramField];
                             handleDocClick(val, targetUrl, openInNewWindow);
@@ -220,109 +221,107 @@
             return baseColumns;
         };
 
-    
         loadSummaryData();
 
         $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
             window.location.href = FORM_URL;
         });
 
-           function loadSummaryData() {
-        loadingIndicator.show();
-        $.ajax({
-            url: `${API_BASE}/Dashboard/Summary`,
-            method: "GET",
-            xhrFields: { withCredentials: true },
-            success: function (data) {
-                loadingIndicator.hide();
-                // ส่งเฉพาะ myTaskCount เข้าไป
-                initTabPanel(data.myTaskCount);
-            },
-            error: function(err) {
-                loadingIndicator.hide();
-                initTabPanel(0);
-            }
-        });
-    }
-
-            function initTabPanel(taskCount) {
-        const tabs = [];
-        if (taskCount > 0) {
-              // Tab 1: My Tasks (แสดง Badge เฉพาะอันนี้)
-        tabs.push({
-            title: "งานรออนุมัติ (My Tasks)",
-            icon: "todo",
-            badgeCount: taskCount, // แสดงจำนวนงานที่เหลือ
-     
-            template: () => {
-                const grid = $("<div>").attr("id", "gridMyTasks");
-                const store = createRemoteStore("GetMyTasks");
-                const columns = createColumns(CODE_URL, true, true, 'code');
-                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหางานที่ต้องอนุมัติ...", CODE_URL, true, 'code'));
-                return $("<div>").addClass("grid-wrapper").append(grid);
-            }
-        });
-        }
-      
-
-        // Tab 2: My Requests (ไม่แสดง Badge)
-        tabs.push({
-            title: "เอกสารของฉัน (My Requests)",
-            icon: "user",
-           
-            template: () => {
-                const grid = $("<div>").attr("id", "gridMyRequests");
-                const store = createRemoteStore("GetMyRequests");
-                const columns = createColumns(FORM_URL, false, false, 'id');
-                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารของฉัน...", FORM_URL, false, 'id'));
-                return $("<div>").addClass("grid-wrapper").append(grid);
-            }
-        });
-
-        // Tab 3: Approved List (ไม่แสดง Badge)
-        tabs.push({
-            title: "อนุมัติแล้ว (Approved)",
-            icon: "check",
-           
-            template: () => {
-                const grid = $("<div>").attr("id", "gridApproved");
-                const store = createRemoteStore("MyApprovedList");
-                const columns = createColumns(FORM_URL, false, false, 'id');
-                grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
-                return $("<div>").addClass("grid-wrapper").append(grid);
-            }
-        });
-        // Tab 4: Rejected List 
-        tabs.push({
-        title: "ไม่อนุมัติ (Rejected)",
-        icon: "revert",
-    
-        template: () => {
-            const grid = $("<div>").attr("id", "gridRejected");
-            const store = createRemoteStore("GetRejectedRequests"); // ใช้ Endpoint ที่สร้างใหม่
-            const columns = createColumns(FORM_URL, false, false, 'id');
-            grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ไม่อนุมัติ...", FORM_URL, false, 'id'));
-            return $("<div>").addClass("grid-wrapper").append(grid);
-        }
-    });
-
-        $("#tabPanel").dxTabPanel({
-            items: tabs,
-            height: "100%",
-            deferRendering: true,
-            itemTitleTemplate: function(itemData) {
-                const container = $("<div>").addClass("d-flex align-items-center gap-2");
-                if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
-                container.append($("<span>").text(itemData.title));
-
-                // แสดง Badge เฉพาะที่มีการส่งค่า badge มาเท่านั้น
-                if (itemData.badgeCount !== undefined && itemData.badgeCount > 0) {
-                    container.append($("<span>").addClass("badge bg-danger rounded-pill").text(itemData.badgeCount));
+        function loadSummaryData() {
+            loadingIndicator.show();
+            $.ajax({
+                url: `${API_BASE}/Dashboard/Summary`,
+                method: "GET",
+                xhrFields: { withCredentials: true },
+                success: function (data) {
+                    loadingIndicator.hide();
+                    initTabPanel(data.myTaskCount);
+                },
+                error: function(err) {
+                    loadingIndicator.hide();
+                    initTabPanel(0);
                 }
+            });
+        }
 
-                return container;
+        function initTabPanel(taskCount) {
+            const tabs = [];
+            
+            if (taskCount > 0) {
+                tabs.push({
+                    title: "งานรออนุมัติ (My Tasks)",
+                    icon: "todo",
+                    badgeCount: taskCount,
+                    template: () => {
+                        const grid = $("<div>").attr("id", "gridMyTasks");
+                        const store = createRemoteStore("GetMyTasks");
+                        const columns = createColumns(CODE_URL, true, true, 'code');
+                        grid.dxDataGrid(createGridConfig(store, columns, "ค้นหางานที่ต้องอนุมัติ...", CODE_URL, true, 'code'));
+                        return $("<div>").addClass("grid-wrapper").append(grid);
+                    }
+                });
             }
-        });
-    }
+
+            tabs.push({
+                title: "เอกสารของฉัน (My Requests)",
+                icon: "user",
+                template: () => {
+                    const grid = $("<div>").attr("id", "gridMyRequests");
+                    const store = createRemoteStore("GetMyRequests");
+                    const columns = createColumns(FORM_URL, false, false, 'id');
+                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารของฉัน...", FORM_URL, false, 'id'));
+                    return $("<div>").addClass("grid-wrapper").append(grid);
+                }
+            });
+
+            tabs.push({
+                title: "อนุมัติแล้ว (Approved)",
+                icon: "check",
+                template: () => {
+                    const grid = $("<div>").attr("id", "gridApproved");
+                    const store = createRemoteStore("MyApprovedList");
+                    const columns = createColumns(FORM_URL, false, false, 'id');
+                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
+                    return $("<div>").addClass("grid-wrapper").append(grid);
+                }
+            });
+
+            tabs.push({
+                title: "ไม่อนุมัติ (Rejected)",
+                icon: "revert",
+                template: () => {
+                    const grid = $("<div>").attr("id", "gridRejected");
+                    const store = createRemoteStore("GetRejectedRequests");
+                    const columns = createColumns(FORM_URL, false, false, 'id');
+                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ไม่อนุมัติ...", FORM_URL, false, 'id'));
+                    return $("<div>").addClass("grid-wrapper").append(grid);
+                }
+            });
+
+            $("#tabPanel").dxTabPanel({
+                items: tabs,
+                height: "100%",
+                deferRendering: true,
+                itemTitleTemplate: function(itemData) {
+                    const container = $("<div>").addClass("d-flex align-items-center gap-2");
+                    if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
+                    container.append($("<span>").text(itemData.title));
+
+                    if (itemData.badgeCount !== undefined && itemData.badgeCount > 0) {
+                        container.append(
+                            $("<span>")
+                                .addClass("badge rounded-pill ms-2")
+                                .css({
+                                    "background-color": "#dc3545",
+                                    "color": "white"
+                                })
+                                .text(itemData.badgeCount)
+                        );
+                    }
+
+                    return container;
+                }
+            });
+        }
     });
 </script>

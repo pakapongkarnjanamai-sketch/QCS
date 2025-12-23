@@ -3,15 +3,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-     <title>Quotation : @ViewData["Title"]</title>
+    <title>QCS - @ViewData["Title"]</title>
+
+    @await RenderSectionAsync("ExternalDependencies", required: false)
 
     <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
-
     <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
     <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
     <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
-    <link href="~/css/site.css" rel="stylesheet" />
 
+    <script src="~/js/devextreme/filesaver.min.js"></script>
+    <script src="~/js/devextreme/exceljs.min.js"></script>
     <script src="~/js/devextreme/jquery.js"></script>
     <script src="~/js/devextreme/bootstrap.js"></script>
     <script src="~/js/devextreme/dx.all.js"></script>
@@ -19,6 +21,7 @@
     <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
     <script src="~/src/devextreme-license.js"></script>
 
+    <script src="~/lib/font-awesome/js/all.min.js"></script>
 
     <environment names="Development">
         <script src="~/host/development.js"></script>
@@ -27,7 +30,15 @@
         <script src="~/host/production.js"></script>
     </environment>
     <script src="~/js/site.js"></script>
+
     <style>
+        /* ==================== CSS VARIABLES (DevExtreme Theme Colors) ==================== */
+        :root {
+            --dx-primary-color: #337ab7;
+            --dx-primary-dark: #2d6da3;
+            --dx-primary-light: #4a90d9;
+        }
+
         /* ==================== GLOBAL RESET ==================== */
         * {
             margin: 0;
@@ -37,7 +48,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f5f7fa;
             color: #2c3e50;
             overflow: hidden;
         }
@@ -50,24 +61,24 @@
             height: 100vh;
             padding: 20px;
             box-sizing: border-box;
-            background-color: #f8f9fa;
+            background-color: #f5f7fa;
         }
 
         /* ==================== PDF VIEWER SECTION ==================== */
         .pdf-section {
-            background: white;
+            background: #fff;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border: 1px solid #e0e0e0;
+            border: none;
         }
 
         .pdf-toolbar {
             padding: 12px 15px;
             background: #fff;
-            border-bottom: 1px solid #eee;
+            border-bottom: 2px solid #f1f3f5;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -82,6 +93,10 @@
             align-items: center;
             gap: 10px;
         }
+
+            .pdf-title i {
+                color: var(--dx-primary-color);
+            }
 
         .pdf-body {
             flex: 1;
@@ -101,6 +116,7 @@
         .error-message {
             text-align: center;
             padding: 20px;
+            color: #dc3545;
         }
 
         /* ==================== INFO PANEL SECTION ==================== */
@@ -147,25 +163,30 @@
                 }
 
         .info-card {
-            background: white;
+            background: #fff;
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             flex-shrink: 0;
-            border: 1px solid #eff2f5;
+            border: none;
         }
 
         .card-header-text {
-            font-size: 15px;
+            font-size: 1.1rem;
             font-weight: 700;
             color: #2c3e50;
             margin-bottom: 15px;
             border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 8px;
+            padding-bottom: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
         }
+
+            .card-header-text i {
+                color: var(--dx-primary-color);
+            }
 
         /* ==================== FILE LIST ==================== */
         .file-item {
@@ -182,13 +203,13 @@
 
             .file-item:hover {
                 background-color: #f8f9fa;
-                border-color: #2190F7;
+                border-color: var(--dx-primary-color);
                 transform: translateX(2px);
             }
 
             .file-item.active {
-                background-color: #e3f2fd;
-                border-color: #2190F7;
+                background-color: #f0f9ff;
+                border-color: var(--dx-primary-color);
             }
 
         .file-icon {
@@ -206,7 +227,7 @@
         .file-name {
             font-weight: 600;
             font-size: 13px;
-            color: #333;
+            color: #2c3e50;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -214,7 +235,7 @@
 
         .file-meta {
             font-size: 11px;
-            color: #888;
+            color: #6c757d;
             margin-top: 2px;
         }
 
@@ -274,7 +295,7 @@
         .timeline-step {
             font-weight: 600;
             font-size: 13px;
-            color: #333;
+            color: #2c3e50;
         }
 
         .timeline-user {
@@ -286,9 +307,13 @@
             margin-top: 2px;
         }
 
+            .timeline-user i {
+                color: var(--dx-primary-color);
+            }
+
         .timeline-date {
             font-size: 11px;
-            color: #999;
+            color: #6c757d;
             margin-top: 2px;
             display: flex;
             align-items: center;
@@ -345,7 +370,30 @@
             color: #055160;
         }
 
+        /* ==================== LINKS ==================== */
+        .doc-link {
+            color: var(--dx-primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+            .doc-link:hover {
+                color: var(--dx-primary-dark);
+                text-decoration: underline;
+            }
+
         /* ==================== UTILITIES ==================== */
+        .text-highlight {
+            color: var(--dx-primary-color);
+        }
+
+        .current-user-row {
+            font-weight: 700;
+            color: var(--dx-primary-color);
+        }
+
         .opacity-50 {
             opacity: 0.5;
         }
@@ -354,33 +402,33 @@
             border-radius: 50rem !important;
         }
 
+        .shadow-sm {
+            box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+        }
+
         /* ==================== RESPONSIVE ==================== */
         @@media (max-width: 1024px) {
-            .viewer-container
+            .viewer-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow-y: auto;
+            }
 
-        {
-            grid-template-columns: 1fr;
-            height: auto;
-            overflow-y: auto;
-        }
+            .pdf-section {
+                height: 500px;
+            }
 
-        .pdf-section {
-            height: 500px;
-        }
+            .info-section {
+                height: auto;
+                overflow: visible;
+            }
 
-        .info-section {
-            height: auto;
-            overflow: visible;
-        }
-
-        .info-scroll-wrapper {
-            overflow: visible;
-            height: auto;
-        }
-
+            .info-scroll-wrapper {
+                overflow: visible;
+                height: auto;
+            }
         }
     </style>
-
 
     @await RenderSectionAsync("Styles", required: false)
 </head>

@@ -5,14 +5,12 @@
     Layout = "_NoNavLayout";
 }
 
-@* ไม่ต้องมี @section Styles เพราะใช้จาก _NoNavLayout หมดแล้ว *@
-
 <div class="viewer-container">
     <!-- PDF Section -->
     <div class="pdf-section">
         <div class="pdf-toolbar">
             <div class="pdf-title">
-                <i class="fas fa-file-alt text-primary"></i>
+                <i class="fas fa-file-alt"></i>
                 <span id="docTitleLabel">Document Viewer</span>
             </div>
             <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
@@ -34,7 +32,7 @@
             <!-- Request Info -->
             <div class="info-card">
                 <div class="card-header-text">
-                    <span>Request Info</span>
+                    <span><i class="fas fa-info-circle"></i> Request Info</span>
                     <span id="headerStatus"></span>
                 </div>
                 <div id="requestInfoForm"></div>
@@ -43,20 +41,23 @@
             <!-- Attachments -->
             <div class="info-card" style="min-height: 200px;">
                 <div class="card-header-text">
-                    <span>Attachments</span>
-                    <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+                    <span><i class="fas fa-paperclip"></i> Attachments</span>
+                    <span id="attachmentCount" class="badge rounded-pill" style="background-color: #6c757d; color: white;">0</span>
                 </div>
                 <div id="documentList"></div>
             </div>
 
             <!-- Approval Flow -->
             <div class="info-card">
-                <div class="card-header-text">Approval Flow</div>
+                <div class="card-header-text">
+                    <span><i class="fas fa-route"></i> Approval Flow</span>
+                </div>
                 <div id="approvalList" class="timeline"></div>
             </div>
         </div>
     </div>
 </div>
+
 @section Scripts {
     <script>
         $(function () {
@@ -95,7 +96,7 @@
             async function loadData() {
                 const loader = createLoader("Loading Data...");
                 try {
-                    const url = new URL(API.GET_DATA, window.location.origin); // Ensure full URL
+                    const url = new URL(API.GET_DATA, window.location.origin);
                     url.searchParams.append("code", DOC_CODE);
 
                     const res = await fetch(url, { credentials: 'include' });
@@ -110,12 +111,9 @@
                     renderForm(data);
                     renderDocuments(data.quotations);
 
-                    // ปรับการเรียกใช้ Workflow
                     const steps = data.approvalSteps || [];
                     renderApprovals(steps);
 
-                    // Auto-load Generated PDF
-                    // ใช้ data.id ซึ่งน่าจะเป็น RequestId
                     if (data.id) {
                         loadViewer(data.id, data.code);
                     } else {
@@ -134,7 +132,6 @@
             // 3. RENDERING
             // ==========================================
             function renderHeader(data) {
-                // [REF_ENUM] ใช้ Helper ที่สร้างขึ้น
                 const info = getStatusBadgeInfo(data.status);
                 $("#headerStatus").html(`<span class="status-badge ${info.cls}">${info.txt}</span>`);
             }
@@ -149,26 +146,33 @@
                         { dataField: "code", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
                         {
-                dataField: "vendorCode",
-                label: { text: "Vendor Code" },
-                colSpan: 2
-            },
-            {
-                dataField: "vendorName",
-                label: { text: "Vendor Name" },
-                colSpan: 2
-            },
-                        {
-                            dataField: "validFrom", label: { text: "Valid From" },
-                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
+                            dataField: "vendorCode",
+                            label: { text: "Vendor Code" },
+                            colSpan: 2
                         },
                         {
-                            dataField: "validUntil", label: { text: "Valid Until" },
-                            editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }
+                            dataField: "vendorName",
+                            label: { text: "Vendor Name" },
+                            colSpan: 2
                         },
                         {
-                            dataField: "remark", label: { text: "Remark" }, colSpan: 2,
-                            editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 }
+                            dataField: "validFrom", 
+                            label: { text: "Valid From" },
+                            editorType: "dxDateBox", 
+                            editorOptions: { displayFormat: "yyyy-MM-dd" }
+                        },
+                        {
+                            dataField: "validUntil", 
+                            label: { text: "Valid Until" },
+                            editorType: "dxDateBox", 
+                            editorOptions: { displayFormat: "yyyy-MM-dd" }
+                        },
+                        {
+                            dataField: "remark", 
+                            label: { text: "Remark" }, 
+                            colSpan: 2,
+                            editorType: "dxTextArea", 
+                            editorOptions: { autoResizeEnabled: true, minHeight: 60 }
                         }
                     ]
                 });
@@ -184,7 +188,6 @@
                 }
 
                 docs.forEach(doc => {
-                    // [REF_ENUM] ดึงชื่อประเภทเอกสารจาก SystemEnums
                     const typeName = (typeof SystemEnums !== 'undefined')
                         ? SystemEnums.getDisplayName('documentType', doc.documentTypeId)
                         : "Type " + doc.documentTypeId;
@@ -218,12 +221,10 @@
 
                 steps.forEach(step => {
                     let dotClass = "";
-                    // Logic สีของ Timeline
                     if (step.status === 2) dotClass = "completed";
                     else if (step.status === 9 || step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
-                    // [REF_ENUM] ชื่อสถานะใน Timeline
                     const stepStatusText = (typeof SystemEnums !== 'undefined')
                         ? SystemEnums.getDisplayName('approvalStatus', step.status)
                         : "Waiting";
@@ -267,7 +268,12 @@
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
 
-                    $("<embed>").attr({ src: objUrl, type: "application/pdf", width: "100%", height: "100%" }).appendTo(viewer);
+                    $("<embed>").attr({ 
+                        src: objUrl, 
+                        type: "application/pdf", 
+                        width: "100%", 
+                        height: "100%" 
+                    }).appendTo(viewer);
 
                 } catch (e) {
                     viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);

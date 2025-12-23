@@ -8,12 +8,12 @@
     <div class="qcs-card">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="m-0 d-flex align-items-center text-nowrap text-primary-header">
-                <i class="fas fa-file-invoice-dollar text-highlight me-2"></i>
+                <i class="fas fa-file-invoice-dollar me-2" style="color: var(--dx-primary-color);"></i>
                 <span id="lblPageTitle" class="fw-bold">@ViewData["Title"]</span>
                 @if (Model.HasValue)
                 {
                     <span class="mx-3 text-muted opacity-25">|</span>
-                    <span id="lblDocNo" class="text-highlight fw-bold">Loading...</span>
+                    <span id="lblDocNo" class="fw-bold" style="color: var(--dx-primary-color);">Loading...</span>
                 }
             </h5>
             <div id="actionButtons"></div>
@@ -21,12 +21,18 @@
     </div>
 
     <div class="qcs-card" id="formContainer">
-        <div class="section-header"><i class="fas fa-info-circle"></i> ข้อมูลใบเสนอราคา (Comparison Info)</div>
+        <div class="section-header">
+            <i class="fas fa-info-circle" style="color: var(--dx-primary-color);"></i> 
+            ข้อมูลใบเสนอราคา (Comparison Info)
+        </div>
         <div id="quotationForm"></div>
     </div>
 
     <div class="qcs-card">
-        <div class="section-header"><i class="fas fa-route"></i> เส้นทางการอนุมัติ (Approval Route)</div>
+        <div class="section-header">
+            <i class="fas fa-route" style="color: var(--dx-primary-color);"></i> 
+            เส้นทางการอนุมัติ (Approval Route)
+        </div>
         <div id="workflowRouteGrid"></div>
     </div>
 </div>
@@ -70,7 +76,6 @@
                 showIndicator: true, showPane: true, shading: true, message: "Processing..."
             }).dxLoadPanel("instance");
 
-            // --- [แก้ไข] Key ของ Store เป็น "code" ---
             const vendorStore = DevExpress.data.AspNet.createStore({
                 key: "code",
                 loadUrl: CONFIG.API_BASE_URL + CONFIG.VENDOR_API_URL,
@@ -124,8 +129,6 @@
                             itemType: "group", colSpan: 2, colCount: 2,
                             items: [
                                 { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 1, validationRules: [{ type: "required" }] },
-
-                                // --- [แก้ไข] Field เป็น vendorCode และ valueExpr เป็น code ---
                                 {
                                     dataField: "vendorCode",
                                     label: { text: "ผู้ขาย (Vendor)" },
@@ -142,8 +145,6 @@
                                     },
                                     validationRules: [{ type: "required", message: "กรุณาเลือกผู้ขาย" }]
                                 },
-                                // -------------------------------------------------------------
-
                                 { dataField: "validFrom", label: { text: "วันที่เริ่ม (Valid From)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
                                 { dataField: "validUntil", label: { text: "ถึงวันที่ (Valid Until)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
                                 { dataField: "remark", label: { text: "หมายเหตุ (Remark)" }, editorType: "dxTextArea", editorOptions: { height: 80 }, colSpan: 2 }
@@ -180,13 +181,11 @@
                     if (!response.ok) throw new Error("ไม่พบข้อมูลเอกสาร");
                     const data = await response.json();
 
-                    // --- [ลบ Logic ซ่อม ID ออก] เพราะใช้ Code โดยตรงแล้ว ---
-
                     prData = data;
                     $("#lblDocNo").text(data.docNo || data.documentNo || "-");
 
                     const canEdit = data.permissions && data.permissions.canEdit;
-                    formInstance.option("formData", data); // Data ต้องมี vendorCode มาจาก API
+                    formInstance.option("formData", data);
                     formInstance.option("readOnly", !canEdit);
 
                     if (attachmentGridInstance) {
@@ -258,7 +257,13 @@
                     editing: { mode: "cell", allowUpdating: canEdit, allowDeleting: false },
                     columns: [
                         { dataField: "originalFileName", caption: "ชื่อไฟล์ (File Name)", allowEditing: false, calculateDisplayValue: (r) => r.originalFileName || r.fileName,
-                            cellTemplate: (c, o) => { const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : ''; $("<div>").addClass("file-info").append($("<i>").addClass("fas fa-file-pdf")).append($("<span>").html(o.displayValue + isNew)).appendTo(c); }
+                            cellTemplate: (c, o) => { 
+                                const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : ''; 
+                                $("<div>").addClass("file-info")
+                                    .append($("<i>").addClass("fas fa-file-pdf"))
+                                    .append($("<span>").html(o.displayValue + isNew))
+                                    .appendTo(c); 
+                            }
                         },
                         { dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250, lookup: { dataSource: docTypesSource, valueExpr: "id", displayExpr: "displayName" }, validationRules: [{ type: "required" }] },
                         { type: "buttons", width: 100, buttons: [
@@ -326,16 +331,12 @@
 
                     if (MODE === "EDIT") formData.append("Id", PR_ID);
                     formData.append("Title", data.title);
-
-                    // --- [แก้ไข] ส่ง VendorCode โดยตรง ---
-                    // data.vendorCode จะมีค่าจากการเลือก Dropdown อัตโนมัติ เพราะ bind กับ dataField
                     formData.append("VendorCode", data.vendorCode);
 
                     const vendorEditor = formInstance.getEditor("vendorCode");
                     const selectedVendor = vendorEditor.option("selectedItem");
                     if (selectedVendor) formData.append("VendorName", selectedVendor.name);
                     else formData.append("VendorName", data.vendorName || "");
-                    // ------------------------------------
 
                     if (data.validFrom) formData.append("ValidFrom", new Date(data.validFrom).toISOString());
                     if (data.validUntil) formData.append("ValidUntil", new Date(data.validUntil).toISOString());
@@ -437,7 +438,7 @@
                     contentTemplate: function(contentElement) {
                         const container = $("<div>").addClass("p-2");
                         $("<div>").attr("id", "actionReasonBox").appendTo(container).dxTextArea({ height: 100, value: "", stylingMode: "outlined" });
-                        const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
+                                               const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
                         $("<div>").appendTo(btnGroup).dxButton({ text: "ยกเลิก (Cancel)", stylingMode: "text", onClick: () => actionPopupInstance.hide() });
                         $("<div>").attr("id", "btnConfirmAction").appendTo(btnGroup).dxButton({ text: "ยืนยัน (Confirm)", stylingMode: "contained" });
                         return container;

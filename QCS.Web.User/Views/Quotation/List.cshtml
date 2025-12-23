@@ -3,13 +3,12 @@
     Layout = "_DevExtremeLayout";
 }
 
-
 <div class="container full-height-container mt-3">
     <div class="qcs-card-content">
 
         <div class="d-flex align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
             <h6 class="m-0 fw-bold text-header">
-                <i class="fas fa-file-invoice-dollar text-primary me-2"></i> @ViewData["Title"]
+                <i class="fas fa-file-invoice-dollar me-2" style="color: var(--dx-primary-color);"></i> @ViewData["Title"]
             </h6>
         </div>
 
@@ -25,53 +24,53 @@
         $(function () {
             const DETAIL_URL = '@Url.Action("View", "Quotation")';
 
-            // [REF_ENUM] Helper function (เหมือนกับหน้า Code.cshtml)
-             const getStatusBadgeInfo = (status) => {
-            let badgeClass = "bg-secondary-soft";
-            let text = "Unknown";
+            // [REF_ENUM] Helper function
+            const getStatusBadgeInfo = (status) => {
+                let badgeClass = "bg-secondary-soft";
+                let text = "Unknown";
 
-            switch (status) {
-                case 0: // Draft
-                    badgeClass = "bg-secondary-soft"; // สีเทา (แบบร่าง)
-                    text = "บันทึก (Draft)";
-                    break;
-                case 1: // Purchaser
-                    badgeClass = "bg-info-soft";      // สีฟ้า (กำลังดำเนินการโดยจัดซื้อ)
-                    text = "บันทึก (Purchaser)";
-                    break;
-                case 2: // Verifier
-                    badgeClass = "bg-warning-soft";   // สีเหลือง (รอตรวจสอบ)
-                    text = "รอตรวจสอบ";
-                    break;
-                case 3: // Manager
-                    badgeClass = "bg-warning-soft";   // สีเหลือง (รออนุมัติ - ระดับสูง)
-                    text = "รออนุมัติ";
-                    break;
-                case 99: // Completed
-                    badgeClass = "bg-success-soft";   // สีเขียว (จบงาน)
-                    text = "อนุมัติครบถ้วน";
-                    break;
-                case -1: // Rejected
-                    badgeClass = "bg-danger-soft";    // สีแดง (ปฏิเสธ)
-                    text = "ไม่อนุมัติ";
-                    break;
-                default:
-                    text = "Status " + status;
-                    break;
-            }
+                switch (status) {
+                    case 0: // Draft
+                        badgeClass = "bg-secondary-soft";
+                        text = "บันทึก (Draft)";
+                        break;
+                    case 1: // Purchaser
+                        badgeClass = "bg-info-soft";
+                        text = "บันทึก (Purchaser)";
+                        break;
+                    case 2: // Verifier
+                        badgeClass = "bg-warning-soft";
+                        text = "รอตรวจสอบ";
+                        break;
+                    case 3: // Manager
+                        badgeClass = "bg-warning-soft";
+                        text = "รออนุมัติ";
+                        break;
+                    case 99: // Completed
+                        badgeClass = "bg-success-soft";
+                        text = "อนุมัติครบถ้วน";
+                        break;
+                    case -1: // Rejected
+                        badgeClass = "bg-danger-soft";
+                        text = "ไม่อนุมัติ";
+                        break;
+                    default:
+                        text = "Status " + status;
+                        break;
+                }
 
-            // (Optional) หากมี SystemEnums ให้ใช้ชื่อจาก SystemEnums แทน
-            if (typeof SystemEnums !== 'undefined') {
-                text = SystemEnums.getDisplayName('workflowStep', status);
-            }
+                // (Optional) หากมี SystemEnums ให้ใช้ชื่อจาก SystemEnums แทน
+                if (typeof SystemEnums !== 'undefined') {
+                    text = SystemEnums.getDisplayName('workflowStep', status);
+                }
 
-            return { cls: badgeClass, txt: text };
-        };
+                return { cls: badgeClass, txt: text };
+            };
 
             $("#gridContainer").dxDataGrid({
                 dataSource: DevExpress.data.AspNet.createStore({
                     key: "id",
-                    loadUrl: `${API_BASE}/Request/ApprovedList`, // ตรวจสอบว่า Endpoint นี้คืนค่ามาถูกต้อง
+                    loadUrl: `${API_BASE}/Request/ApprovedList`,
                     onBeforeSend: function (method, ajaxOptions) {
                         ajaxOptions.xhrFields = { withCredentials: true };
                     }
@@ -88,7 +87,7 @@
                     {
                         dataField: "code",
                         caption: "เลขที่เอกสาร",
-                          width: 120,
+                        width: 120,
                         sortOrder: "desc",
                         cellTemplate: (container, options) => {
                             $("<a>")
@@ -103,18 +102,22 @@
                         dataField: "title",
                         caption: "หัวข้อ/รายการ",
                         minWidth: 180
-                    },{ dataField: "requesterName", caption: "ผู้ขอ", width: 180 },
-                           {
-            dataField: "vendorName",
-            caption: "ผู้ขาย (Vendor)",
-             width: 320,
-            calculateDisplayValue: (rowData) => {
-                 return rowData.vendorCode
-                    ? `${rowData.vendorCode} : ${rowData.vendorName}`
-                    : rowData.vendorName;
-            }
-        },
-        
+                    },
+                    { 
+                        dataField: "requesterName", 
+                        caption: "ผู้ขอ", 
+                        width: 180 
+                    },
+                    {
+                        dataField: "vendorName",
+                        caption: "ผู้ขาย (Vendor)",
+                        width: 320,
+                        calculateDisplayValue: (rowData) => {
+                            return rowData.vendorCode
+                                ? `${rowData.vendorCode} : ${rowData.vendorName}`
+                                : rowData.vendorName;
+                        }
+                    },
                     {
                         dataField: "requestDate",
                         caption: "วันที่ขอ",
@@ -124,28 +127,30 @@
                         alignment: "center"
                     },
                     {
-                    dataField: "currentStepId",
-                    caption: "สถานะ",
-                    width: 150, // ขยายความกว้างเล็กน้อย
-                    alignment: "center",
-                    lookup: {
-                        // ปรับ DataSource ให้ตรงกับ Enum WorkflowStep
-                        dataSource: [
-                            { id: 0, name: "บันทึก (Draft)" },
-                            { id: 1, name: "บันทึก (Purchaser)" },
-                            { id: 2, name: "รอตรวจสอบ (Verifier)" },
-                            { id: 3, name: "รออนุมัติ (Manager)" },
-                            { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
-                            { id: -1, name: "ไม่อนุมัติ (Rejected)" }
-                        ],
-                        valueExpr: "id", displayExpr: "name"
+                        dataField: "currentStepId",
+                        caption: "สถานะ",
+                        width: 150,
+                        alignment: "center",
+                        lookup: {
+                            dataSource: [
+                                { id: 0, name: "บันทึก (Draft)" },
+                                { id: 1, name: "บันทึก (Purchaser)" },
+                                { id: 2, name: "รอตรวจสอบ (Verifier)" },
+                                { id: 3, name: "รออนุมัติ (Manager)" },
+                                { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
+                                { id: -1, name: "ไม่อนุมัติ (Rejected)" }
+                            ],
+                            valueExpr: "id", 
+                            displayExpr: "name"
+                        },
+                        cellTemplate: (container, options) => {
+                            const info = getStatusBadgeInfo(options.value);
+                            $("<span>")
+                                .addClass("status-badge " + info.cls)
+                                .text(info.txt)
+                                .appendTo(container);
+                        }
                     },
-                    cellTemplate: (container, options) => {
-                        const info = getStatusBadgeInfo(options.value);
-                        $("<span>").addClass("status-badge " + info.cls).text(info.txt).appendTo(container);
-                    }
-                },
-              
                     {
                         type: "buttons",
                         width: 70,

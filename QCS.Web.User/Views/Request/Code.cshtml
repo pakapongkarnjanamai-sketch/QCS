@@ -10,7 +10,7 @@
     <div class="pdf-section">
         <div class="pdf-toolbar">
             <div class="pdf-title">
-                <i class="fas fa-file-alt text-primary"></i>
+                <i class="fas fa-file-alt"></i>
                 <span id="docTitleLabel">Document Viewer</span>
             </div>
             <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
@@ -37,7 +37,7 @@
             <!-- Request Info -->
             <div class="info-card">
                 <div class="card-header-text">
-                    <span>Request Info</span>
+                    <span><i class="fas fa-info-circle"></i> Request Info</span>
                     <span id="headerStatus"></span>
                 </div>
                 <div id="requestInfoForm"></div>
@@ -46,15 +46,17 @@
             <!-- Attachments -->
             <div class="info-card" style="min-height: 200px;">
                 <div class="card-header-text">
-                    <span>Attachments</span>
-                    <span id="attachmentCount" class="badge bg-secondary rounded-pill">0</span>
+                    <span><i class="fas fa-paperclip"></i> Attachments</span>
+                    <span id="attachmentCount" class="badge rounded-pill" style="background-color: #6c757d; color: white;">0</span>
                 </div>
                 <div id="documentList"></div>
             </div>
 
             <!-- Approval Flow -->
             <div class="info-card">
-                <div class="card-header-text">Approval Flow</div>
+                <div class="card-header-text">
+                     <span><i class="fas fa-route"></i> Approval Flow</span>
+                </div>
                 <div id="approvalList" class="timeline"></div>
             </div>
         </div>
@@ -84,14 +86,13 @@
                 REJECT: `${API_BASE}/Approval/Reject`
             };
 
-            // [REF_ENUM] ลบ MAPS และสร้าง Helper สำหรับดึงสถานะและสี
+            // [REF_ENUM] Helper สำหรับจัดการสถานะและสี
             const getStatusBadgeInfo = (status) => {
-                let badgeClass = "bg-secondary-soft"; // Draft or Default
-                if (status === 1) badgeClass = "bg-warning-soft"; // Pending
-                else if (status === 2 || status === 3) badgeClass = "bg-success-soft"; // Approved/Completed
-                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft"; // Rejected
+                let badgeClass = "bg-secondary-soft";
+                if (status === 1) badgeClass = "bg-warning-soft";
+                else if (status === 2 || status === 3) badgeClass = "bg-success-soft";
+                else if (status === 9 || status === 99) badgeClass = "bg-danger-soft";
 
-                // ดึงชื่อภาษาไทยจาก SystemEnums
                 const text = (typeof SystemEnums !== 'undefined')
                     ? SystemEnums.getDisplayName('requestStatus', status)
                     : "Status " + status;
@@ -186,16 +187,26 @@
 
                 if (canReject) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'ไม่อนุมัติ (Reject)', icon: 'fas fa-times', type: 'danger', stylingMode: 'outlined',
-                        width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
+                        text: 'ไม่อนุมัติ (Reject)', 
+                        icon: 'fas fa-times', 
+                        type: 'danger', 
+                        stylingMode: 'outlined',
+                        width: '100%', 
+                        height: 40, 
+                        elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Reject')
                     }).addClass("flex-grow-1");
                 }
 
                 if (canApprove) {
                     $("<div>").appendTo($container).dxButton({
-                        text: 'อนุมัติ (Approve)', icon: 'fas fa-check', type: 'success', stylingMode: 'contained',
-                        width: '100%', height: 40, elementAttr: { class: "fw-bold shadow-sm" },
+                        text: 'อนุมัติ (Approve)', 
+                        icon: 'fas fa-check', 
+                        type: 'success', 
+                        stylingMode: 'contained',
+                        width: '100%', 
+                        height: 40, 
+                        elementAttr: { class: "fw-bold shadow-sm" },
                         onClick: () => openActionPopup('Approve')
                     }).addClass("flex-grow-1");
                 }
@@ -277,23 +288,42 @@
 
             function renderForm(data) {
                 $("#requestInfoForm").dxForm({
-                    formData: data, readOnly: true, labelLocation: "top", colCount: 2,
+                    formData: data, 
+                    readOnly: true, 
+                    labelLocation: "top", 
+                    colCount: 2,
                     items: [
                         { dataField: "documentNo", label: { text: "No." }, colSpan: 2 },
                         { dataField: "title", label: { text: "Title" }, colSpan: 2 },
                         {
-                dataField: "vendorCode",
-                label: { text: "Vendor Code" },
-                colSpan: 2
-            },
-            {
-                dataField: "vendorName",
-                label: { text: "Vendor Name" },
-                colSpan: 2
-            },
-                        { dataField: "validFrom", label: { text: "Valid From" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
-                        { dataField: "validUntil", label: { text: "Valid Until" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
-                        { dataField: "remark", label: { text: "Remark" }, colSpan: 2, editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 } }
+                            dataField: "vendorCode",
+                            label: { text: "Vendor Code" },
+                            colSpan: 2
+                        },
+                        {
+                            dataField: "vendorName",
+                            label: { text: "Vendor Name" },
+                            colSpan: 2
+                        },
+                        { 
+                            dataField: "validFrom", 
+                            label: { text: "Valid From" }, 
+                            editorType: "dxDateBox", 
+                            editorOptions: { displayFormat: "yyyy-MM-dd" } 
+                        },
+                        { 
+                            dataField: "validUntil", 
+                            label: { text: "Valid Until" }, 
+                            editorType: "dxDateBox", 
+                            editorOptions: { displayFormat: "yyyy-MM-dd" } 
+                        },
+                        { 
+                            dataField: "remark", 
+                            label: { text: "Remark" }, 
+                            colSpan: 2, 
+                            editorType: "dxTextArea", 
+                            editorOptions: { autoResizeEnabled: true, minHeight: 60 } 
+                        }
                     ]
                 });
             }
@@ -306,7 +336,6 @@
                     return;
                 }
                 docs.forEach(doc => {
-                    // [REF_ENUM] ใช้ SystemEnums ดึงชื่อประเภทเอกสาร
                     const typeName = (typeof SystemEnums !== 'undefined')
                         ? SystemEnums.getDisplayName('documentType', doc.documentTypeId)
                         : "Type " + doc.documentTypeId;
@@ -343,7 +372,6 @@
                     else if (step.status === 9 || step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
-                    // [REF_ENUM] ดึงชื่อสถานะจาก SystemEnums
                     const stepStatus = (typeof SystemEnums !== 'undefined')
                         ? SystemEnums.getDisplayName('approvalStatus', step.status)
                         : "Waiting";
@@ -385,7 +413,12 @@
                     if (!res.ok) throw new Error("Unable to load file content.");
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
-                    $("<embed>").attr({ src: objUrl, type: "application/pdf", width: "100%", height: "100%" }).appendTo(viewer);
+                    $("<embed>").attr({ 
+                        src: objUrl, 
+                        type: "application/pdf", 
+                        width: "100%", 
+                        height: "100%" 
+                    }).appendTo(viewer);
                 } catch (e) {
                     viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
                 } finally {
@@ -412,8 +445,13 @@
                 const id = "local-loader-" + Math.floor(Math.random() * 1000);
                 const $el = $("<div>").attr("id", id).appendTo(target);
                 const loadPanel = $el.dxLoadPanel({
-                    shadingColor: "rgba(255,255,255,0.7)", position: { of: target },
-                    visible: true, showIndicator: true, showPane: true, message: msg, container: target
+                    shadingColor: "rgba(255,255,255,0.7)", 
+                    position: { of: target },
+                    visible: true, 
+                    showIndicator: true, 
+                    showPane: true, 
+                    message: msg, 
+                    container: target
                 }).dxLoadPanel("instance");
                 return { hide: () => { loadPanel.hide(); $el.remove(); } };
             }
