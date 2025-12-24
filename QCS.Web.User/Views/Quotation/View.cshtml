@@ -2,7 +2,330 @@
 
 @{
     ViewData["Title"] = $"{Model}";
-    Layout = "_NoNavLayout";
+    Layout = "_DevExtremeLayout";
+    ViewData["HideNav"] = true;
+}
+
+@section Styles {
+    <style>
+        /* ==================== COMMON STYLES ==================== */
+        body {
+            overflow: hidden;
+        }
+
+        .viewer-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #f5f7fa;
+        }
+
+        /* PDF Section */
+        .pdf-section {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: none;
+        }
+
+        .pdf-toolbar {
+            padding: 12px 15px;
+            background: #fff;
+            border-bottom: 2px solid #f1f3f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .pdf-title {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .pdf-title i {
+                color: var(--dx-primary-color);
+            }
+
+        .pdf-body {
+            flex: 1;
+            background: #525659;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .pdf-placeholder {
+            color: #ccc;
+            text-align: center;
+        }
+
+        .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #dc3545;
+        }
+
+        /* Info Section */
+        .info-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #actionCard {
+            flex-shrink: 0;
+        }
+
+        .info-scroll-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 5px;
+        }
+
+            .info-scroll-wrapper::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            .info-scroll-wrapper::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 10px;
+            }
+
+            .info-scroll-wrapper::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 10px;
+            }
+
+                .info-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+                    background: #555;
+                }
+
+        .info-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            flex-shrink: 0;
+            border: none;
+        }
+
+        .card-header-text {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .card-header-text i {
+                color: var(--dx-primary-color);
+            }
+
+        /* File List */
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #f1f3f5;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fff;
+        }
+
+            .file-item:hover {
+                background-color: #f8f9fa;
+                border-color: var(--dx-primary-color);
+                transform: translateX(2px);
+            }
+
+            .file-item.active {
+                background-color: #f0f9ff;
+                border-color: var(--dx-primary-color);
+            }
+
+            /* Disabled Style for View Mode */
+            .file-item.disabled {
+                cursor: default;
+                opacity: 0.6;
+                pointer-events: none;
+            }
+
+                .file-item.disabled:hover {
+                    background-color: #fff;
+                    border-color: #f1f3f5;
+                    transform: none;
+                }
+
+        .file-icon {
+            font-size: 24px;
+            color: #f05b41;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .file-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #2c3e50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 25px;
+            margin-top: 10px;
+        }
+
+            .timeline::before {
+                content: '';
+                position: absolute;
+                left: 8px;
+                top: 5px;
+                bottom: 5px;
+                width: 2px;
+                background: #e9ecef;
+            }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 25px;
+        }
+
+            .timeline-item:last-child {
+                padding-bottom: 0;
+            }
+
+        .timeline-dot {
+            position: absolute;
+            left: -25px;
+            top: 4px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid #dee2e6;
+            z-index: 1;
+        }
+
+            .timeline-dot.completed {
+                border-color: #28a745;
+                background: #28a745;
+            }
+
+            .timeline-dot.current {
+                border-color: #ffc107;
+                background: #fff;
+            }
+
+            .timeline-dot.rejected {
+                border-color: #dc3545;
+                background: #dc3545;
+            }
+
+        .timeline-step {
+            font-weight: 600;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .timeline-user {
+            font-size: 12px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 2px;
+        }
+
+            .timeline-user i {
+                color: var(--dx-primary-color);
+            }
+
+        .timeline-date {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .timeline-comment {
+            margin-top: 8px;
+            font-size: 12px;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 3px solid #ddd;
+            color: #555;
+            font-style: italic;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* Responsive */
+        @@media (max-width: 1024px) {
+            .viewer-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow-y: auto;
+            }
+
+            .pdf-section {
+                height: 500px;
+            }
+
+            .info-section {
+                height: auto;
+                overflow: visible;
+            }
+
+            .info-scroll-wrapper {
+                overflow: visible;
+                height: auto;
+            }
+        }
+    </style>
 }
 
 <div class="viewer-container">
@@ -12,9 +335,11 @@
                 <i class="fas fa-file-alt"></i>
                 <span id="docTitleLabel">Document Viewer</span>
             </div>
-            <button class="btn btn-sm btn-outline-primary ms-auto me-1" id="btnDownload" disabled>
+
+            <button class="btn btn-sm btn-outline-primary ms-auto me-1" id="btnDownload" style="display:none;" disabled>
                 <i class="fas fa-download"></i> Download
             </button>
+
             <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
                 <i class="fas fa-expand"></i> Fullscreen
             </button>
@@ -28,10 +353,14 @@
     </div>
 
     <div class="info-section">
+        <div id="actionCard" class="info-card" style="display:none;">
+            <div id="actionButtonContainer" class="d-flex gap-2 w-100"></div>
+        </div>
+
         <div class="info-scroll-wrapper">
             <div class="info-card">
                 <div class="card-header-text">
-                    <span><i class="fas fa-info-circle"></i> Request Info</span>
+                    <span><i class="fas fa-info-circle"></i> Info</span>
                     <span id="headerStatus"></span>
                 </div>
                 <div id="requestInfoForm"></div>
@@ -55,59 +384,43 @@
     </div>
 </div>
 
+<div id="actionPopup">
+    <div class="p-2">
+        <div id="actionReasonBox"></div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <div id="btnCancelAction"></div>
+            <div id="btnConfirmAction"></div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         $(function () {
-            // ==========================================
-            // 1. CONFIG
-            // ==========================================
+            // === CONFIGURATION ===
             const DOC_CODE = "@Model";
             const API = {
                 GET_DATA: `${API_BASE}/Quotation/ByCode`,
-                VIEW_FILE: `${API_BASE}/Quotation/ViewFile`
+                VIEW_FILE_QUOTATION: `${API_BASE}/Quotation/ViewFile`, // สำหรับ View Mode (Step 99)
+                VIEW_FILE_REQUEST: `${API_BASE}/Request/ViewFile`,     // สำหรับ Request Mode (Step != 99)
+                APPROVE: `${API_BASE}/Approval/Approve`,
+                REJECT: `${API_BASE}/Approval/Reject`
             };
 
-            // [REF_ENUM] Helper สำหรับจัดการสถานะและสี
-            const getStatusBadgeInfo = (status) => {
-                // แปลง status เป็น int เผื่อมาเป็น string
-                const s = parseInt(status);
-                let badgeClass = "bg-secondary-soft"; // Draft or Default
+            // Global State
+            let currentDocId = null;
+            let currentActionType = "";
+            let actionPopupInstance;
+            let isFinalState = false; // Check Step 99
+            let viewFileApiUrl = "";  // Endpoint ที่เลือกใช้
 
-                // กำหนดสีตาม Status ID
-                if (s === 1) badgeClass = "bg-warning-soft";      // Pending
-                else if (s === 2 || s === 3) badgeClass = "bg-success-soft"; // Approved/Completed
-                else if (s === 9 || s === 99) badgeClass = "bg-danger-soft"; // Rejected
+            // === INIT ===
+            initActionPopup();
 
-                // ดึงชื่อภาษาไทยจาก SystemEnums (ถ้ามี) หรือแสดง Status ID
-                const text = (typeof SystemEnums !== 'undefined')
-                    ? SystemEnums.getDisplayName('requestStatus', s)
-                    : getStatusText(s);
-                return { cls: badgeClass, txt: text };
-            };
-
-            const getStatusText = (s) => {
-                if (s === 1) return "Pending";
-                if (s === 2 || s === 3) return "Approved";
-                if (s === 9 || s === 99) return "Rejected";
-                return "Draft";
-            };
-
-            // [ADDED] Helper สำหรับชื่อประเภทเอกสาร (Fallback กรณี SystemEnums ไม่พร้อม)
-            // อ้างอิงตาม API: 10=MainQuotation, 20=ComparativeQuotation, 30=Specifications, 40=TermsAndConditions
-            const getDocumentTypeText = (id) => {
-                if (id === 10) return "ใบเสนอราคาหลัก";
-                if (id === 20) return "ใบเสนอราคาเปรียบเทียบ";
-                if (id === 30) return "รายละเอียดคุณลักษณะ (Spec)";
-                if (id === 40) return "เงื่อนไขและข้อกำหนด";
-                return "เอกสารแนบ";
-            };
-
-            // ==========================================
-            // 2. INIT
-            // ==========================================
             if (DOC_CODE) loadData();
             else showError("Document Code is missing.");
 
+            // === MAIN LOGIC ===
             async function loadData() {
                 const loader = createLoader("Loading Data...");
                 try {
@@ -120,24 +433,60 @@
                     const data = await res.json();
                     if (!data) throw new Error("No data returned.");
 
+                    currentDocId = data.requestId || data.id;
+                    isFinalState = (data.currentStepId === 99);
+
+                    // 1. กำหนด API Endpoint
+                    if (isFinalState) {
+                        viewFileApiUrl = API.VIEW_FILE_QUOTATION;
+                    } else {
+                        viewFileApiUrl = API.VIEW_FILE_REQUEST;
+                    }
+
                     renderHeader(data);
                     renderForm(data);
+                    renderDocuments(data.quotations || []); // Render Attachments
 
-                    renderDocuments(data.quotations || []);
+                    // 2. จัดการ UI (Buttons & Viewer)
+                    if (isFinalState) {
+                        // === View Mode (Step 99) ===
+                        // แสดงปุ่ม Download
+                        $("#btnDownload").show();
+                        $("#btnFullscreen").removeClass("ms-auto");
+                        $("#actionCard").hide();
 
+                        // เปิดไฟล์โดยใช้ Request ID (PDF รวม)
+                        loadViewer(currentDocId, data.code);
+                    } else {
+                        // === Request Mode (Step != 99) ===
+                        // ซ่อนปุ่ม Download
+                        $("#btnDownload").hide();
+                        $("#btnFullscreen").addClass("ms-auto");
+
+                        // แสดงปุ่ม Action ตามสิทธิ์
+                        if (data.permissions && (data.permissions.canApprove || data.permissions.canReject)) {
+                            renderActionButtons(data);
+                        } else {
+                            $("#actionCard").hide();
+                        }
+
+                        // เปิดไฟล์แนบแรกโดยใช้ Attachment ID
+                        const docs = data.quotations || [];
+                        if (docs.length > 0) {
+                            loadViewer(docs[0].id, docs[0].originalFileName || data.code);
+                        } else {
+                            $("#pdfViewer").html('<div class="pdf-placeholder">No files attached</div>');
+                        }
+                    }
+
+                    // Timeline
                     const steps = (data.workflowRoute && data.workflowRoute.steps)
                                   ? data.workflowRoute.steps
                                   : (data.approvalSteps || []);
                     renderApprovals(steps);
 
-                    const reqId = data.requestId || data.id;
-                    if (reqId) {
-                        loadViewer(reqId, data.code);
-                    } else {
-                        $("#pdfViewer").html('<div class="pdf-placeholder">Document ID not found</div>');
-                    }
-
                     $("#btnFullscreen").on("click", toggleFullscreen);
+
                 } catch (err) {
                     showError(err.message);
                 } finally {
@@ -145,56 +494,57 @@
                 }
             }
 
-            // ==========================================
-            // 3. RENDERING
-            // ==========================================
-            function renderHeader(data) {
-                const info = getStatusBadgeInfo(data.status);
-                $("#headerStatus").html(`<span class="status-badge ${info.cls}">${info.txt}</span>`);
+            // === VIEWER LOGIC ===
+            async function loadViewer(idToLoad, label) {
+                if(label) $("#docTitleLabel").text(label);
+
+                // Highlight เฉพาะในโหมด Request (เพราะ View Mode กดเลือกไม่ได้)
+                if (!isFinalState) {
+                    $(".file-item").removeClass("active");
+                    $(`.file-item[data-id="${idToLoad}"]`).addClass("active");
+                }
+
+                const viewer = $("#pdfViewer").empty();
+                const loader = createLoader("Opening file...", "#pdfViewer");
+
+                // Reset Download Button
+                const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
+
+                try {
+                    // ใช้ URL ที่กำหนดไว้ (ViewFile/RequestID หรือ ViewFile/DocID)
+                    const url = `${viewFileApiUrl}/${idToLoad}`;
+
+                    const res = await fetch(url, { method: 'GET', credentials: 'include' });
+                    if (!res.ok) throw new Error("Unable to load file content.");
+
+                    const blob = await res.blob();
+                    const objUrl = URL.createObjectURL(blob);
+
+                    // ถ้าเป็น View Mode ให้เปิดใช้งานปุ่ม Download
+                    if(isFinalState) {
+                        $btnDownload.prop("disabled", false).on("click", function () {
+                            const link = document.createElement('a');
+                            link.href = objUrl;
+                            link.download = `${label || "Document"}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        });
+                    }
+
+                    $("<embed>").attr({
+                        src: objUrl, type: "application/pdf",
+                        width: "100%", height: "100%"
+                    }).appendTo(viewer);
+
+                } catch (e) {
+                    viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
+                } finally {
+                    loader.hide();
+                }
             }
 
-            function renderForm(data) {
-                $("#requestInfoForm").dxForm({
-                    formData: data,
-                    readOnly: true,
-                    labelLocation: "top",
-                    colCount: 2,
-                    items: [
-                        { dataField: "code", label: { text: "Code." }, colSpan: 2 },
-                        { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 2 },
-                        {
-                            dataField: "vendorCode",
-                            label: { text: "รหัสผู้ขาย (Vendor Code)" },
-                            colSpan: 2,
-                        },
-                        {
-                            dataField: "vendorName",
-                            label: { text: "ชื่อผู้ขาย (Vendor Name)" },
-                            colSpan: 2
-                        },
-                        {
-                            dataField: "validFrom",
-                            label: { text: "วันที่เริ่ม (Valid From)" },
-                            editorType: "dxDateBox",
-                            editorOptions: { displayFormat: "yyyy-MM-dd" }
-                        },
-                        {
-                            dataField: "validUntil",
-                            label: { text: "ถึงวันที่ (Valid Until)" },
-                            editorType: "dxDateBox",
-                            editorOptions: { displayFormat: "yyyy-MM-dd" }
-                        },
-                        {
-                            dataField: "remark",
-                            label: { text: "หมายเหตุ (Remark)" },
-                            colSpan: 2,
-                            editorType: "dxTextArea",
-                            editorOptions: { autoResizeEnabled: true, minHeight: 60 }
-                        }
-                    ]
-                });
-            }
-
+            // === RENDER DOCUMENTS ===
             function renderDocuments(docs) {
                 const container = $("#documentList").empty();
                 $("#attachmentCount").text(docs ? docs.length : 0);
@@ -205,21 +555,17 @@
                 }
 
                 docs.forEach(doc => {
-                    // [UPDATE] อ้างอิงชื่อตาม API ผ่าน SystemEnums (ถ้ามี) หรือใช้ Fallback
-                    const typeName = (typeof SystemEnums !== 'undefined')
-                        ? SystemEnums.getDisplayName('documentType', doc.documentTypeId)
-                        : getDocumentTypeText(doc.documentTypeId);
-
-                    const fileName = doc.originalFileName || doc.fileName || "Unknown";
+                    const typeName = getDocumentTypeText(doc.documentTypeId);
                     const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
+                    const displayFileName = doc.originalFileName || doc.fileName;
+
+                   
 
                     const item = $(`
-                        <div class="file-item">
-                            <i class="fas fa-file-pdf file-icon text-danger"></i>
+                        <div class="file-item  data-id="${doc.id}">
+                            <i class="fas fa-file-pdf file-icon"></i>
                             <div class="file-details">
-                                <div class="file-name text-primary" title="${fileName}">
-                                    ${fileName}
-                                </div>
+                                <div class="file-name" title="${displayFileName}">${displayFileName}</div>
                                 <div class="file-meta">
                                     <span class="badge bg-light text-dark border me-1">${typeName}</span>
                                     <span>${sizeStr}</span>
@@ -227,11 +573,153 @@
                             </div>
                         </div>
                     `);
+
+                    // เพิ่ม Event Click เฉพาะตอนไม่ใช่ Final State
+                    if (!isFinalState) {
+                        item.on("click", () => loadViewer(doc.id, displayFileName));
+                    }
+
                     container.append(item);
                 });
             }
 
-          
+            // === ACTION LOGIC ===
+            function initActionPopup() {
+                actionPopupInstance = $("#actionPopup").dxPopup({
+                    width: 400, height: "auto", visible: false,
+                    dragEnabled: true, hideOnOutsideClick: false,
+                    showCloseButton: true, title: "Action",
+                    contentTemplate: function(contentElement) {
+                        const container = $("<div>").addClass("p-2");
+                        $("<div>").attr("id", "actionReasonBox").appendTo(container).dxTextArea({
+                            height: 100, value: "", stylingMode: "outlined"
+                        });
+                        const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
+
+                        $("<div>").appendTo(btnGroup).dxButton({
+                            text: "ยกเลิก (Cancel)", stylingMode: "text",
+                            onClick: () => actionPopupInstance.hide()
+                        });
+                        $("<div>").attr("id", "btnConfirmAction").appendTo(btnGroup).dxButton({
+                            text: "ยืนยัน (Confirm)", stylingMode: "contained"
+                        });
+                        return container;
+                    }
+                }).dxPopup("instance");
+            }
+
+            function renderActionButtons(data) {
+                const permissions = data.permissions || {};
+                const $card = $("#actionCard");
+                const $container = $("#actionButtonContainer");
+
+                $card.show();
+                $container.empty();
+
+                if (permissions.canReject) {
+                    $("<div>").appendTo($container).dxButton({
+                        text: 'ไม่อนุมัติ (Reject)', icon: 'fas fa-times',
+                        type: 'danger', stylingMode: 'outlined',
+                        width: '100%', height: 40,
+                        elementAttr: { class: "fw-bold shadow-sm" },
+                        onClick: () => openActionPopup('Reject')
+                    }).addClass("flex-grow-1");
+                }
+
+                if (permissions.canApprove) {
+                    $("<div>").appendTo($container).dxButton({
+                        text: 'อนุมัติ (Approve)', icon: 'fas fa-check',
+                        type: 'success', stylingMode: 'contained',
+                        width: '100%', height: 40,
+                        elementAttr: { class: "fw-bold shadow-sm" },
+                        onClick: () => openActionPopup('Approve')
+                    }).addClass("flex-grow-1");
+                }
+            }
+
+            function openActionPopup(action) {
+                currentActionType = action;
+                let title = "ยืนยัน (Confirm)";
+                let btnType = "default";
+                let ph = "ความคิดเห็นเพิ่มเติม (Optional)...";
+                if (action === 'Reject') {
+                    title = "ระบุเหตุผลไม่อนุมัติ (Reject Reason)";
+                    btnType = "danger";
+                    ph = "ต้องระบุเหตุผล (Required)...";
+                } else if (action === 'Approve') {
+                    title = "ยืนยันอนุมัติ (Confirm Approve)";
+                    btnType = "success";
+                }
+
+                actionPopupInstance.option("title", title);
+                actionPopupInstance.show().done(() => {
+                    const textArea = $("#actionReasonBox").dxTextArea("instance");
+                    if (textArea) {
+                        textArea.reset();
+                        textArea.option("placeholder", ph);
+                        setTimeout(() => textArea.focus(), 100);
+                    }
+
+                    const btnConfirm = $("#btnConfirmAction").dxButton("instance");
+                    if (btnConfirm) {
+                        btnConfirm.option({
+                            type: btnType,
+                            onClick: () => {
+                                const comment = textArea ? textArea.option("value") : "";
+                                if (currentActionType === 'Reject' && !comment) {
+                                    DevExpress.ui.notify("กรุณาระบุเหตุผล", "error", 2000);
+                                    textArea.focus();
+                                    return;
+                                }
+                                actionPopupInstance.hide();
+                                sendApprovalAction(currentActionType, comment);
+                            }
+                        });
+                    }
+                });
+            }
+
+            async function sendApprovalAction(action, comment) {
+                if(!currentDocId) return showError("Error: Document ID not found.");
+                const loader = createLoader("Processing...");
+                try {
+                    const endpoint = (action === 'Approve') ? API.APPROVE : API.REJECT;
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requestId: currentDocId, comment: comment }),
+                        credentials: 'include'
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    DevExpress.ui.notify("ดำเนินการสำเร็จ (Success)", "success", 2000);
+                    setTimeout(() => location.reload(), 1000);
+                } catch (err) {
+                    showError("Approval Error: " + err.message);
+                } finally {
+                    loader.hide();
+                }
+            }
+
+            // === RENDERING UTILS ===
+            function renderHeader(data) {
+                const info = getStatusBadgeInfo(data.status);
+                $("#headerStatus").html(`<span class="status-badge ${info.cls}">${info.txt}</span>`);
+            }
+
+            function renderForm(data) {
+                $("#requestInfoForm").dxForm({
+                    formData: data, readOnly: true, labelLocation: "top", colCount: 2,
+                    items: [
+                        { dataField: "code", label: { text: "Code." }, colSpan: 2 },
+                        { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 2 },
+                        { dataField: "vendorCode", label: { text: "รหัสผู้ขาย (Vendor Code)" }, colSpan: 2 },
+                        { dataField: "vendorName", label: { text: "ชื่อผู้ขาย (Vendor Name)" }, colSpan: 2 },
+                        { dataField: "validFrom", label: { text: "วันที่เริ่ม (Valid From)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
+                        { dataField: "validUntil", label: { text: "ถึงวันที่ (Valid Until)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" } },
+                        { dataField: "remark", label: { text: "หมายเหตุ (Remark)" }, colSpan: 2, editorType: "dxTextArea", editorOptions: { autoResizeEnabled: true, minHeight: 60 } }
+                    ]
+                });
+            }
 
             function renderApprovals(steps) {
                 const container = $("#approvalList").empty();
@@ -239,7 +727,6 @@
                     container.html('<div class="text-center text-muted small p-3">No approval history</div>');
                     return;
                 }
-
                 steps.sort((a, b) => (a.sequenceNo || a.sequence) - (b.sequenceNo || b.sequence));
                 steps.forEach(step => {
                     let dotClass = "";
@@ -247,24 +734,18 @@
                     else if (step.status === 9 || step.status === 99) dotClass = "rejected";
                     else if (step.status === 1) dotClass = "current";
 
-                    const stepStatusText = (typeof SystemEnums !== 'undefined')
-                        ? SystemEnums.getDisplayName('approvalStatus', step.status)
-                        : (step.status === 2 ? "Approved" : "Pending");
-
-                    const approver = step.approverName || "System/Waiting";
-                    const dateStr = formatDateTime(step.actionDate);
-                    const seq = step.sequenceNo || step.sequence;
+                    const stepStatus = (step.status === 2) ? "Approved" : (step.status === 9 ? "Rejected" : "Pending");
+                    let approver = step.approverName;
+                    if(!approver && step.assignments) approver = step.assignments.map(a=>a.employeeName).join(", ");
+                    if(!approver) approver = "System/Waiting";
 
                     const html = `
                         <div class="timeline-item">
                             <div class="timeline-dot ${dotClass}"></div>
                             <div class="timeline-content">
-                                <div class="timeline-step">Step ${seq}: ${step.stepName}</div>
-                                <div class="timeline-user">
-                                    <i class="fas fa-user-circle"></i> ${approver}
-                                    <span class="text-muted">(${stepStatusText})</span>
-                                </div>
-                                ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${dateStr}</div>` : ''}
+                                <div class="timeline-step">Step ${step.sequenceNo || step.sequence}: ${step.stepName}</div>
+                                <div class="timeline-user"><i class="fas fa-user-circle"></i> ${approver} <span class="text-muted">(${stepStatus})</span></div>
+                                ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${formatDateTime(step.actionDate)}</div>` : ''}
                                 ${step.comment ? `<div class="timeline-comment">"${step.comment}"</div>` : ''}
                             </div>
                         </div>
@@ -273,54 +754,30 @@
                 });
             }
 
-            async function loadViewer(requestId, label) {
-                if(label) $("#docTitleLabel").text(label);
+            function getStatusBadgeInfo(status) {
+                const s = parseInt(status);
+                let badgeClass = "bg-secondary-soft";
+                if (s === 1) badgeClass = "bg-warning-soft";
+                else if (s === 2 || s === 3) badgeClass = "bg-success-soft";
+                else if (s === 9 || s === 99) badgeClass = "bg-danger-soft";
 
-                // 1. Reset ปุ่ม Download (ปิดการใช้งานชั่วคราวและลบ event เดิม)
-                const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
-
-                const viewer = $("#pdfViewer").empty();
-                const loader = createLoader("Generating PDF...", "#pdfViewer");
-                try {
-                    const url = `${API.VIEW_FILE}/${requestId}`;
-                    const res = await fetch(url, { method: 'GET', credentials: 'include' });
-                    if (!res.ok) {
-                        let errorMsg = "Unable to load file content.";
-                        try { errorMsg = await res.text(); } catch {}
-                        throw new Error(errorMsg);
-                    }
-
-                    const blob = await res.blob();
-                    const objUrl = URL.createObjectURL(blob);
-
-                    // 2. เปิดใช้งานปุ่ม Download และกำหนดการทำงาน
-                    $btnDownload.prop("disabled", false).on("click", function () {
-                        const link = document.createElement('a');
-                        link.href = objUrl;
-                        link.download = `${label || "Document"}.pdf`; // ตั้งชื่อไฟล์ตาม Label (Code)
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    });
-
-                    $("<embed>").attr({
-                        src: objUrl,
-                        type: "application/pdf",
-                        width: "100%",
-                        height: "100%"
-                    }).appendTo(viewer);
-                } catch (e) {
-                    viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
-                } finally {
-                    loader.hide();
-                }
+                const text = (typeof SystemEnums !== 'undefined')
+                    ? SystemEnums.getDisplayName('requestStatus', s)
+                    : (s===2?"Approved":(s===1?"Pending":"Draft"));
+                return { cls: badgeClass, txt: text };
             }
 
-            // ==========================================
-            // 4. UTILS
-            // ==========================================
+            function getDocumentTypeText(id) {
+                if(typeof SystemEnums !== 'undefined') return SystemEnums.getDisplayName('documentType', id);
+                if (id === 10) return "ใบเสนอราคาหลัก";
+                if (id === 20) return "ใบเสนอราคาเปรียบเทียบ";
+                if (id === 30) return "รายละเอียดคุณลักษณะ (Spec)";
+                if (id === 40) return "เงื่อนไขและข้อกำหนด";
+                return "เอกสารแนบ";
+            }
+
             function formatSize(b) {
-                if (!b) return "0 B";
+                if (!b) return "";
                 const i = Math.floor(Math.log(b) / Math.log(1024));
                 return (b / Math.pow(1024, i)).toFixed(1) + " " + ["B", "KB", "MB", "GB"][i];
             }
@@ -338,20 +795,14 @@
                 const id = "local-loader-" + Math.floor(Math.random() * 1000);
                 const $el = $("<div>").attr("id", id).appendTo(target);
                 const loadPanel = $el.dxLoadPanel({
-                    shadingColor: "rgba(255,255,255,0.7)",
-                    position: { of: target },
-                    visible: true,
-                    showIndicator: true,
-                    showPane: true,
-                    message: msg,
-                    container: target
+                    shadingColor: "rgba(255,255,255,0.7)", position: { of: target },
+                    visible: true, showIndicator: true, showPane: true, message: msg, container: target
                 }).dxLoadPanel("instance");
                 return { hide: () => { loadPanel.hide(); $el.remove(); } };
             }
 
             function showError(msg) {
-                if (typeof DevExpress !== 'undefined') DevExpress.ui.notify(msg, "error", 4000);
-                else alert(msg);
+                if (typeof DevExpress !== 'undefined') DevExpress.ui.notify(msg, "error", 4000); else alert(msg);
             }
 
             function toggleFullscreen() {
