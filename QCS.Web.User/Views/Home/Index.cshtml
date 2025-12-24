@@ -31,13 +31,15 @@
     </div>
 </div>
 
+
+
 <script>
     $(function () {
         // === CONFIG ===
         const FORM_URL = '@Url.Action("Form", "Request")';
         const CODE_URL = '@Url.Action("Code", "Request")';
 
-        // === HELPER: Status Badge (ปรับปรุงตาม WorkflowStep) ===
+        // === HELPER: Status Badge ===
         const getStatusBadgeInfo = (status) => {
             let badgeClass = "bg-secondary-soft";
             let text = "Unknown";
@@ -72,7 +74,6 @@
                     break;
             }
 
-            // (Optional) หากมี SystemEnums ให้ใช้ชื่อจาก SystemEnums แทน
             if (typeof SystemEnums !== 'undefined') {
                 text = SystemEnums.getDisplayName('workflowStep', status);
             }
@@ -133,9 +134,7 @@
             };
         }
 
-        // === COLUMN DEFINITIONS ===
         const createColumns = (targetUrl, openInNewWindow, isTaskGrid = false, paramField = 'id') => {
-            
             const baseColumns = [
                 {
                     dataField: "code",
@@ -187,7 +186,7 @@
                             { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
                             { id: -1, name: "ไม่อนุมัติ (Rejected)" }
                         ],
-                        valueExpr: "id", 
+                        valueExpr: "id",
                         displayExpr: "name"
                     },
                     cellTemplate: (container, options) => {
@@ -196,10 +195,10 @@
                     }
                 },
                 {
-                    type: "buttons", 
+                    type: "buttons",
                     width: 70,
                     buttons: [{
-                        hint: "เปิดดู", 
+                        hint: "เปิดดู",
                         icon: "find",
                         onClick: (e) => {
                             const val = e.row.data[paramField];
@@ -221,32 +220,128 @@
             return baseColumns;
         };
 
+        // เริ่มต้นโหลดข้อมูล
         loadSummaryData();
 
         $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
             window.location.href = FORM_URL;
         });
 
-        function loadSummaryData() {
-            loadingIndicator.show();
+        // === REAL-TIME UPDATE FUNCTIONS ===
+
+        // ฟังก์ชันสำหรับ Refresh ข้อมูลทั้งหมดในหน้า
+        function refreshAllData() {
+            console.log("Refreshing Data...");
+
+            // 1. โหลด Badge Count ใหม่
+            loadSummaryData(true); // ส่ง true เพื่อบอกว่าเป็นการ refresh เงียบๆ
+
+            // 2. Refresh Grid ทุกตัวที่มีอยู่ใน DOM
+            const grids = ["#gridMyTasks", "#gridMyRequests", "#gridApproved", "#gridRejected"];
+            grids.forEach(id => {
+                if ($(id).length) {
+                    const gridInstance = $(id).dxDataGrid("instance");
+                    if (gridInstance) {
+                        gridInstance.refresh();
+                    }
+                }
+            });
+        }
+
+        // ✅ 2. SignalR Setup
+        // ตรวจสอบว่า API_BASE มีเครื่องหมาย / ปิดท้ายหรือไม่ เพื่อสร้าง URL ที่ถูกต้อง
+        const hubBaseUrl = (typeof API_BASE !== 'undefined') ? API_BASE : "https://localhost:7127";
+        // ตัด /api ออกถ้ามี เพื่อให้ชี้ไปที่ root (เพราะ Hub มักจะ map ไว้ที่ Root เช่น /notificationHub)
+        const rootUrl = hubBaseUrl.replace(/\/api\/?$/, "");
+        const hubUrl = `${rootUrl}/notificationHub`;
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(hubUrl)
+            .withAutomaticReconnect()
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+
+        // รับ Event จาก Server
+        connection.on("ReceiveUpdate", function (message) {
+            console.log("SignalR Update Received:", message);
+            // แจ้งเตือนมุมขวาล่าง (Optional)
+            DevExpress.ui.notify({
+                message: "ข้อมูลมีการเปลี่ยนแปลง: " + message,
+                type: "info",
+                displayTime: 3000,
+                position: { my: "bottom right", at: "bottom right", offset: "-20 -20" }
+            });
+
+            // สั่ง Refresh หน้าจอ
+            refreshAllData();
+        });
+
+        // เริ่มการเชื่อมต่อ
+        connection.start().then(function () {
+            console.log("SignalR Connected to " + hubUrl);
+        }).catch(function (err) {
+            console.error("SignalR Connection Error: ", err.toString());
+        });
+
+
+        // === DATA LOADING ===
+
+      function loadSummaryData(isSilentRefresh = false) {
+            if (!isSilentRefresh) loadingIndicator.show();
+
             $.ajax({
                 url: `${API_BASE}/Dashboard/Summary`,
                 method: "GET",
                 xhrFields: { withCredentials: true },
                 success: function (data) {
-                    loadingIndicator.hide();
-                    initTabPanel(data.myTaskCount);
+                    if (!isSilentRefresh) loadingIndicator.hide();
+
+                    // ✅ แก้ไข: ใช้ .data("dxTabPanel") เพื่อเช็คว่ามี instance หรือยังโดยไม่ error
+                    const tabPanelInstance = $("#tabPanel").data("dxTabPanel");
+
+                    if (tabPanelInstance) {
+                        // ถ้ามีแล้ว ให้ Update ตัวเลข Badge
+                        updateBadgeDOM(data.myTaskCount);
+                    } else {
+                        // ถ้ายังไม่มี (โหลดครั้งแรก) ให้สร้างใหม่
+                        initTabPanel(data.myTaskCount);
+                    }
                 },
                 error: function(err) {
-                    loadingIndicator.hide();
-                    initTabPanel(0);
+                    if (!isSilentRefresh) loadingIndicator.hide();
+                    // เช็คแบบปลอดภัยเช่นกัน
+                    if (!$("#tabPanel").data("dxTabPanel")) {
+                        initTabPanel(0);
+                    }
                 }
             });
         }
 
+        // Helper เล็กๆ สำหรับแก้ตัวเลข Badge โดยไม่ต้อง Re-render Grid
+        function updateBadgeDOM(count) {
+            const badge = $(".dx-tab .badge");
+            if (count > 0) {
+                if (badge.length) {
+                    badge.text(count);
+                } else {
+                    // ถ้ายังไม่มี Badge แต่อยู่ๆ มีงานเข้ามา อาจต้อง Reload Tab เพื่อความง่าย
+                    // หรือแทรก HTML เข้าไป (ซับซ้อนกว่า) -> เลือก Reload Tab ในกรณีนี้
+                     const tabPanel = $("#tabPanel").dxTabPanel("instance");
+                     const items = tabPanel.option("items");
+                     // เช็คว่า Tab แรกเป็น My Tasks หรือไม่
+                     if (items.length > 0 && items[0].icon === 'todo') {
+                         items[0].badgeCount = count;
+                         tabPanel.option("items", items); // Trigger re-render title
+                     }
+                }
+            } else {
+                badge.remove(); // ถ้าเหลือ 0 ให้ลบ Badge ออก
+            }
+        }
+
         function initTabPanel(taskCount) {
             const tabs = [];
-            
+
             if (taskCount > 0) {
                 tabs.push({
                     title: "งานรออนุมัติ (My Tasks)",

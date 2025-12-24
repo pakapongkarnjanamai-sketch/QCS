@@ -6,20 +6,29 @@
 
 <div class="container mt-4 mb-5">
     <div class="qcs-card">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="m-0 d-flex align-items-center text-nowrap text-primary-header">
-                <i class="fas fa-file-invoice-dollar me-2" style="color: var(--dx-primary-color);"></i>
-                <span id="lblPageTitle" class="fw-bold">@ViewData["Title"]</span>
-                @if (Model.HasValue)
-                {
-                    <span class="mx-3 text-muted opacity-25">|</span>
-                    <span id="lblDocNo" class="fw-bold" style="color: var(--dx-primary-color);">Loading...</span>
-                }
-            </h5>
-            <div id="actionButtons"></div>
+        <div class="row align-items-center g-3">
+
+            <div class="col-12 col-xl me-auto">
+                <h5 class="m-0 d-flex align-items-center text-primary-header">
+                    <i class="fas fa-file-invoice-dollar me-2 flex-shrink-0" style="color: var(--dx-primary-color);"></i>
+
+                    <div class="text-wrap lh-sm">
+                        <span id="lblPageTitle" class="fw-bold">@ViewData["Title"]</span>
+                        @if (Model.HasValue)
+                        {
+                            <span class="mx-2 text-muted opacity-25">|</span>
+                            <span id="lblDocNo" class="fw-bold" style="color: var(--dx-primary-color);">Loading...</span>
+                        }
+                    </div>
+                </h5>
+            </div>
+
+            <div class="col-12 col-xl-auto">
+                <div id="actionButtons"></div>
+            </div>
+
         </div>
     </div>
-
     <div class="qcs-card" id="formContainer">
         <div class="section-header">
             <i class="fas fa-info-circle" style="color: var(--dx-primary-color);"></i> 

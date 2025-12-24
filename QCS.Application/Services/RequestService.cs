@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using QCS.Application.Hubs; 
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
@@ -34,36 +36,206 @@ namespace QCS.Application.Services
         private readonly ICurrentUserService _currentUserService;
         private readonly IWebHostEnvironment _env;
         private readonly IFileService _fileService;
+        private readonly IHubContext<NotificationHub> _hubContext;
 
-        // ✅ กำหนดค่าคงที่ เพื่อให้อ่านง่ายและแก้ที่เดียว
+        // ✅ Constants
         private const int MainWorkflowId = 1;
         private const int CompletedStepId = 99;
+        private const string SignalREventName = "ReceiveUpdate"; // ชื่อ Event สำหรับ Client
 
         public RequestService(
             IUnitOfWork unitOfWork,
             WorkflowService workflowService,
             ICurrentUserService currentUserService,
             IWebHostEnvironment env,
-            IFileService fileService)
+            IFileService fileService,
+            IHubContext<NotificationHub> hubContext)
         {
             _unitOfWork = unitOfWork;
             _workflowService = workflowService;
             _currentUserService = currentUserService;
             _env = env;
             _fileService = fileService;
+            _hubContext = hubContext;
+        }
+
+        // =================================================================================================
+        // ✅ ACTION METHODS (Create, Update, Delete, Approve, Reject) - เพิ่ม NotifyUpdates()
+        // =================================================================================================
+
+        public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
+        {
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
+            if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
+
+            var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
+            var newDocNo = await GenerateDocNoAsync();
+
+            int currentStepId = 1;
+            int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
+
+            if (isSubmit)
+            {
+                var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
+                currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
+                if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
+            }
+
+            var pr = new Request
+            {
+                Code = newDocNo,
+                Title = input.Title,
+                RequestDate = DateTime.Now,
+                Status = docStatus,
+                CurrentStepId = currentStepId,
+                VendorCode = input.VendorCode,
+                VendorName = input.VendorName,
+                ValidFrom = input.ValidFrom,
+                ValidUntil = input.ValidUntil,
+                Remark = input.Remark
+            };
+
+            foreach (var step in sortedSteps)
+            {
+                var actionDate = (step.SequenceNo == 1 && isSubmit) ? (DateTime?)DateTime.Now : null;
+                var stepStatus = step.SequenceNo switch
+                {
+                    1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Pending,
+                    2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
+                    _ => (int)RequestStatus.Draft
+                };
+
+                pr.ApprovalSteps.Add(new ApprovalStep
+                {
+                    Sequence = step.SequenceNo,
+                    StepName = step.StepName,
+                    Status = stepStatus,
+                    ActionDate = actionDate,
+                    ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
+                    ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId) : null,
+                    Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
+                });
+            }
+
+            var files = GetFilesFromInput(input);
+            if (files != null && files.Any())
+            {
+                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                foreach (var q in newQuotations)
+                {
+                    pr.Quotations.Add(q);
+                }
+            }
+
+            await requestRepo.AddAsync(pr);
+            await _unitOfWork.CommitAsync();
+
+            // ✅ แจ้งเตือน Real-time
+            await NotifyUpdatesAsync($"สร้างเอกสารใหม่ {pr.Code}");
+
+            return pr;
+        }
+
+        public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
+        {
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var quotationRepo = _unitOfWork.Repository<Quotation>();
+
+            var pr = await requestRepo.GetAll()
+                .Include(r => r.Quotations)
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == input.Id);
+
+            if (pr == null) throw new KeyNotFoundException("Document not found");
+            if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
+
+            pr.Title = input.Title;
+            pr.VendorCode = input.VendorCode;
+            pr.VendorName = input.VendorName;
+            pr.ValidFrom = input.ValidFrom;
+            pr.ValidUntil = input.ValidUntil;
+            pr.Remark = input.Remark;
+
+            if (isSubmit)
+            {
+                pr.Status = (int)RequestStatus.Pending;
+                var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+                if (step1 != null)
+                {
+                    step1.Status = (int)RequestStatus.Approved;
+                    step1.ActionDate = DateTime.Now;
+                    step1.ApproverNId = _currentUserService.UserId;
+                    step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId);
+                    step1.Comment = input.Comment;
+                }
+
+                var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
+                if (step2 != null)
+                {
+                    step2.Status = (int)RequestStatus.Pending;
+                    step2.ApproverNId = null;
+                    step2.ApproverName = null;
+                    pr.CurrentStepId = 2;
+                }
+            }
+
+            // Update files metadata
+            if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
+            {
+                var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                updates?.ForEach(item =>
+                {
+                    var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
+                    if (f != null) f.DocumentTypeId = item.DocumentTypeId;
+                });
+            }
+
+            // Delete removed files
+            if (!string.IsNullOrEmpty(input.DeletedFileIds))
+            {
+                var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
+                var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
+                await quotationRepo.DeleteRangeAsync(toRemove);
+            }
+
+            // Upload new files
+            var files = GetFilesFromInput(input);
+            if (files != null && files.Any())
+            {
+                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                foreach (var q in newQuotations)
+                {
+                    pr.Quotations.Add(q);
+                }
+            }
+
+            await requestRepo.UpdateAsync(pr);
+            await _unitOfWork.CommitAsync();
+
+            // ✅ แจ้งเตือน Real-time
+            await NotifyUpdatesAsync($"แก้ไขเอกสาร {pr.Code}");
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var pr = await requestRepo.GetByIdAsync(id);
+            if (pr != null)
+            {
+                var code = pr.Code; // เก็บไว้ log
+                await requestRepo.DeleteAsync(pr);
+                await _unitOfWork.CommitAsync();
+
+                // ✅ แจ้งเตือน Real-time
+                await NotifyUpdatesAsync($"ลบเอกสาร {code}");
+            }
         }
 
         public async Task ApproveAsync(ApprovalActionDto input)
         {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var request = await requestRepo.GetAll()
-                .Include(r => r.ApprovalSteps)
-                .FirstOrDefaultAsync(r => r.Id == input.RequestId);
-
-            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
-
-            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
-            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
+            // ใช้ Helper ดึงข้อมูลและตรวจสอบ Step
+            var (request, currentStepObj) = await GetRequestAndCurrentStepAsync(input.RequestId);
 
             var currentUserId = _currentUserService.UserId;
             string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId);
@@ -92,21 +264,17 @@ namespace QCS.Application.Services
                 request.CurrentStep = WorkflowStep.Completed;
             }
 
-            await requestRepo.UpdateAsync(request);
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();
+
+            // ✅ แจ้งเตือน Real-time
+            await NotifyUpdatesAsync($"อนุมัติเอกสาร {request.Code}");
         }
 
         public async Task RejectAsync(ApprovalActionDto input)
         {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var request = await requestRepo.GetAll()
-                .Include(r => r.ApprovalSteps)
-                .FirstOrDefaultAsync(r => r.Id == input.RequestId);
-
-            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
-
-            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
-            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบัน");
+            // ใช้ Helper ดึงข้อมูลและตรวจสอบ Step
+            var (request, currentStepObj) = await GetRequestAndCurrentStepAsync(input.RequestId);
 
             var currentUserId = _currentUserService.UserId;
             string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId);
@@ -120,12 +288,72 @@ namespace QCS.Application.Services
             request.Status = (int)RequestStatus.Rejected;
             request.CurrentStep = WorkflowStep.Rejected;
 
-            //var remainingSteps = request.ApprovalSteps.Where(s => s.Sequence > currentStepObj.Sequence);
-            //foreach (var step in remainingSteps) step.Status = (int)RequestStatus.Cancelled;
-
-            await requestRepo.UpdateAsync(request);
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();
+
+            // ✅ แจ้งเตือน Real-time
+            await NotifyUpdatesAsync($"ไม่อนุมัติเอกสาร {request.Code}");
         }
+
+        // =================================================================================================
+        // ✅ PRIVATE HELPERS
+        // =================================================================================================
+
+        private async Task NotifyUpdatesAsync(string message)
+        {
+            try
+            {
+                // ส่ง SignalR แจ้ง Client ทั้งหมดให้ Refresh ข้อมูล
+                await _hubContext.Clients.All.SendAsync(SignalREventName, message);
+            }
+            catch
+            {
+                // ถ้าส่ง Notify ไม่ผ่าน (เช่น Socket หลุด) ให้ข้ามไป ไม่ต้อง Rollback DB
+                // อาจจะ Log Error ไว้ตรงนี้ถ้ามี Logger
+            }
+        }
+
+        // Helper เพื่อลดโค้ดซ้ำใน Approve/Reject
+        private async Task<(Request, ApprovalStep)> GetRequestAndCurrentStepAsync(int requestId)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == requestId);
+
+            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
+
+            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบันของเอกสาร");
+
+            return (request, currentStepObj);
+        }
+
+        private async Task<string> GenerateDocNoAsync()
+        {
+            var todayStr = DateTime.Now.ToString("yyyyMMdd");
+            var prefix = $"QC-{todayStr}-";
+            var countToday = await _unitOfWork.Repository<Request>().GetAll().CountAsync(x => x.Code.StartsWith(prefix));
+            return $"{prefix}{(countToday + 1):D3}";
+        }
+
+        private async Task<string> GetApproverNameAsync(int routeId, string nId)
+        {
+            var name = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, nId);
+            return !string.IsNullOrEmpty(name) ? name : nId;
+        }
+
+        private List<IFormFile> GetFilesFromInput(object input)
+        {
+            if (input is IHasAttachments dto)
+            {
+                return dto.GetUploadFiles() ?? new List<IFormFile>();
+            }
+            return new List<IFormFile>();
+        }
+
+        // =================================================================================================
+        // ✅ QUERY METHODS (Get...) - ไม่เปลี่ยนแปลง logic เดิม
+        // =================================================================================================
 
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
@@ -244,35 +472,26 @@ namespace QCS.Application.Services
 
             if (request == null) return null;
 
-            // ✅ ตรวจสอบสถานะจบงาน (Approved / Rejected)
+            // ตรวจสอบสถานะจบงาน (Approved / Rejected)
             bool isFinalState = request.Status == (int)RequestStatus.Approved ||
                                 request.Status == (int)RequestStatus.Rejected;
 
-            // เตรียมตัวแปร
             WorkflowRouteDetailDto? workflowRoute = null;
 
-            // กำหนดสิทธิ์เริ่มต้นเป็น ReadOnly (สำหรับเคสจบงาน)
             PermissionDto permissions = new PermissionDto
             {
                 CanEdit = false,
-            
                 CanApprove = false,
                 CanReject = false
             };
 
             if (isFinalState)
             {
-                // =========================================================
-                // ⚡ OPTIMIZATION: จบงานแล้ว -> Map History จาก DB โดยตรง
-                // =========================================================
-
-                // สร้าง Object WorkflowRouteDto หลอกๆ ขึ้นมา เพื่อให้ Frontend มีข้อมูลไปวาด Stepper
                 workflowRoute = new WorkflowRouteDetailDto
                 {
-                    Id = 0, // ไม่สำคัญ
+                    Id = 0,
                     RouteName = "History",
                     CanInitiate = false,
-                    // แปลง ApprovalStep (DB) -> WorkflowStepDto (Display)
                     Steps = request.ApprovalSteps.Select(step => new WorkflowStepDto
                     {
                         Id = step.Id,
@@ -283,16 +502,15 @@ namespace QCS.Application.Services
                         ApproverName = step.ApproverName,
                         ApproverNId = step.ApproverNId,
                         Comment = step.Comment,
-                        // สร้าง Assignments หลอกๆ (ใส่คนที่อนุมัติไปแล้ว) เพื่อให้ Frontend ไม่ Error หากมีการเรียกใช้
                         Assignments = !string.IsNullOrEmpty(step.ApproverNId)
                             ? new List<AssignmentDto>
                               {
-                          new AssignmentDto
-                          {
-                              NId = step.ApproverNId,
-                              EmployeeName = step.ApproverName ?? "",
-                              IsCurrentUser = step.ApproverNId == _currentUserService.UserId
-                          }
+                                  new AssignmentDto
+                                  {
+                                      NId = step.ApproverNId,
+                                      EmployeeName = step.ApproverName ?? "",
+                                      IsCurrentUser = step.ApproverNId == _currentUserService.UserId
+                                  }
                               }
                             : new List<AssignmentDto>()
                     }).OrderBy(s => s.SequenceNo).ToList()
@@ -300,9 +518,6 @@ namespace QCS.Application.Services
             }
             else
             {
-                // =========================================================
-                // 🔄 NORMAL FLOW: ยังไม่จบ -> โหลด Workflow จริงเพื่อเช็คสิทธิ์
-                // =========================================================
                 workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
 
                 if (workflowRoute?.Steps != null)
@@ -321,7 +536,6 @@ namespace QCS.Application.Services
                     }
                 }
 
-                // คำนวณสิทธิ์ (Edit/Approve/Reject) เฉพาะตอนที่เอกสารยังเดินเรื่องอยู่
                 permissions = _workflowService.GetPermissions(request, workflowRoute);
             }
 
@@ -338,8 +552,6 @@ namespace QCS.Application.Services
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
                 Remark = request.Remark,
-
-                // รายการไฟล์แนบ
                 Quotations = request.Quotations.Select(q => new QuotationItemDto
                 {
                     Id = q.Id,
@@ -347,8 +559,6 @@ namespace QCS.Application.Services
                     OriginalFileName = q.FileName,
                     FilePath = q.FilePath
                 }).ToList(),
-
-                // ส่ง Permissions และ WorkflowRoute ที่เตรียมไว้
                 Permissions = permissions,
                 WorkflowRoute = workflowRoute
             };
@@ -363,164 +573,6 @@ namespace QCS.Application.Services
                 .FirstOrDefaultAsync();
 
             return id == 0 ? null : await GetByIdAsync(id);
-        }
-
-        public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
-        {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
-            if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
-
-            var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
-            var newDocNo = await GenerateDocNoAsync();
-
-            int currentStepId = 1;
-            int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
-
-            if (isSubmit)
-            {
-                var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
-                currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
-                if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
-            }
-
-            var pr = new Request
-            {
-                Code = newDocNo,
-                Title = input.Title,
-                RequestDate = DateTime.Now,
-                Status = docStatus,
-                CurrentStepId = currentStepId,
-                VendorCode = input.VendorCode,
-                VendorName = input.VendorName,
-                ValidFrom = input.ValidFrom,
-                ValidUntil = input.ValidUntil,
-                Remark = input.Remark
-            };
-
-            foreach (var step in sortedSteps)
-            {
-                var actionDate = (step.SequenceNo == 1 && isSubmit) ? (DateTime?)DateTime.Now : null;
-                var stepStatus = step.SequenceNo switch
-                {
-                    1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Pending,
-                    2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
-                    _ => (int)RequestStatus.Draft
-                };
-
-                pr.ApprovalSteps.Add(new ApprovalStep
-                {
-                    Sequence = step.SequenceNo,
-                    StepName = step.StepName,
-                    Status = stepStatus,
-                    ActionDate = actionDate,
-                    ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
-                    ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId) : null,
-                    Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
-                });
-            }
-
-            // ✅ ใช้ Helper ที่ปลอดภัยแทน Reflection
-            var files = GetFilesFromInput(input);
-            if (files != null && files.Any())
-            {
-                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
-                foreach (var q in newQuotations)
-                {
-                    pr.Quotations.Add(q);
-                }
-            }
-
-            await requestRepo.AddAsync(pr);
-            await _unitOfWork.CommitAsync();
-
-            return pr;
-        }
-
-        public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
-        {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var quotationRepo = _unitOfWork.Repository<Quotation>();
-
-            var pr = await requestRepo.GetAll()
-                .Include(r => r.Quotations)
-                .Include(r => r.ApprovalSteps)
-                .FirstOrDefaultAsync(r => r.Id == input.Id);
-
-            if (pr == null) throw new KeyNotFoundException("Document not found");
-            if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
-
-            pr.Title = input.Title;
-            pr.VendorCode = input.VendorCode;
-            pr.VendorName = input.VendorName;
-            pr.ValidFrom = input.ValidFrom;
-            pr.ValidUntil = input.ValidUntil;
-            pr.Remark = input.Remark;
-
-            if (isSubmit)
-            {
-                pr.Status = (int)RequestStatus.Pending;
-                var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
-                if (step1 != null)
-                {
-                    step1.Status = (int)RequestStatus.Approved;
-                    step1.ActionDate = DateTime.Now;
-                    step1.ApproverNId = _currentUserService.UserId;
-                    step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId);
-                    step1.Comment = input.Comment;
-                }
-
-                var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
-                if (step2 != null)
-                {
-                    step2.Status = (int)RequestStatus.Pending;
-                    step2.ApproverNId = null;
-                    step2.ApproverName = null;
-                    pr.CurrentStepId = 2;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
-            {
-                var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                updates?.ForEach(item =>
-                {
-                    var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
-                    if (f != null) f.DocumentTypeId = item.DocumentTypeId;
-                });
-            }
-
-            if (!string.IsNullOrEmpty(input.DeletedFileIds))
-            {
-                var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
-                var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
-                await quotationRepo.DeleteRangeAsync(toRemove);
-            }
-
-
-            var files = GetFilesFromInput(input);
-            if (files != null && files.Any())
-            {
-                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
-                foreach (var q in newQuotations)
-                {
-                    pr.Quotations.Add(q);
-                }
-            }
-
-            await requestRepo.UpdateAsync(pr);
-            await _unitOfWork.CommitAsync();
-        }
-
-        public async Task DeleteAsync(int id)
-        {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var pr = await requestRepo.GetByIdAsync(id);
-            if (pr != null)
-            {
-                await requestRepo.DeleteAsync(pr);
-                await _unitOfWork.CommitAsync();
-            }
         }
 
         public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
@@ -555,32 +607,6 @@ namespace QCS.Application.Services
                 }
             }
             return null;
-        }
-
-        private async Task<string> GenerateDocNoAsync()
-        {
-            var todayStr = DateTime.Now.ToString("yyyyMMdd");
-            var prefix = $"QC-{todayStr}-";
-            var countToday = await _unitOfWork.Repository<Request>().GetAll().CountAsync(x => x.Code.StartsWith(prefix));
-            return $"{prefix}{(countToday + 1):D3}";
-        }
-
-        private async Task<string> GetApproverNameAsync(int routeId, string nId)
-        {
-            var name = await _workflowService.GetEmployeeNameFromWorkflowAsync(routeId, nId);
-            return !string.IsNullOrEmpty(name) ? name : nId;
-        }
-
-        private List<IFormFile> GetFilesFromInput(object input)
-        {
-            if (input is IHasAttachments dto)
-            {
-                // เรียกผ่าน Interface กลาง ไม่ต้องเช็คชื่อ Property แล้ว
-                return dto.GetUploadFiles() ?? new List<IFormFile>();
-            }
-
-            // Fallback (เผื่อกรณีอื่น)
-            return new List<IFormFile>();
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.EntityFrameworkCore;
+using QCS.Application.Hubs;
 using QCS.Application.Services;
 using QCS.Infrastructure.Data;
 using QCS.Infrastructure.Services;
@@ -9,7 +10,7 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
+builder.Services.AddSignalR();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -100,7 +101,7 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "QCS API V1");
     });
 }
-
+app.MapHub<NotificationHub>("/notificationHub");
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
