@@ -36,73 +36,7 @@ namespace QCS.Application.Services
             _configuration = configuration;
         }
 
-        //public IQueryable<RequestGridDto> GetGridQuery(string code = null)
-        //{
-        //    var query = _unitOfWork.Repository<Request>().GetAll()
-        //        .AsNoTracking();
-
-        //    // ย้าย Logic การ Filter มาไว้ที่นี่
-        //    if (!string.IsNullOrEmpty(code))
-        //    {
-        //        query = query.Where(x => x.Code == code);
-        //    }
-
-        //    // ทำ Projection เป็น DTO (Copy logic มาจาก RequestService เพื่อความ Consistent)
-        //    return query.Select(r => new RequestGridDto
-        //    {
-        //        Id = r.Id,
-        //        Code = r.Code,
-        //        Title = r.Title,
-        //        VendorCode = r.VendorCode,
-        //        VendorName = r.VendorName,
-        //        RequestDate = r.RequestDate,
-        //        CurrentStepId = r.CurrentStepId,
-        //        // เพิ่ม Field อื่นๆ ที่ RequestService มีถ้าจำเป็น
-        //        RequesterName = r.ApprovalSteps
-        //                    .Where(s => s.Sequence == 1)
-        //                    .Select(s => s.ApproverName)
-        //                    .FirstOrDefault() ?? "Unknown"
-        //    });
-
-
-
-        //}
-
-        //public async Task<AttachmentResultDto?> GetAttachmentAsync(int fileId)
-        //{
-        //    // ✅ เรียกผ่าน UnitOfWork
-        //    var q = await _unitOfWork.Repository<Quotation>().GetAll()
-        //        .Include(x => x.AttachmentFile)
-        //        .FirstOrDefaultAsync(x => x.Id == fileId);
-
-        //    if (q == null) return null;
-
-        //    if (q.AttachmentFile?.Data != null)
-        //    {
-        //        return new AttachmentResultDto
-        //        {
-        //            Data = q.AttachmentFile.Data,
-        //            ContentType = q.AttachmentFile.ContentType ?? "application/octet-stream",
-        //            FileName = q.FileName
-        //        };
-        //    }
-
-        //    if (!string.IsNullOrEmpty(q.FilePath) && q.FilePath != "Database")
-        //    {
-        //        var path = Path.Combine(_env.WebRootPath, q.FilePath);
-        //        if (System.IO.File.Exists(path))
-        //        {
-        //            return new AttachmentResultDto
-        //            {
-        //                Data = await System.IO.File.ReadAllBytesAsync(path),
-        //                ContentType = q.ContentType ?? "application/octet-stream",
-        //                FileName = q.FileName
-        //            };
-        //        }
-        //    }
-
-        //    return null;
-        //}
+     
 
         public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int requestId)
         {
@@ -116,7 +50,7 @@ namespace QCS.Application.Services
 
             var pdfRequest = new MergeAndStampRequestDto
             {
-                DocumentName = request.Title,
+                DocumentName = request.Code +"_"+ request.Title,
                 ReferenceCode = request.Code,
                 PdfFiles = request.Quotations
                     .Where(q => q.AttachmentFile != null)

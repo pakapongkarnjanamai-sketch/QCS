@@ -12,6 +12,9 @@
                 <i class="fas fa-file-alt"></i>
                 <span id="docTitleLabel">Document Viewer</span>
             </div>
+            <button class="btn btn-sm btn-outline-primary ms-auto me-1" id="btnDownload" disabled>
+                <i class="fas fa-download"></i> Download
+            </button>
             <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen">
                 <i class="fas fa-expand"></i> Fullscreen
             </button>
@@ -71,7 +74,7 @@
                 let badgeClass = "bg-secondary-soft"; // Draft or Default
 
                 // กำหนดสีตาม Status ID
-                if (s === 1) badgeClass = "bg-warning-soft"; // Pending
+                if (s === 1) badgeClass = "bg-warning-soft";      // Pending
                 else if (s === 2 || s === 3) badgeClass = "bg-success-soft"; // Approved/Completed
                 else if (s === 9 || s === 99) badgeClass = "bg-danger-soft"; // Rejected
 
@@ -89,6 +92,16 @@
                 return "Draft";
             };
 
+            // [ADDED] Helper สำหรับชื่อประเภทเอกสาร (Fallback กรณี SystemEnums ไม่พร้อม)
+            // อ้างอิงตาม API: 10=MainQuotation, 20=ComparativeQuotation, 30=Specifications, 40=TermsAndConditions
+            const getDocumentTypeText = (id) => {
+                if (id === 10) return "ใบเสนอราคาหลัก";
+                if (id === 20) return "ใบเสนอราคาเปรียบเทียบ";
+                if (id === 30) return "รายละเอียดคุณลักษณะ (Spec)";
+                if (id === 40) return "เงื่อนไขและข้อกำหนด";
+                return "เอกสารแนบ";
+            };
+
             // ==========================================
             // 2. INIT
             // ==========================================
@@ -104,24 +117,19 @@
                     const res = await fetch(url, { credentials: 'include' });
                     if (!res.ok) throw new Error("Document not found.");
 
-                    // [UPDATE] รับ Object โดยตรงตามโครงสร้าง JSON ใหม่
-                    const data = await res.json(); 
-                    
+                    const data = await res.json();
                     if (!data) throw new Error("No data returned.");
 
                     renderHeader(data);
                     renderForm(data);
-                    
-                    // [UPDATE] ใช้ field 'quotations'
+
                     renderDocuments(data.quotations || []);
 
-                    // [UPDATE] ใช้ field 'workflowRoute.steps' ถ้ามี หรือ fallback ไป 'approvalSteps'
-                    const steps = (data.workflowRoute && data.workflowRoute.steps) 
-                                  ? data.workflowRoute.steps 
+                    const steps = (data.workflowRoute && data.workflowRoute.steps)
+                                  ? data.workflowRoute.steps
                                   : (data.approvalSteps || []);
                     renderApprovals(steps);
 
-                    // [UPDATE] ใช้ data.requestId หรือ data.id
                     const reqId = data.requestId || data.id;
                     if (reqId) {
                         loadViewer(reqId, data.code);
@@ -197,13 +205,11 @@
                 }
 
                 docs.forEach(doc => {
-                    // [UPDATE] Map Document Type ID เป็นข้อความ
-                    let typeName = "Attachment";
-                    if (doc.documentTypeId === 10) typeName = "Main Quotation";
-                    else if (doc.documentTypeId === 20) typeName = "Comparison Sheet";
-                    else if (doc.documentTypeId === 30) typeName = "Specification";
-                    
-                    // [UPDATE] รองรับ originalFileName
+                    // [UPDATE] อ้างอิงชื่อตาม API ผ่าน SystemEnums (ถ้ามี) หรือใช้ Fallback
+                    const typeName = (typeof SystemEnums !== 'undefined')
+                        ? SystemEnums.getDisplayName('documentType', doc.documentTypeId)
+                        : getDocumentTypeText(doc.documentTypeId);
+
                     const fileName = doc.originalFileName || doc.fileName || "Unknown";
                     const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
 
@@ -211,7 +217,9 @@
                         <div class="file-item">
                             <i class="fas fa-file-pdf file-icon text-danger"></i>
                             <div class="file-details">
-                                <div class="file-name text-primary" title="${fileName}">${fileName}</div>
+                                <div class="file-name text-primary" title="${fileName}">
+                                    ${fileName}
+                                </div>
                                 <div class="file-meta">
                                     <span class="badge bg-light text-dark border me-1">${typeName}</span>
                                     <span>${sizeStr}</span>
@@ -223,11 +231,7 @@
                 });
             }
 
-            // ฟังก์ชันสำหรับคลิกเลือกไฟล์ (เรียกใช้จาก onclick ใน renderDocuments)
-            window.viewFile = function(id, name) {
-                // โหลด PDF ใหม่ใน iframe หรือ embed
-                loadViewer(id, name);
-            }
+          
 
             function renderApprovals(steps) {
                 const container = $("#approvalList").empty();
@@ -236,9 +240,7 @@
                     return;
                 }
 
-                // [UPDATE] ใช้ sequenceNo ตาม JSON ใหม่
                 steps.sort((a, b) => (a.sequenceNo || a.sequence) - (b.sequenceNo || b.sequence));
-
                 steps.forEach(step => {
                     let dotClass = "";
                     if (step.status === 2) dotClass = "completed";
@@ -273,14 +275,15 @@
 
             async function loadViewer(requestId, label) {
                 if(label) $("#docTitleLabel").text(label);
-                
+
+                // 1. Reset ปุ่ม Download (ปิดการใช้งานชั่วคราวและลบ event เดิม)
+                const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
+
                 const viewer = $("#pdfViewer").empty();
                 const loader = createLoader("Generating PDF...", "#pdfViewer");
-                
                 try {
                     const url = `${API.VIEW_FILE}/${requestId}`;
                     const res = await fetch(url, { method: 'GET', credentials: 'include' });
-                    
                     if (!res.ok) {
                         let errorMsg = "Unable to load file content.";
                         try { errorMsg = await res.text(); } catch {}
@@ -290,11 +293,21 @@
                     const blob = await res.blob();
                     const objUrl = URL.createObjectURL(blob);
 
-                    $("<embed>").attr({ 
-                        src: objUrl, 
-                        type: "application/pdf", 
-                        width: "100%", 
-                        height: "100%" 
+                    // 2. เปิดใช้งานปุ่ม Download และกำหนดการทำงาน
+                    $btnDownload.prop("disabled", false).on("click", function () {
+                        const link = document.createElement('a');
+                        link.href = objUrl;
+                        link.download = `${label || "Document"}.pdf`; // ตั้งชื่อไฟล์ตาม Label (Code)
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    });
+
+                    $("<embed>").attr({
+                        src: objUrl,
+                        type: "application/pdf",
+                        width: "100%",
+                        height: "100%"
                     }).appendTo(viewer);
                 } catch (e) {
                     viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
