@@ -1,1 +1,0 @@
-﻿const API_BASE = "https://ap-ntc2138-qawb/QCS/Service/api";

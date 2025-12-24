@@ -410,7 +410,7 @@
                         { dataField: "stepName", caption: "ขั้นตอน (Step)", width: 200 },
                         { dataField: "assignees", caption: "ผู้มีสิทธิ์อนุมัติ (Assignees)", cellTemplate: (c, o) => {
                             const list = o.data.rawAssignments || [];
-                            if (list.length === 0) return $("<span>").text("Any").appendTo(c);
+                            if (list.length === 0) return $("<span>").text("-").appendTo(c);
                             list.forEach(a => $("<div>").html(a.isCurrentUser ? `<span class="current-user-row"><i class="fas fa-user-circle"></i> ${a.employeeName} (You)</span>` : `<span class="text-muted"><i class="fas fa-user"></i> ${a.employeeName}</span>`).appendTo(c));
                         }},
                         { dataField: "status", caption: "สถานะ", width: 130, alignment: "center", cellTemplate: (c, o) => { const b = getStatusBadge(o.value); $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c); }},

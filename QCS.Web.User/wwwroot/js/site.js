@@ -101,8 +101,11 @@ var SystemEnums = {
     }
 };
 
+
+
 // ฟังก์ชันดึงข้อมูลจาก API (ควรเรียกใน _Layout หรือส่วนต้นของหน้าเว็บ)
 function initSystemEnums() {
+   
     $.ajax({
         url: API_BASE + "/Enum/all", // ตรวจสอบ URL API ของคุณให้ถูกต้อง
         method: "GET",

@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -23,13 +25,6 @@
 
     <script src="~/lib/font-awesome/js/all.min.js"></script>
 
-    <environment names="Development">
-        <script src="~/host/development.js"></script>
-    </environment>
-    <environment names="Staging,Production">
-        <script src="~/host/production.js"></script>
-    </environment>
-    <script src="~/js/site.js"></script>
 
     <style>
         /* ==================== CSS VARIABLES (DevExtreme Theme Colors) ==================== */
@@ -434,6 +429,11 @@
 </head>
 <body>
     @RenderBody()
+    <script>
+        const API_BASE = '@Configuration["ApiSettings:BaseUrl"]';
+        console.log("API_BASE:", API_BASE);
+    </script>
+    <script src="~/js/site.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
