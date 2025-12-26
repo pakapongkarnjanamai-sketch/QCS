@@ -183,7 +183,7 @@
                     },
                     cellTemplate: (container, options) => {
                         const info = getStatusBadgeInfo(options.value);
-                        $("<span>").addClass("badge rounded-pill fw-normal px-2 py-1 " + info.cls).text(info.txt).appendTo(container);
+                        $("<span>").addClass("badge rounded-pill fw-normal ms-1 status-badge " + info.cls).text(info.txt).appendTo(container);
                     }
                 },
                 {
