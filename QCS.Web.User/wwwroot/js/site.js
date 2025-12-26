@@ -124,5 +124,3 @@ function initSystemEnums() {
     });
 }
 
-// เรียกทำงานทันทีเมื่อไฟล์โหลด (หรือจะไปเรียกใน $(document).ready() ของ Layout ก็ได้)
-initSystemEnums();

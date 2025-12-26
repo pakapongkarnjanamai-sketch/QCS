@@ -8,11 +8,11 @@ namespace QCS.Application.Services
     public interface IFileService
     {
         /// <summary>
-        /// ประมวลผลไฟล์ที่อัปโหลดและแปลงเป็น List ของ OriginalQuotation (พร้อม AttachmentFile)
+        /// ประมวลผลไฟล์ที่อัปโหลดและแปลงเป็น List ของ Quotation (พร้อม AttachmentFile)
         /// </summary>
         /// <param name="files">รายการไฟล์จาก Form</param>
         /// <param name="quotationsJson">JSON string ที่เก็บ Metadata ของไฟล์ (เช่น DocumentTypeId)</param>
-        /// <returns>List ของ OriginalQuotation entity ที่พร้อมบันทึก</returns>
+        /// <returns>List ของ Quotation entity ที่พร้อมบันทึก</returns>
         Task<List<Quotation>> PrepareFilesForUploadAsync(List<IFormFile> files, string quotationsJson);
     }
     public class FileService : IFileService
@@ -39,7 +39,7 @@ namespace QCS.Application.Services
                 // หา Metadata ที่ชื่อไฟล์ตรงกัน
                 var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
 
-                // สร้าง Object OriginalQuotation
+                // สร้าง Object Quotation
                 var quotation = new Quotation
                 {
                     FileName = file.FileName,

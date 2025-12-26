@@ -12,9 +12,11 @@ namespace QCS.Domain.Enum
         [Display(Name = "แบบร่าง")]
         [Description("แบบร่าง")]
         Draft = 0,
+
         [Display(Name = "รออนุมัติ")]
         [Description("รออนุมัติ")]
         Pending = 1,
+
         [Display(Name = "อนุมัติครบถ้วน")]
         [Description("อนุมัติครบถ้วน")]
         Approved = 2,
@@ -22,6 +24,7 @@ namespace QCS.Domain.Enum
         [Display(Name = "ไม่อนุมัติ")]
         [Description("ไม่อนุมัติ")]
         Rejected = 9,
+
         [Display(Name = "ยกเลิก")]
         [Description("ยกเลิก")]
         Cancelled = 99

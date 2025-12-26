@@ -1,4 +1,7 @@
-﻿@{
+﻿@using QCS.Domain.Enum
+@using QCS.Infrastructure.Services
+
+@{
     ViewData["Title"] = "My Tasks & Requests";
     Layout = "_DevExtremeLayout";
 }
@@ -31,51 +34,46 @@
     </div>
 </div>
 
-
-
 <script>
     $(function () {
         // === CONFIG ===
         const FORM_URL = '@Url.Action("Form", "Request")';
-        // const CODE_URL = '@Url.Action("Code", "Request")';
-               const CODE_URL = '@Url.Action("View", "OriginalQuotation")';
-        // === HELPER: Status Badge ===
-        const getStatusBadgeInfo = (status) => {
-            let badgeClass = "bg-secondary-soft";
-            let text = "Unknown";
+        const CODE_URL = '@Url.Action("View", "Quotation")'; // View Mode
 
-            switch (status) {
+        // 1. ดึงข้อมูล Enum WorkflowStep จาก Server
+        const workflowStepsSource = @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>()));
+
+        // === HELPER: Status Badge ===
+        const getStatusBadgeInfo = (stepId) => {
+            let badgeClass = "bg-secondary-soft";
+
+            // 2. ค้นหาข้อความจาก Enum
+            const stepEnum = workflowStepsSource.find(x => x.Id === stepId);
+      
+            const text = stepEnum ? stepEnum.DisplayName : "Step " + stepId;
+
+            // 3. กำหนดสีตาม Step ID
+            switch (stepId) {
                 case 0: // Draft
-                    badgeClass = "bg-secondary-soft";
-                    text = "บันทึก (Draft)";
+                    badgeClass = "bg-secondary-soft text-secondary";
                     break;
                 case 1: // Purchaser
-                    badgeClass = "bg-info-soft";
-                    text = "บันทึก (Purchaser)";
+                    badgeClass = "bg-info-soft text-dark";
                     break;
                 case 2: // Verifier
-                    badgeClass = "bg-warning-soft";
-                    text = "รอตรวจสอบ";
+                    badgeClass = "bg-warning-soft text-dark";
                     break;
                 case 3: // Manager
-                    badgeClass = "bg-warning-soft";
-                    text = "รออนุมัติ";
+                    badgeClass = "bg-warning-soft text-dark";
                     break;
                 case 99: // Completed
-                    badgeClass = "bg-success-soft";
-                    text = "อนุมัติครบถ้วน";
+                    badgeClass = "bg-success-soft text-dark";
                     break;
                 case -1: // Rejected
-                    badgeClass = "bg-danger-soft";
-                    text = "ไม่อนุมัติ";
+                    badgeClass = "bg-danger-soft text-dark";
                     break;
                 default:
-                    text = "Status " + status;
-                    break;
-            }
-
-            if (typeof SystemEnums !== 'undefined') {
-                text = SystemEnums.getDisplayName('workflowStep', status);
+                    badgeClass = "bg-light text-muted border";
             }
 
             return { cls: badgeClass, txt: text };
@@ -174,24 +172,18 @@
                 },
                 {
                     dataField: "currentStepId",
-                    caption: "สถานะ",
-                    width: 150,
+                    caption: "สถานะ (Current Step)",
+                    width: 180,
                     alignment: "center",
                     lookup: {
-                        dataSource: [
-                            { id: 0, name: "บันทึก (Draft)" },
-                            { id: 1, name: "บันทึก (Purchaser)" },
-                            { id: 2, name: "รอตรวจสอบ (Verifier)" },
-                            { id: 3, name: "รออนุมัติ (Manager)" },
-                            { id: 99, name: "อนุมัติครบถ้วน (Completed)" },
-                            { id: -1, name: "ไม่อนุมัติ (Rejected)" }
-                        ],
+                        // 4. ใช้ DataSource จาก Enum จริง
+                        dataSource: workflowStepsSource,
                         valueExpr: "id",
-                        displayExpr: "name"
+                        displayExpr: "displayName"
                     },
                     cellTemplate: (container, options) => {
                         const info = getStatusBadgeInfo(options.value);
-                        $("<span>").addClass("status-badge " + info.cls).text(info.txt).appendTo(container);
+                        $("<span>").addClass("badge rounded-pill fw-normal px-2 py-1 " + info.cls).text(info.txt).appendTo(container);
                     }
                 },
                 {
@@ -207,7 +199,6 @@
                     }]
                 }
             ];
-
             if (isTaskGrid) {
                 const requesterCol = { dataField: "requesterName", caption: "ผู้ขอ", width: 180 };
                 return [
@@ -222,7 +213,6 @@
 
         // เริ่มต้นโหลดข้อมูล
         loadSummaryData();
-
         $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
             window.location.href = FORM_URL;
         });
@@ -232,7 +222,6 @@
         // ฟังก์ชันสำหรับ Refresh ข้อมูลทั้งหมดในหน้า
         function refreshAllData() {
             console.log("Refreshing Data...");
-
             // 1. โหลด Badge Count ใหม่
             loadSummaryData(true); // ส่ง true เพื่อบอกว่าเป็นการ refresh เงียบๆ
 
@@ -249,9 +238,7 @@
         }
 
         // ✅ 2. SignalR Setup
-        // ตรวจสอบว่า API_BASE มีเครื่องหมาย / ปิดท้ายหรือไม่ เพื่อสร้าง URL ที่ถูกต้อง
         const hubBaseUrl = (typeof API_BASE !== 'undefined') ? API_BASE : "https://localhost:7127";
-        // ตัด /api ออกถ้ามี เพื่อให้ชี้ไปที่ root (เพราะ Hub มักจะ map ไว้ที่ Root เช่น /notificationHub)
         const rootUrl = hubBaseUrl.replace(/\/api\/?$/, "");
         const hubUrl = `${rootUrl}/notificationHub`;
 
@@ -264,15 +251,12 @@
         // รับ Event จาก Server
         connection.on("ReceiveUpdate", function (message) {
             console.log("SignalR Update Received:", message);
-            // แจ้งเตือนมุมขวาล่าง (Optional)
             DevExpress.ui.notify({
                 message: "ข้อมูลมีการเปลี่ยนแปลง: " + message,
                 type: "info",
                 displayTime: 3000,
                 position: { my: "bottom right", at: "bottom right", offset: "-20 -20" }
             });
-
-            // สั่ง Refresh หน้าจอ
             refreshAllData();
         });
 
@@ -283,12 +267,10 @@
             console.error("SignalR Connection Error: ", err.toString());
         });
 
-
         // === DATA LOADING ===
 
       function loadSummaryData(isSilentRefresh = false) {
             if (!isSilentRefresh) loadingIndicator.show();
-
             $.ajax({
                 url: `${API_BASE}/Dashboard/Summary`,
                 method: "GET",
@@ -296,20 +278,16 @@
                 success: function (data) {
                     if (!isSilentRefresh) loadingIndicator.hide();
 
-                    // ✅ แก้ไข: ใช้ .data("dxTabPanel") เพื่อเช็คว่ามี instance หรือยังโดยไม่ error
                     const tabPanelInstance = $("#tabPanel").data("dxTabPanel");
 
                     if (tabPanelInstance) {
-                        // ถ้ามีแล้ว ให้ Update ตัวเลข Badge
                         updateBadgeDOM(data.myTaskCount);
                     } else {
-                        // ถ้ายังไม่มี (โหลดครั้งแรก) ให้สร้างใหม่
                         initTabPanel(data.myTaskCount);
                     }
                 },
                 error: function(err) {
                     if (!isSilentRefresh) loadingIndicator.hide();
-                    // เช็คแบบปลอดภัยเช่นกัน
                     if (!$("#tabPanel").data("dxTabPanel")) {
                         initTabPanel(0);
                     }
@@ -317,31 +295,26 @@
             });
         }
 
-        // Helper เล็กๆ สำหรับแก้ตัวเลข Badge โดยไม่ต้อง Re-render Grid
         function updateBadgeDOM(count) {
             const badge = $(".dx-tab .badge");
             if (count > 0) {
                 if (badge.length) {
                     badge.text(count);
                 } else {
-                    // ถ้ายังไม่มี Badge แต่อยู่ๆ มีงานเข้ามา อาจต้อง Reload Tab เพื่อความง่าย
-                    // หรือแทรก HTML เข้าไป (ซับซ้อนกว่า) -> เลือก Reload Tab ในกรณีนี้
                      const tabPanel = $("#tabPanel").dxTabPanel("instance");
                      const items = tabPanel.option("items");
-                     // เช็คว่า Tab แรกเป็น My Tasks หรือไม่
                      if (items.length > 0 && items[0].icon === 'todo') {
                          items[0].badgeCount = count;
-                         tabPanel.option("items", items); // Trigger re-render title
+                         tabPanel.option("items", items);
                      }
                 }
             } else {
-                badge.remove(); // ถ้าเหลือ 0 ให้ลบ Badge ออก
+                badge.remove();
             }
         }
 
         function initTabPanel(taskCount) {
             const tabs = [];
-
             if (taskCount > 0) {
                 tabs.push({
                     title: "งานรออนุมัติ (My Tasks)",
@@ -368,7 +341,6 @@
                     return $("<div>").addClass("grid-wrapper").append(grid);
                 }
             });
-
             tabs.push({
                 title: "อนุมัติแล้ว (Approved)",
                 icon: "check",
@@ -406,10 +378,7 @@
                         container.append(
                             $("<span>")
                                 .addClass("badge rounded-pill ms-2")
-                                .css({
-                                    "background-color": "#dc3545",
-                                    "color": "white"
-                                })
+                                .css({ "background-color": "#dc3545", "color": "white" })
                                 .text(itemData.badgeCount)
                         );
                     }

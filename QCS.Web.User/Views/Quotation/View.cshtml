@@ -1,4 +1,6 @@
 ﻿@model string
+@using QCS.Domain.Enum
+@using QCS.Infrastructure.Services
 
 @{
     ViewData["Title"] = $"{Model}";
@@ -407,17 +409,21 @@
                 REJECT: `${API_BASE}/Approval/Reject`
             };
 
+            // ดึงข้อมูล Enum จาก Server (Inject via C#)
+            const documentTypes = @Html.Raw(Json.Serialize(EnumHelper.ToList<DocumentType>()));
+             const workflowStepSource = @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>()));
+
+const approvalStatuses = @Html.Raw(Json.Serialize(EnumHelper.ToList<ApprovalStatus>()));
             // Global State
             let currentDocId = null;
             let currentDocData = null;
             let currentActionType = "";
             let actionPopupInstance;
             let isFinalState = false; // Check Step 99
-            let viewFileApiUrl = "";  // Endpoint ที่เลือกใช้
+            let viewFileApiUrl = ""; // Endpoint ที่เลือกใช้
 
             // === INIT ===
             initActionPopup();
-
             if (DOC_CODE) loadData();
             else showError("Document Code is missing.");
 
@@ -430,16 +436,12 @@
 
                 const res = await fetch(url, { credentials: 'include' });
                 if (!res.ok) throw new Error("Document not found.");
-
                 const data = await res.json();
                 if (!data) throw new Error("No data returned.");
-
                 // <--- 2. บันทึก Data ลง Global Variable
                 currentDocData = data;
-
                 currentDocId = data.requestId || data.id;
                 isFinalState = (data.currentStepId === 99);
-
                 // 1. กำหนด API Endpoint
                 if (isFinalState) {
                     viewFileApiUrl = API.VIEW_FILE_QUOTATION;
@@ -495,7 +497,6 @@
             // === VIEWER LOGIC ===
          async function loadViewer(idToLoad, label) {
             if(label) $("#docTitleLabel").text(label);
-
             if (!isFinalState) {
                 $(".file-item").removeClass("active");
                 $(`.file-item[data-id="${idToLoad}"]`).addClass("active");
@@ -505,12 +506,10 @@
             const loader = createLoader("Opening file...", "#pdfViewer");
 
             const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
-
             try {
                 const url = `${viewFileApiUrl}/${idToLoad}`;
                 const res = await fetch(url, { method: 'GET', credentials: 'include' });
                 if (!res.ok) throw new Error("Unable to load file content.");
-
                 const blob = await res.blob();
                 const objUrl = URL.createObjectURL(blob);
 
@@ -542,10 +541,10 @@
 
                         // กรองค่าว่างออก แล้วเชื่อมด้วย "_"
                         const finalFileName = fileNameParts.filter(p => p).join("_") + ".pdf";
-
                         const link = document.createElement('a');
                         link.href = objUrl;
-                        link.download = finalFileName; // ใช้ชื่อไฟล์ใหม่
+                        link.download = finalFileName;
+                        // ใช้ชื่อไฟล์ใหม่
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
@@ -556,7 +555,6 @@
                     src: objUrl, type: "application/pdf",
                     width: "100%", height: "100%"
                 }).appendTo(viewer);
-
             } catch (e) {
                 viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
             } finally {
@@ -578,10 +576,8 @@
                     const sizeStr = doc.fileSize ? formatSize(doc.fileSize) : "";
                     const displayFileName = doc.originalFileName || doc.fileName;
 
-                   
-
                     const item = $(`
-                        <div class="file-item  data-id="${doc.id}">
+                        <div class="file-item" data-id="${doc.id}">
                             <i class="fas fa-file-pdf file-icon"></i>
                             <div class="file-details">
                                 <div class="file-name" title="${displayFileName}">${displayFileName}</div>
@@ -634,7 +630,6 @@
 
                 $card.show();
                 $container.empty();
-
                 if (permissions.canReject) {
                     $("<div>").appendTo($container).dxButton({
                         text: 'ไม่อนุมัติ (Reject)', icon: 'fas fa-times',
@@ -720,8 +715,8 @@
             }
 
             // === RENDERING UTILS ===
-            function renderHeader(data) {
-                const info = getStatusBadgeInfo(data.status);
+        function renderHeader(data) {
+                const info = getStatusBadgeInfo(data.currentStepId);
                 $("#headerStatus").html(`<span class="status-badge ${info.cls}">${info.txt}</span>`);
             }
 
@@ -740,30 +735,46 @@
                 });
             }
 
+       // ฟังก์ชันแสดง Timeline การอนุมัติ
             function renderApprovals(steps) {
                 const container = $("#approvalList").empty();
                 if (!steps || steps.length === 0) {
                     container.html('<div class="text-center text-muted small p-3">No approval history</div>');
                     return;
                 }
+
+                // เรียงลำดับ Step
                 steps.sort((a, b) => (a.sequenceNo || a.sequence) - (b.sequenceNo || b.sequence));
+
                 steps.forEach(step => {
+                    // 1. ดึงข้อมูล Badge Class และ Text จาก Helper
+                    // step.status คือ ID ของ ApprovalStatus (0, 1, 2, 9)
+                    const statusInfo = getApprovalStatusInfo(step.status);
+
+                    // 2. กำหนด Dot Class สำหรับ Timeline (จุดสี) ให้สอดคล้องกับสถานะ
                     let dotClass = "";
-                    if (step.status === 2) dotClass = "completed";
-                    else if (step.status === 9 || step.status === 99) dotClass = "rejected";
-                    else if (step.status === 1) dotClass = "current";
+                    switch (parseInt(step.status)) {
+                        case 2: dotClass = "completed"; break; // Approved
+                        case 9: dotClass = "rejected"; break;  // Rejected
+                        case 1: dotClass = "current"; break;   // InReview
+                        default: dotClass = ""; // Next
+                    }
 
-                    const stepStatus = (step.status === 2) ? "Approved" : (step.status === 9 ? "Rejected" : "Pending");
+                    // จัดการชื่อผู้อนุมัติ
                     let approver = step.approverName;
-                    if(!approver && step.assignments) approver = step.assignments.map(a=>a.employeeName).join(", ");
-                    if(!approver) approver = "System/Waiting";
+                    if (!approver && step.assignments) approver = step.assignments.map(a => a.employeeName).join(", ");
+                    if (!approver) approver = "System/Waiting";
 
+                    // 3. สร้าง HTML โดยใช้ Badge Class ที่ได้
                     const html = `
                         <div class="timeline-item">
                             <div class="timeline-dot ${dotClass}"></div>
                             <div class="timeline-content">
                                 <div class="timeline-step">Step ${step.sequenceNo || step.sequence}: ${step.stepName}</div>
-                                <div class="timeline-user"><i class="fas fa-user-circle"></i> ${approver} <span class="text-muted">(${stepStatus})</span></div>
+                                <div class="timeline-user">
+                                    <i class="fas fa-user-circle"></i> ${approver} 
+                                    <span class="badge rounded-pill fw-normal ms-1 ${statusInfo.cls}">${statusInfo.txt}</span>
+                                </div>
                                 ${step.actionDate ? `<div class="timeline-date"><i class="far fa-clock"></i> ${formatDateTime(step.actionDate)}</div>` : ''}
                                 ${step.comment ? `<div class="timeline-comment">"${step.comment}"</div>` : ''}
                             </div>
@@ -773,26 +784,75 @@
                 });
             }
 
-            function getStatusBadgeInfo(status) {
-                const s = parseInt(status);
-                let badgeClass = "bg-secondary-soft";
-                if (s === 1) badgeClass = "bg-warning-soft";
-                else if (s === 2 || s === 3) badgeClass = "bg-success-soft";
-                else if (s === 9 || s === 99) badgeClass = "bg-danger-soft";
+            // Helper ใหม่: จัดการสีและข้อความของ ApprovalStatus (เหมือนหน้า List)
+            function getApprovalStatusInfo(statusId) {
+                const idInt = parseInt(statusId || 0); // แปลงเป็น int กันพลาด
+           
+                const statusEnum = typeof approvalStatuses !== 'undefined' 
+                                    ? approvalStatuses.find(x => x.Id === idInt) 
+                                    : null;
+                const text = statusEnum ? statusEnum.DisplayName : "Step " + idInt;
 
-                const text = (typeof SystemEnums !== 'undefined')
-                    ? SystemEnums.getDisplayName('requestStatus', s)
-                    : (s===2?"Approved":(s===1?"Pending":"Draft"));
+                let badgeClass = "bg-light text-secondary border"; // Default (Next/Waiting)
+
+                switch (idInt) {
+                    case 0: // Next (ยังไม่ถึง)
+                        badgeClass = "bg-secondary-soft text-dark";
+                        break;
+                    case 1: // InReview (รอพิจารณา)
+                        badgeClass = "bg-warning-soft text-dark";
+                        break;
+                    case 2: // Approved (อนุมัติ)
+                        badgeClass = "bg-success-soft text-dark";
+                        break;
+                    case 3: // Skipped (ข้าม)
+                        badgeClass = "bg-info-soft text-dark";
+                        break;
+                    case 9: // Rejected (ไม่อนุมัติ)
+                        badgeClass = "bg-danger-soft text-dark";
+                        break;
+                }
+
+                return { cls: badgeClass, txt: text };
+            }
+           function getStatusBadgeInfo(statusId) {
+              
+                    let badgeClass = "bg-secondary-soft";
+
+                  const statusEnum = workflowStepSource.find(x => x.Id === statusId);
+                  const text = statusEnum ? statusEnum.DisplayName : "Unknown";
+
+
+              switch (statusId) {
+                     case 0: // Draft
+                        badgeClass = "bg-secondary-soft";
+                        break;
+                    case 1: // Purchaser
+                        badgeClass = "bg-info-soft";
+                        break;
+                    case 2: // Verifier
+                        badgeClass = "bg-warning-soft";
+                        break;
+                    case 3: // Manager
+                        badgeClass = "bg-warning-soft";
+                        break;
+                    case 99: // Completed
+                        badgeClass = "bg-success-soft";
+                        break;
+                    case -1: // Rejected
+                        badgeClass = "bg-danger-soft";
+                        break;
+                    default:
+                    badgeClass = "bg-light text-muted border";
+                        break;
+                  }
                 return { cls: badgeClass, txt: text };
             }
 
             function getDocumentTypeText(id) {
-                if(typeof SystemEnums !== 'undefined') return SystemEnums.getDisplayName('documentType', id);
-                if (id === 10) return "ใบเสนอราคาหลัก";
-                if (id === 20) return "ใบเสนอราคาเปรียบเทียบ";
-                if (id === 30) return "รายละเอียดคุณลักษณะ (Spec)";
-                if (id === 40) return "เงื่อนไขและข้อกำหนด";
-                return "เอกสารแนบ";
+                // ใช้ข้อมูลจากตัวแปร documentTypes ที่ Inject มาจาก C#
+                const found = documentTypes.find(x => x.Id === id);
+                return found ? found.DisplayName : "เอกสารแนบ";
             }
 
             function formatSize(b) {
@@ -821,7 +881,8 @@
             }
 
             function showError(msg) {
-                if (typeof DevExpress !== 'undefined') DevExpress.ui.notify(msg, "error", 4000); else alert(msg);
+                if (typeof DevExpress !== 'undefined') DevExpress.ui.notify(msg, "error", 4000);
+                else alert(msg);
             }
 
             function toggleFullscreen() {

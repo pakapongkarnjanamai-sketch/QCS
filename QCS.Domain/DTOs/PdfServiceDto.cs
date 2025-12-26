@@ -19,7 +19,7 @@ namespace QCS.Domain.DTOs
     public class PdfFileDto
     {
         public string Name { get; set; }
-        public string DocumentType { get; set; } // "OriginalQuotation", "Spec", etc.
+        public int DocumentTypeId { get; set; } // "Quotation", "Spec", etc.
         public string ContentType { get; set; } = "application/pdf";
         public byte[] Data { get; set; }
         public long Length { get; set; }

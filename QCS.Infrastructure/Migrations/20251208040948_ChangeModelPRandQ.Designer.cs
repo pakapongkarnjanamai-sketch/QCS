@@ -229,7 +229,7 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("Requests");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.OriginalQuotation", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -466,7 +466,7 @@ namespace QCS.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.OriginalQuotation", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
                     b.HasOne("QCS.Domain.Models.Request", "Request")
                         .WithMany("Quotations")

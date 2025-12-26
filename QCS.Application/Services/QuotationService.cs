@@ -57,7 +57,7 @@ namespace QCS.Application.Services
                     .Select(q => new PdfFileDto
                     {
                         Name = q.FileName,
-                        DocumentType = MapDocumentType(q.DocumentTypeId),
+                        DocumentTypeId = q.DocumentTypeId,
                         ContentType = q.ContentType ?? "application/pdf",
                         Data = q.AttachmentFile.Data,
                         Length = q.FileSize
@@ -100,15 +100,5 @@ namespace QCS.Application.Services
             };
         }
 
-        private string MapDocumentType(int typeId)
-        {
-            return typeId switch
-            {
-                10 => "Main OriginalQuotation",
-                20 => "Comparison Sheet",
-                30 => "Specification",
-                _ => "AdditionalAttachment"
-            };
-        }
     }
 }

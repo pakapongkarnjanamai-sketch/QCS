@@ -1,6 +1,9 @@
 ﻿@model int?
+@using QCS.Domain.Enum
+@using QCS.Infrastructure.Services
+
 @{
-    ViewData["Title"] = "สร้างใบเสนอราคา (Create OriginalQuotation Comparison)";
+    ViewData["Title"] = "สร้างใบเสนอราคา (Create Quotation Comparison)";
     Layout = "_DevExtremeLayout";
 }
 
@@ -31,7 +34,7 @@
     </div>
     <div class="qcs-card" id="formContainer">
         <div class="section-header">
-            <i class="fas fa-info-circle" style="color: var(--dx-primary-color);"></i> 
+            <i class="fas fa-info-circle" style="color: var(--dx-primary-color);"></i>
             ข้อมูล (Info)
         </div>
         <div id="quotationForm"></div>
@@ -39,7 +42,7 @@
 
     <div class="qcs-card">
         <div class="section-header">
-            <i class="fas fa-route" style="color: var(--dx-primary-color);"></i> 
+            <i class="fas fa-route" style="color: var(--dx-primary-color);"></i>
             เส้นทางการอนุมัติ (Approval Route)
         </div>
         <div id="workflowRouteGrid"></div>
@@ -75,37 +78,53 @@
                 API_REJECT: `/Approval/Reject`,
                 VENDOR_API_URL: "/Vendor"
             };
-            const docTypesSource = (typeof SystemEnums !== 'undefined' && SystemEnums.documentType) ? SystemEnums.documentType : [];
+
+            // ดึงข้อมูล Enum DocumentType จาก Server (Inject via C#)
+            const docTypesSource = @Html.Raw(Json.Serialize(EnumHelper.ToList<DocumentType>()));
+            const approvalStatuses = @Html.Raw(Json.Serialize(EnumHelper.ToList<ApprovalStatus>()));
 
             let fileList = [], deletedFileIds = [], prData = {}, currentActionType = "";
             let formInstance, toolbarInstance, attachmentGridInstance, actionPopupInstance;
-
             const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
                 shadingColor: "rgba(0,0,0,0.4)", position: { of: "window" }, visible: false,
                 showIndicator: true, showPane: true, shading: true, message: "Processing..."
             }).dxLoadPanel("instance");
-
             const vendorStore = DevExpress.data.AspNet.createStore({
                 key: "code",
                 loadUrl: CONFIG.API_BASE_URL + CONFIG.VENDOR_API_URL,
                 onBeforeSend: (m, ajax) => ajax.xhrFields = { withCredentials: true }
             });
-
             const formatDateTime = (dateStr) => {
                 if (!dateStr) return "-";
                 const d = new Date(dateStr);
                 const pad = (n) => n.toString().padStart(2, '0');
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             };
-
-            const getStatusBadge = (status) => {
-                let cls = "status-draft";
-                if (status === 1) cls = "status-pending";
-                else if (status === 2) cls = "status-approved";
-                else if (status === 3 || status === 9) cls = "status-rejected";
-                let txt = (typeof SystemEnums !== 'undefined') ? SystemEnums.getDisplayName('approvalStatus', status) : "Status " + status;
-                return { cls, txt };
-            };
+           function getStatusBadgeInfo(statusId) {
+              
+                let badgeClass = "bg-secondary-soft";
+                const statusEnum = approvalStatuses.find(x => x.Id === statusId);
+                const text = statusEnum ? statusEnum.DisplayName : "Unknown";
+            
+                switch (statusId) {
+                    case 0: // Draft
+                        badgeClass = "bg-secondary-soft";
+                        break;
+                    case 1: // Pending
+                        badgeClass = "bg-warning-soft";
+                        break;
+                    case 2: // Approved
+                        badgeClass = "bg-success-soft";
+                        break;
+                    case 9: // Rejected
+                        badgeClass = "bg-danger-soft";
+                        break;
+                    case 99: // Cancelled
+                        badgeClass = "bg-dark text-white";
+                        break;
+                }
+                return { cls: badgeClass, txt: text };
+            }
 
             initUI();
             if (MODE === "CREATE") loadCreateModeData();
@@ -192,11 +211,9 @@
 
                     prData = data;
                     $("#lblDocNo").text(data.docNo || data.code || "-");
-
                     const canEdit = data.permissions && data.permissions.canEdit;
                     formInstance.option("formData", data);
                     formInstance.option("readOnly", !canEdit);
-
                     if (attachmentGridInstance) {
                         const files = data.quotations || [];
                         attachmentGridInstance.option("dataSource", files);
@@ -219,7 +236,8 @@
 
                     renderWorkflowRouteGrid(data.workflowRoute, data.currentStepId);
                     const items = toolbarInstance.option("items");
-                    const setBtn = (id, v) => { const idx = items.findIndex(i => i.options?.elementAttr?.id === id); if (idx >= 0) items[idx].visible = v; };
+                    const setBtn = (id, v) => { const idx = items.findIndex(i => i.options?.elementAttr?.id === id);
+                    if (idx >= 0) items[idx].visible = v; };
                     setBtn("btnSave", canEdit);
                     setBtn("btnSubmit", canEdit);
                     setBtn("btnApprove", data.permissions.canApprove);
@@ -260,21 +278,20 @@
                 }).appendTo($uploaderDiv);
 
                 if (!canEdit) $uploaderDiv.hide();
-
                 attachmentGridInstance = $("<div>").dxDataGrid({
                     dataSource: files, showBorders: true, columnAutoWidth: true, noDataText: "ไม่มีไฟล์แนบ", keyExpr: "id",
                     editing: { mode: "cell", allowUpdating: canEdit, allowDeleting: false },
                     columns: [
                         { dataField: "originalFileName", caption: "ชื่อไฟล์ (File Name)", allowEditing: false, calculateDisplayValue: (r) => r.originalFileName || r.fileName,
-                            cellTemplate: (c, o) => { 
-                                const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : ''; 
+                            cellTemplate: (c, o) => {
+                                const isNew = o.data.isNew ? ' <span class="badge bg-success ms-1">New</span>' : '';
                                 $("<div>").addClass("file-info")
                                     .append($("<i>").addClass("fas fa-file-pdf"))
                                     .append($("<span>").html(o.displayValue + isNew))
-                                    .appendTo(c); 
+                                    .appendTo(c);
                             }
                         },
-                        { dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250, lookup: { dataSource: docTypesSource, valueExpr: "id", displayExpr: "displayName" }, validationRules: [{ type: "required" }] },
+                        { dataField: "documentTypeId", caption: "ประเภท (Type)", width: 250, lookup: { dataSource: docTypesSource, valueExpr: "Id", displayExpr: "DisplayName" }, validationRules: [{ type: "required" }] },
                         { type: "buttons", width: 100, buttons: [
                             { hint: "View", icon: "eyeopen", onClick: (e) => { if (e.row.data.id && e.row.data.id > 0) viewPdf(e.row.data.id); else DevExpress.ui.notify("ไฟล์ใหม่ต้องบันทึกก่อน", "warning", 2000); } },
                             { name: "delete", visible: canEdit, icon: "trash", onClick: (e) => {
@@ -298,8 +315,10 @@
                 if (!formInstance.validate().isValid) { DevExpress.ui.notify("กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน", "error", 2000); return; }
                 const ds = attachmentGridInstance.option("dataSource") || [];
                 if (ds.length === 0) { DevExpress.ui.notify("กรุณาแนบไฟล์เอกสารประกอบ", "error", 3000); return; }
-                if (!ds.some(f => f.documentTypeId === 10)) { DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาหลัก (Main Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
-                if (!ds.some(f => f.documentTypeId === 20)) { DevExpress.ui.notify("กรุณาแนบ 'ใบเสนอราคาคู่เทียบ (Comparative Quotation)' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
+
+                // ตรวจสอบเอกสารตาม DocumentType (10 = ORIGINAL QUOTATION, 20 = COMPARISON DOCUMENT)
+                if (!ds.some(f => f.documentTypeId === 10)) { DevExpress.ui.notify("กรุณาแนบ 'ORIGINAL QUOTATION' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
+                if (!ds.some(f => f.documentTypeId === 20)) { DevExpress.ui.notify("กรุณาแนบ 'COMPARISON DOCUMENT' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
 
                 if (isSubmit) openActionPopup('Submit');
                 else executeSaveOrSubmit(false, null);
@@ -364,7 +383,6 @@
                         if (deletedFileIds.length > 0) formData.append("DeletedFileIds", deletedFileIds.join(","));
                     }
                     fileList.forEach(f => formData.append(MODE === "CREATE" ? "Attachments" : "NewAttachments", f));
-
                     let endpoint = "";
                     if (MODE === "CREATE") endpoint = isSubmit ? CONFIG.API_CREATE_SUBMIT : CONFIG.API_CREATE_SAVE;
                     else endpoint = isSubmit ? CONFIG.API_UPDATE_SUBMIT : CONFIG.API_UPDATE_SAVE;
@@ -392,7 +410,8 @@
                     });
                     if (!res.ok) throw new Error(await res.text());
                     setTimeout(() => location.reload(), 500);
-                } catch (err) { console.error("Approval Error:", err.message); } finally { loadingIndicator.hide(); }
+                } catch (err) { console.error("Approval Error:", err.message);
+                } finally { loadingIndicator.hide(); }
             }
 
             function renderWorkflowRouteGrid(routeData, currentStepId) {
@@ -401,7 +420,6 @@
                     status: s.status || 0, approverName: s.approverName, approverNId: s.approverNId,
                     actionDate: s.actionDate, comment: s.comment
                 })) : [];
-
                 $("#workflowRouteGrid").dxDataGrid({
                     dataSource: gridData, showBorders: true, showRowLines: true, columnAutoWidth: true, paging: { enabled: false },
                     onRowPrepared: (e) => { if (e.rowType === "data" && e.data.sequenceNo === currentStepId) e.rowElement.addClass("row-current-step"); },
@@ -413,8 +431,11 @@
                             if (list.length === 0) return $("<span>").text("-").appendTo(c);
                             list.forEach(a => $("<div>").html(a.isCurrentUser ? `<span class="current-user-row"><i class="fas fa-user-circle"></i> ${a.employeeName} (You)</span>` : `<span class="text-muted"><i class="fas fa-user"></i> ${a.employeeName}</span>`).appendTo(c));
                         }},
-                        { dataField: "status", caption: "สถานะ", width: 130, alignment: "center", cellTemplate: (c, o) => { const b = getStatusBadge(o.value); $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c); }},
-                        { dataField: "approverName", caption: "ผู้ดำเนินการ", cellTemplate: (c, o) => { const name = o.data.approverName; const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-"; $("<span>").text(txt).appendTo(c); }},
+                        { dataField: "status", caption: "สถานะ", width: 130, alignment: "center", cellTemplate: (c, o) => { const b = getStatusBadgeInfo(o.value);
+                        $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(c); }},
+                        { dataField: "approverName", caption: "ผู้ดำเนินการ", cellTemplate: (c, o) => { const name = o.data.approverName;
+                        const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-"; $("<span>").text(txt).appendTo(c);
+                        }},
                         { dataField: "actionDate", caption: "วันที่", width: 140, alignment: "center", customizeText: (c) => formatDateTime(c.value) },
                         { dataField: "comment", caption: "ความเห็น", customizeText: (c) => c.value || "-" }
                     ]
@@ -433,7 +454,8 @@
                                 { dataField: "stepName", caption: "Step" },
                                 { dataField: "approverName", caption: "Approver", cellTemplate: (c, o) => { const name = o.data.approverName; const txt = name ? (o.data.approverNId ? `${name} (${o.data.approverNId})` : name) : "-"; $("<span>").text(txt).appendTo(c); } },
                                 { dataField: "actionDate", caption: "Date", width: 140, alignment: "center", customizeText: (info) => formatDateTime(info.value) },
-                                { dataField: "status", caption: "Status", width: 130, cellTemplate: (cnt, opt) => { const b = getStatusBadge(opt.value); $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(cnt); } },
+                                { dataField: "status", caption: "Status", width: 130, cellTemplate: (cnt, opt) => { const b = getStatusBadgeInfo(opt.value);
+                                $("<span>").addClass("status-badge " + b.cls).text(b.txt).appendTo(cnt); } },
                                 { dataField: "comment", caption: "Remark", customizeText: (info) => info.value || "-" }
                             ]
                         }).appendTo(c);
@@ -447,7 +469,7 @@
                     contentTemplate: function(contentElement) {
                         const container = $("<div>").addClass("p-2");
                         $("<div>").attr("id", "actionReasonBox").appendTo(container).dxTextArea({ height: 100, value: "", stylingMode: "outlined" });
-                                               const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
+                        const btnGroup = $("<div>").addClass("mt-3 d-flex justify-content-end gap-2").appendTo(container);
                         $("<div>").appendTo(btnGroup).dxButton({ text: "ยกเลิก (Cancel)", stylingMode: "text", onClick: () => actionPopupInstance.hide() });
                         $("<div>").attr("id", "btnConfirmAction").appendTo(btnGroup).dxButton({ text: "ยืนยัน (Confirm)", stylingMode: "contained" });
                         return container;

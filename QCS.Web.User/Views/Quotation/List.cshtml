@@ -1,5 +1,7 @@
-﻿@{
-    ViewData["Title"] = "ใบเสนอราคา (OriginalQuotation)";
+﻿@using QCS.Domain.Enum
+@using QCS.Infrastructure.Services
+@{
+    ViewData["Title"] = "ใบเสนอราคา (Quotation)";
     Layout = "_DevExtremeLayout";
 }
 
@@ -24,49 +26,47 @@
 
     <script>
         $(function () {
-            const DETAIL_URL = '@Url.Action("View", "OriginalQuotation")';
+            const DETAIL_URL = '@Url.Action("View", "Quotation")';
 
-            // === HELPER: Status Badge ===
-            const getStatusBadgeInfo = (status) => {
-                let badgeClass = "bg-secondary-soft";
-                let text = "Unknown";
+        // 1. ดึงข้อมูล Enum WorkflowStep จาก Server (Inject via C#)
+              const workflowStepSource = @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>()));
 
-                switch (status) {
-                    case 0: // Draft
+              // === HELPER: Status Badge ===
+              const getStatusBadgeInfo = (statusId) => {
+                  let badgeClass = "bg-secondary-soft";
+
+                  // ค้นหาข้อความจาก Enum (ป้องกันการ Hardcode)
+                  const statusEnum = workflowStepSource.find(x => x.Id === statusId);
+                  const text = statusEnum ? statusEnum.DisplayName : "Unknown";
+
+                  // กำหนดสีตาม WorkflowStep
+                  switch (statusId) {
+                     case 0: // Draft
                         badgeClass = "bg-secondary-soft";
-                        text = "บันทึก (Draft)";
                         break;
                     case 1: // Purchaser
                         badgeClass = "bg-info-soft";
-                        text = "บันทึก (Purchaser)";
                         break;
                     case 2: // Verifier
                         badgeClass = "bg-warning-soft";
-                        text = "รอตรวจสอบ";
                         break;
                     case 3: // Manager
                         badgeClass = "bg-warning-soft";
-                        text = "รออนุมัติ";
                         break;
                     case 99: // Completed
                         badgeClass = "bg-success-soft";
-                        text = "อนุมัติครบถ้วน";
                         break;
                     case -1: // Rejected
                         badgeClass = "bg-danger-soft";
-                        text = "ไม่อนุมัติ";
                         break;
                     default:
-                        text = "Status " + status;
+                    badgeClass = "bg-light text-muted border";
                         break;
-                }
+                  }
 
-                if (typeof SystemEnums !== 'undefined') {
-                    text = SystemEnums.getDisplayName('workflowStep', status);
-                }
+                  return { cls: badgeClass, txt: text };
+              };
 
-                return { cls: badgeClass, txt: text };
-            };
 
             // === MAIN GRID ===
             const grid = $("#gridContainer").dxDataGrid({

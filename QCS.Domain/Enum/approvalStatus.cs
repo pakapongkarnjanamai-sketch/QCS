@@ -1,23 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace QCS.Domain.Enum
 {
     /// <summary>
     /// สถานะของแต่ละขั้นตอนการอนุมัติ (Approval Step)
     /// </summary>
-    public enum approvalStatus
+    public enum ApprovalStatus
     {
         [Display(Name = "ไม่ถึงขั้นตอน")]
         [Description("ไม่ถึงขั้นตอน")]
         Next = 0,
-        [Display(Name = "รอพิจารณา")]
-        [Description("รอพิจารณา")]
+        [Display(Name = "รออนุมัติ")]
+        [Description("รออนุมัติ")]
         InReview = 1,
         [Display(Name = "อนุมัติ")]
         [Description("อนุมัติ")]

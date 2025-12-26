@@ -208,7 +208,7 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("Requests");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.OriginalQuotation", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -462,7 +462,7 @@ namespace QCS.Infrastructure.Migrations
                     b.Navigation("Request");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.OriginalQuotation", b =>
+            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
                     b.HasOne("QCS.Domain.Models.AttachmentFile", "AttachmentFile")
                         .WithMany()
