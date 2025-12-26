@@ -42,22 +42,22 @@
                   // กำหนดสีตาม WorkflowStep
                   switch (statusId) {
                      case 0: // Draft
-                        badgeClass = "bg-secondary-soft";
+                        badgeClass = "bg-secondary-soft  text-dark";
                         break;
                     case 1: // Purchaser
-                        badgeClass = "bg-info-soft";
+                        badgeClass = "bg-info-soft  text-dark";
                         break;
                     case 2: // Verifier
-                        badgeClass = "bg-warning-soft";
+                        badgeClass = "bg-warning-soft  text-dark";
                         break;
                     case 3: // Manager
-                        badgeClass = "bg-warning-soft";
+                        badgeClass = "bg-warning-soft text-dark";
                         break;
                     case 99: // Completed
-                        badgeClass = "bg-success-soft";
+                        badgeClass = "bg-success-soft text-dark";
                         break;
                     case -1: // Rejected
-                        badgeClass = "bg-danger-soft";
+                        badgeClass = "bg-danger-soft text-dark";
                         break;
                     default:
                     badgeClass = "bg-light text-muted border";

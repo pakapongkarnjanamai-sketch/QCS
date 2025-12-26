@@ -287,11 +287,22 @@ namespace QCS.Application.Services
 
         public async Task RejectAsync(ApprovalActionDto input)
         {
-            var (request, currentStepObj) = await GetRequestAndCurrentStepAsync(input.RequestId);
+            // 1. ดึงข้อมูล Request พร้อมทั้ง ApprovalSteps, Quotations และเจาะจงไปที่ AttachmentFile ด้วย
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.ApprovalSteps)
+                .Include(r => r.Quotations)
+                    .ThenInclude(q => q.AttachmentFile) // ✅ ดึงข้อมูล AttachmentFile ที่ผูกกับ Quotation
+                .FirstOrDefaultAsync(r => r.Id == input.RequestId);
+
+            if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
+
+            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบันของเอกสาร");
 
             var currentUserId = _currentUserService.UserId;
             string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId);
 
+            // 2. อัปเดตสถานะการ Reject ตาม Workflow
             currentStepObj.Status = (int)RequestStatus.Rejected;
             currentStepObj.ActionDate = DateTime.Now;
             currentStepObj.Comment = input.Comment;
@@ -299,26 +310,98 @@ namespace QCS.Application.Services
             currentStepObj.ApproverName = approverName;
 
             request.Status = (int)RequestStatus.Rejected;
-            // ✅ เปลี่ยนจาก WorkflowStep.Rejected เป็น RejectedStepId (int)
             request.CurrentStepId = RejectedStepId;
 
+            // 3. ✅ ปรับปรุง: เปลี่ยน IsActive เป็น 0 (false) ให้ข้อมูลที่เกี่ยวข้องทั้งหมด (Request -> Step -> Quotation -> AttachmentFile)
+            request.IsActive = false;
+
+            // ปิด Approval Steps
+            if (request.ApprovalSteps != null)
+            {
+                foreach (var step in request.ApprovalSteps)
+                {
+                    step.IsActive = false;
+                }
+            }
+
+            // ปิด Quotations และ AttachmentFiles
+            if (request.Quotations != null)
+            {
+                foreach (var quotation in request.Quotations)
+                {
+                    quotation.IsActive = false;
+
+                    // ✅ ปิดตัวไฟล์แนบด้วย (ถ้ามี)
+                    if (quotation.AttachmentFile != null)
+                    {
+                        quotation.AttachmentFile.IsActive = false;
+                    }
+                }
+            }
+
+            // 4. บันทึกข้อมูล
             await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();
 
+            // แจ้งเตือน
             await NotifyUpdatesAsync($"ไม่อนุมัติเอกสาร {request.Code}");
         }
         public async Task DeleteAsync(int id)
         {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var pr = await requestRepo.GetByIdAsync(id);
-            if (pr != null)
+            // ✅ 1. เริ่ม Transaction เพื่อความปลอดภัย (ลบต้องลบทั้งหมด หรือไม่ลบเลย)
+            using var transaction = _unitOfWork.BeginTransaction();
+            try
             {
-                var code = pr.Code; // เก็บไว้ log
-                await requestRepo.DeleteAsync(pr);
-                await _unitOfWork.CommitAsync();
+                // ✅ 2. ดึงข้อมูล Request พร้อมข้อมูลที่เกี่ยวข้องทั้งหมด (Steps, Quotations, AttachmentFiles)
+                var request = await _unitOfWork.Repository<Request>().GetAll()
+                    .Include(r => r.ApprovalSteps)
+                    .Include(r => r.Quotations)
+                        .ThenInclude(q => q.AttachmentFile) // ดึงไฟล์แนบด้วย
+                    .FirstOrDefaultAsync(r => r.Id == id);
 
-                // ✅ แจ้งเตือน Real-time
-                await NotifyUpdatesAsync($"ลบเอกสาร {code}");
+                if (request != null)
+                {
+                    var code = request.Code; // เก็บเลขที่เอกสารไว้ Log/Notify
+
+                    // ✅ 3. ลบ AttachmentFiles ที่ผูกกับ Quotations (ต้องลบแยกเพราะอาจไม่ Cascade อัตโนมัติ)
+                    var attachmentFilesToDelete = request.Quotations
+                        .Where(q => q.AttachmentFile != null)
+                        .Select(q => q.AttachmentFile)
+                        .ToList();
+
+                    if (attachmentFilesToDelete.Any())
+                    {
+                        await _unitOfWork.Repository<AttachmentFile>().DeleteRangeAsync(attachmentFilesToDelete);
+                    }
+
+                    // ✅ 4. ลบข้อมูลลูก (Quotations และ ApprovalSteps)
+                    // หมายเหตุ: แม้ Database จะมี Cascade Delete แต่การสั่งลบผ่าน EF Core จะช่วยจัดการ State ภายในได้ดีกว่า
+                    if (request.Quotations.Any())
+                    {
+                        await _unitOfWork.Repository<Quotation>().DeleteRangeAsync(request.Quotations);
+                    }
+
+                    if (request.ApprovalSteps.Any())
+                    {
+                        await _unitOfWork.Repository<ApprovalStep>().DeleteRangeAsync(request.ApprovalSteps);
+                    }
+
+                    // ✅ 5. ลบตัวเอกสาร Request (Header)
+                    await _unitOfWork.Repository<Request>().DeleteAsync(request);
+
+                    // ✅ 6. บันทึกและยืนยัน Transaction
+                    await _unitOfWork.CommitAsync();
+                    await transaction.CommitAsync();
+
+                    // แจ้งเตือน Real-time
+                    await NotifyUpdatesAsync($"ลบเอกสาร {code}");
+                }
+            }
+            catch
+            {
+                // หากเกิดข้อผิดพลาด ให้ย้อนกลับการลบทั้งหมด
+                await transaction.RollbackAsync();
+                throw;
             }
         }
 
