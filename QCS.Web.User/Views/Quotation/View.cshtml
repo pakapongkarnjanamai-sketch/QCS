@@ -409,6 +409,7 @@
 
             // Global State
             let currentDocId = null;
+            let currentDocData = null;
             let currentActionType = "";
             let actionPopupInstance;
             let isFinalState = false; // Check Step 99
@@ -421,129 +422,147 @@
             else showError("Document Code is missing.");
 
             // === MAIN LOGIC ===
-            async function loadData() {
-                const loader = createLoader("Loading Data...");
-                try {
-                    const url = new URL(API.GET_DATA, window.location.origin);
-                    url.searchParams.append("code", DOC_CODE);
+           async function loadData() {
+            const loader = createLoader("Loading Data...");
+            try {
+                const url = new URL(API.GET_DATA, window.location.origin);
+                url.searchParams.append("code", DOC_CODE);
 
-                    const res = await fetch(url, { credentials: 'include' });
-                    if (!res.ok) throw new Error("Document not found.");
+                const res = await fetch(url, { credentials: 'include' });
+                if (!res.ok) throw new Error("Document not found.");
 
-                    const data = await res.json();
-                    if (!data) throw new Error("No data returned.");
+                const data = await res.json();
+                if (!data) throw new Error("No data returned.");
 
-                    currentDocId = data.requestId || data.id;
-                    isFinalState = (data.currentStepId === 99);
+                // <--- 2. บันทึก Data ลง Global Variable
+                currentDocData = data;
 
-                    // 1. กำหนด API Endpoint
-                    if (isFinalState) {
-                        viewFileApiUrl = API.VIEW_FILE_QUOTATION;
+                currentDocId = data.requestId || data.id;
+                isFinalState = (data.currentStepId === 99);
+
+                // 1. กำหนด API Endpoint
+                if (isFinalState) {
+                    viewFileApiUrl = API.VIEW_FILE_QUOTATION;
+                } else {
+                    viewFileApiUrl = API.VIEW_FILE_REQUEST;
+                }
+
+                renderHeader(data);
+                renderForm(data);
+                renderDocuments(data.quotations || []);
+
+                // 2. จัดการ UI (Buttons & Viewer)
+                if (isFinalState) {
+                    // === View Mode (Step 99) ===
+                    $("#btnDownload").show();
+                    $("#btnFullscreen").removeClass("ms-auto");
+                    $("#actionCard").hide();
+
+                    loadViewer(currentDocId, data.code);
+                } else {
+                    // === Request Mode (Step != 99) ===
+                    $("#btnDownload").hide();
+                    $("#btnFullscreen").addClass("ms-auto");
+
+                    if (data.permissions && (data.permissions.canApprove || data.permissions.canReject)) {
+                        renderActionButtons(data);
                     } else {
-                        viewFileApiUrl = API.VIEW_FILE_REQUEST;
-                    }
-
-                    renderHeader(data);
-                    renderForm(data);
-                    renderDocuments(data.quotations || []); // Render Attachments
-
-                    // 2. จัดการ UI (Buttons & Viewer)
-                    if (isFinalState) {
-                        // === View Mode (Step 99) ===
-                        // แสดงปุ่ม Download
-                        $("#btnDownload").show();
-                        $("#btnFullscreen").removeClass("ms-auto");
                         $("#actionCard").hide();
+                    }
 
-                        // เปิดไฟล์โดยใช้ Request ID (PDF รวม)
-                        loadViewer(currentDocId, data.code);
+                    const docs = data.quotations || [];
+                    if (docs.length > 0) {
+                        loadViewer(docs[0].id, docs[0].originalFileName || data.code);
                     } else {
-                        // === Request Mode (Step != 99) ===
-                        // ซ่อนปุ่ม Download
-                        $("#btnDownload").hide();
-                        $("#btnFullscreen").addClass("ms-auto");
-
-                        // แสดงปุ่ม Action ตามสิทธิ์
-                        if (data.permissions && (data.permissions.canApprove || data.permissions.canReject)) {
-                            renderActionButtons(data);
-                        } else {
-                            $("#actionCard").hide();
-                        }
-
-                        // เปิดไฟล์แนบแรกโดยใช้ Attachment ID
-                        const docs = data.quotations || [];
-                        if (docs.length > 0) {
-                            loadViewer(docs[0].id, docs[0].originalFileName || data.code);
-                        } else {
-                            $("#pdfViewer").html('<div class="pdf-placeholder">No files attached</div>');
-                        }
+                        $("#pdfViewer").html('<div class="pdf-placeholder">No files attached</div>');
                     }
-
-                    // Timeline
-                    const steps = (data.workflowRoute && data.workflowRoute.steps)
-                                  ? data.workflowRoute.steps
-                                  : (data.approvalSteps || []);
-                    renderApprovals(steps);
-
-                    $("#btnFullscreen").on("click", toggleFullscreen);
-
-                } catch (err) {
-                    showError(err.message);
-                } finally {
-                    loader.hide();
                 }
-            }
 
+                // Timeline
+                const steps = (data.workflowRoute && data.workflowRoute.steps)
+                                ? data.workflowRoute.steps
+                                : (data.approvalSteps || []);
+                renderApprovals(steps);
+
+                $("#btnFullscreen").on("click", toggleFullscreen);
+
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                loader.hide();
+            }
+        }
             // === VIEWER LOGIC ===
-            async function loadViewer(idToLoad, label) {
-                if(label) $("#docTitleLabel").text(label);
+         async function loadViewer(idToLoad, label) {
+            if(label) $("#docTitleLabel").text(label);
 
-                // Highlight เฉพาะในโหมด Request (เพราะ View Mode กดเลือกไม่ได้)
-                if (!isFinalState) {
-                    $(".file-item").removeClass("active");
-                    $(`.file-item[data-id="${idToLoad}"]`).addClass("active");
-                }
-
-                const viewer = $("#pdfViewer").empty();
-                const loader = createLoader("Opening file...", "#pdfViewer");
-
-                // Reset Download Button
-                const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
-
-                try {
-                    // ใช้ URL ที่กำหนดไว้ (ViewFile/RequestID หรือ ViewFile/DocID)
-                    const url = `${viewFileApiUrl}/${idToLoad}`;
-
-                    const res = await fetch(url, { method: 'GET', credentials: 'include' });
-                    if (!res.ok) throw new Error("Unable to load file content.");
-
-                    const blob = await res.blob();
-                    const objUrl = URL.createObjectURL(blob);
-
-                    // ถ้าเป็น View Mode ให้เปิดใช้งานปุ่ม Download
-                    if(isFinalState) {
-                        $btnDownload.prop("disabled", false).on("click", function () {
-                            const link = document.createElement('a');
-                            link.href = objUrl;
-                            link.download = `${label || "Document"}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        });
-                    }
-
-                    $("<embed>").attr({
-                        src: objUrl, type: "application/pdf",
-                        width: "100%", height: "100%"
-                    }).appendTo(viewer);
-
-                } catch (e) {
-                    viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
-                } finally {
-                    loader.hide();
-                }
+            if (!isFinalState) {
+                $(".file-item").removeClass("active");
+                $(`.file-item[data-id="${idToLoad}"]`).addClass("active");
             }
 
+            const viewer = $("#pdfViewer").empty();
+            const loader = createLoader("Opening file...", "#pdfViewer");
+
+            const $btnDownload = $("#btnDownload").prop("disabled", true).off("click");
+
+            try {
+                const url = `${viewFileApiUrl}/${idToLoad}`;
+                const res = await fetch(url, { method: 'GET', credentials: 'include' });
+                if (!res.ok) throw new Error("Unable to load file content.");
+
+                const blob = await res.blob();
+                const objUrl = URL.createObjectURL(blob);
+
+                // ถ้าเป็น View Mode ให้เปิดใช้งานปุ่ม Download
+                if(isFinalState) {
+                    $btnDownload.prop("disabled", false).on("click", function () {
+                        // <--- 3. ปรับปรุง Logic การตั้งชื่อไฟล์ตรงนี้ครับ
+
+                        // ฟังก์ชันช่วยทำความสะอาดชื่อไฟล์ (ป้องกันอักขระต้องห้าม)
+                        const sanitize = (str) => (str || "").toString().replace(/[\/\\?%*:|"<>]/g, "-").trim();
+
+                        // จัดการวันที่ (Valid Until) ให้เป็นรูปแบบ yyyy-MM-dd
+                        let dateStr = "";
+                        if (currentDocData.validUntil) {
+                            const d = new Date(currentDocData.validUntil);
+                            if (!isNaN(d.getTime())) {
+                                const pad = (n) => n.toString().padStart(2, '0');
+                                dateStr = `Exp-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                            }
+                        }
+
+                        // ประกอบชื่อไฟล์: {label}_{title}_{vendorCode}_{validUntil}.pdf
+                        const fileNameParts = [
+                            sanitize(label),
+                            sanitize(currentDocData.title),
+                            sanitize(currentDocData.vendorCode),
+                            dateStr
+                        ];
+
+                        // กรองค่าว่างออก แล้วเชื่อมด้วย "_"
+                        const finalFileName = fileNameParts.filter(p => p).join("_") + ".pdf";
+
+                        const link = document.createElement('a');
+                        link.href = objUrl;
+                        link.download = finalFileName; // ใช้ชื่อไฟล์ใหม่
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    });
+                }
+
+                $("<embed>").attr({
+                    src: objUrl, type: "application/pdf",
+                    width: "100%", height: "100%"
+                }).appendTo(viewer);
+
+            } catch (e) {
+                viewer.html(`<div class="error-message text-danger p-4"><i class="fas fa-exclamation-triangle"></i> ${e.message}</div>`);
+            } finally {
+                loader.hide();
+            }
+        }
             // === RENDER DOCUMENTS ===
             function renderDocuments(docs) {
                 const container = $("#documentList").empty();

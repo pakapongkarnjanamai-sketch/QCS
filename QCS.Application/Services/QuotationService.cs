@@ -104,10 +104,10 @@ namespace QCS.Application.Services
         {
             return typeId switch
             {
-                10 => "Main Quotation",
+                10 => "Main OriginalQuotation",
                 20 => "Comparison Sheet",
                 30 => "Specification",
-                _ => "Attachment"
+                _ => "AdditionalAttachment"
             };
         }
     }

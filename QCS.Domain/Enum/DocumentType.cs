@@ -4,16 +4,16 @@ namespace QCS.Domain.Enum
 {
     public enum DocumentType
     {
-        [Display(Name = "ใบเสนอราคาหลัก")]
-        MainQuotation = 10,
+        [Display(Name = "ORIGINAL QUOTATION")]
+        OriginalQuotation = 10,
 
-        [Display(Name = "ใบเสนอราคาเปรียบเทียบ")]
-        ComparativeQuotation = 20,
+        [Display(Name = "COMPARISON DOCUMENT")]
+        Comparison = 20,
 
-        [Display(Name = "รายละเอียดคุณลักษณะ (Spec)")]
+        [Display(Name = "PRODUCT SPECIFICATIONS")]
         Specifications = 30,
 
-        [Display(Name = "เงื่อนไขและข้อกำหนด")]
-        TermsAndConditions = 40
+        [Display(Name = "ATTACHMENT")]
+        Attachment = 40
     }
 }

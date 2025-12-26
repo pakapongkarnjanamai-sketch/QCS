@@ -1,5 +1,5 @@
 ﻿@{
-    ViewData["Title"] = "ใบเสนอราคา (Quotation)";
+    ViewData["Title"] = "ใบเสนอราคา (OriginalQuotation)";
     Layout = "_DevExtremeLayout";
 }
 
@@ -24,7 +24,7 @@
 
     <script>
         $(function () {
-            const DETAIL_URL = '@Url.Action("View", "Quotation")';
+            const DETAIL_URL = '@Url.Action("View", "OriginalQuotation")';
 
             // === HELPER: Status Badge ===
             const getStatusBadgeInfo = (status) => {
