@@ -65,170 +65,184 @@ namespace QCS.Application.Services
 
         public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
-            if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
-
-            var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
-            var newDocNo = await GenerateDocNoAsync();
-
-            int currentStepId = 1;
-            int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
-
-            if (isSubmit)
+            // ✅ 1. เริ่ม Transaction
+            using var transaction = _unitOfWork.BeginTransaction();
+            try
             {
-                var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
-                currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
-                if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
-            }
+                var requestRepo = _unitOfWork.Repository<Request>();
+                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId);
+                if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
 
-            var pr = new Request
-            {
-                Code = newDocNo,
-                Title = input.Title,
-                RequestDate = DateTime.Now,
-                Status = docStatus,
-                CurrentStepId = currentStepId,
-                VendorCode = input.VendorCode,
-                VendorName = input.VendorName,
-                ValidFrom = input.ValidFrom,
-                ValidUntil = input.ValidUntil,
-                Remark = input.Remark
-            };
+                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
+                var newDocNo = await GenerateDocNoAsync();
 
-            foreach (var step in sortedSteps)
-            {
-                var actionDate = (step.SequenceNo == 1 && isSubmit) ? (DateTime?)DateTime.Now : null;
-                var stepStatus = step.SequenceNo switch
+                int currentStepId = 1;
+                int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
+
+                if (isSubmit)
                 {
-                    1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Pending,
-                    2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
-                    _ => (int)RequestStatus.Draft
+                    var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
+                    currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
+                    if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
+                }
+
+                var pr = new Request
+                {
+                    Code = newDocNo,
+                    Title = input.Title,
+                    RequestDate = DateTime.Now,
+                    Status = docStatus,
+                    CurrentStepId = currentStepId,
+                    VendorCode = input.VendorCode,
+                    VendorName = input.VendorName,
+                    ValidFrom = input.ValidFrom,
+                    ValidUntil = input.ValidUntil,
+                    Remark = input.Remark
                 };
 
-                pr.ApprovalSteps.Add(new ApprovalStep
+                foreach (var step in sortedSteps)
                 {
-                    Sequence = step.SequenceNo,
-                    StepName = step.StepName,
-                    Status = stepStatus,
-                    ActionDate = actionDate,
-                    ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
-                    ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId) : null,
-                    Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
-                });
-            }
+                    var actionDate = (step.SequenceNo == 1 && isSubmit) ? (DateTime?)DateTime.Now : null;
+                    var stepStatus = step.SequenceNo switch
+                    {
+                        1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Pending,
+                        2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
+                        _ => (int)RequestStatus.Draft
+                    };
 
-            var files = GetFilesFromInput(input);
-            if (files != null && files.Any())
-            {
-                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
-                foreach (var q in newQuotations)
-                {
-                    pr.Quotations.Add(q);
+                    pr.ApprovalSteps.Add(new ApprovalStep
+                    {
+                        Sequence = step.SequenceNo,
+                        StepName = step.StepName,
+                        Status = stepStatus,
+                        ActionDate = actionDate,
+                        ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
+                        ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId) : null,
+                        Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
+                    });
                 }
+
+                var files = GetFilesFromInput(input);
+                if (files != null && files.Any())
+                {
+                    var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                    foreach (var q in newQuotations)
+                    {
+                        pr.Quotations.Add(q);
+                    }
+                }
+
+                await requestRepo.AddAsync(pr);
+                await _unitOfWork.CommitAsync(); // บันทึกลง DB (แต่ยังไม่ Commit จริงจนกว่าจะสั่ง transaction.Commit)
+
+                // ✅ 2. ยืนยัน Transaction ถ้าทุกอย่างราบรื่น
+                await transaction.CommitAsync();
+
+                // ✅ 3. แจ้งเตือน (ทำหลังจาก Commit สำเร็จแล้ว เพื่อป้องกัน Ghost Notification)
+                await NotifyUpdatesAsync($"สร้างเอกสารใหม่ {pr.Code}");
+
+                return pr;
             }
-
-            await requestRepo.AddAsync(pr);
-            await _unitOfWork.CommitAsync();
-
-            // ✅ แจ้งเตือน Real-time
-            await NotifyUpdatesAsync($"สร้างเอกสารใหม่ {pr.Code}");
-
-            return pr;
+            catch
+            {
+                // ✅ 4. ย้อนกลับข้อมูลทั้งหมดถ้ามี Error
+                await transaction.RollbackAsync();
+                throw; // โยน Error ต่อให้ Controller จัดการ
+            }
         }
 
         public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
         {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var quotationRepo = _unitOfWork.Repository<Quotation>();
-
-            var pr = await requestRepo.GetAll()
-                .Include(r => r.Quotations)
-                .Include(r => r.ApprovalSteps)
-                .FirstOrDefaultAsync(r => r.Id == input.Id);
-
-            if (pr == null) throw new KeyNotFoundException("Document not found");
-            if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
-
-            pr.Title = input.Title;
-            pr.VendorCode = input.VendorCode;
-            pr.VendorName = input.VendorName;
-            pr.ValidFrom = input.ValidFrom;
-            pr.ValidUntil = input.ValidUntil;
-            pr.Remark = input.Remark;
-
-            if (isSubmit)
+            // ✅ 1. เริ่ม Transaction
+            using var transaction = _unitOfWork.BeginTransaction();
+            try
             {
-                pr.Status = (int)RequestStatus.Pending;
-                var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
-                if (step1 != null)
+                var requestRepo = _unitOfWork.Repository<Request>();
+                var quotationRepo = _unitOfWork.Repository<Quotation>();
+
+                var pr = await requestRepo.GetAll()
+                    .Include(r => r.Quotations)
+                    .Include(r => r.ApprovalSteps)
+                    .FirstOrDefaultAsync(r => r.Id == input.Id);
+
+                if (pr == null) throw new KeyNotFoundException("Document not found");
+                if (pr.Status != (int)RequestStatus.Draft) throw new InvalidOperationException("Cannot edit non-draft document");
+
+                // ... (Logic การ Update Property เหมือนเดิม) ...
+                pr.Title = input.Title;
+                pr.VendorCode = input.VendorCode;
+                pr.VendorName = input.VendorName;
+                pr.ValidFrom = input.ValidFrom;
+                pr.ValidUntil = input.ValidUntil;
+                pr.Remark = input.Remark;
+
+                if (isSubmit)
                 {
-                    step1.Status = (int)RequestStatus.Approved;
-                    step1.ActionDate = DateTime.Now;
-                    step1.ApproverNId = _currentUserService.UserId;
-                    step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId);
-                    step1.Comment = input.Comment;
+                    pr.Status = (int)RequestStatus.Pending;
+                    var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+                    if (step1 != null)
+                    {
+                        step1.Status = (int)RequestStatus.Approved;
+                        step1.ActionDate = DateTime.Now;
+                        step1.ApproverNId = _currentUserService.UserId;
+                        step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId);
+                        step1.Comment = input.Comment;
+                    }
+
+                    var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
+                    if (step2 != null)
+                    {
+                        step2.Status = (int)RequestStatus.Pending;
+                        step2.ApproverNId = null;
+                        step2.ApproverName = null;
+                        pr.CurrentStepId = 2;
+                    }
                 }
 
-                var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
-                if (step2 != null)
+                // Update files metadata
+                if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
                 {
-                    step2.Status = (int)RequestStatus.Pending;
-                    step2.ApproverNId = null;
-                    step2.ApproverName = null;
-                    pr.CurrentStepId = 2;
+                    var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    updates?.ForEach(item =>
+                    {
+                        var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
+                        if (f != null) f.DocumentTypeId = item.DocumentTypeId;
+                    });
                 }
-            }
 
-            // Update files metadata
-            if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
-            {
-                var updates = JsonSerializer.Deserialize<List<QuotationItemDto>>(input.UpdatedQuotationsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                updates?.ForEach(item =>
+                // Delete removed files
+                if (!string.IsNullOrEmpty(input.DeletedFileIds))
                 {
-                    var f = pr.Quotations.FirstOrDefault(q => q.Id == item.Id);
-                    if (f != null) f.DocumentTypeId = item.DocumentTypeId;
-                });
-            }
-
-            // Delete removed files
-            if (!string.IsNullOrEmpty(input.DeletedFileIds))
-            {
-                var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
-                var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
-                await quotationRepo.DeleteRangeAsync(toRemove);
-            }
-
-            // Upload new files
-            var files = GetFilesFromInput(input);
-            if (files != null && files.Any())
-            {
-                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
-                foreach (var q in newQuotations)
-                {
-                    pr.Quotations.Add(q);
+                    var ids = input.DeletedFileIds.Split(',').Select(int.Parse).ToList();
+                    var toRemove = pr.Quotations.Where(q => ids.Contains(q.Id)).ToList();
+                    await quotationRepo.DeleteRangeAsync(toRemove);
                 }
-            }
 
-            await requestRepo.UpdateAsync(pr);
-            await _unitOfWork.CommitAsync();
+                // Upload new files
+                var files = GetFilesFromInput(input);
+                if (files != null && files.Any())
+                {
+                    var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                    foreach (var q in newQuotations)
+                    {
+                        pr.Quotations.Add(q);
+                    }
+                }
 
-            // ✅ แจ้งเตือน Real-time
-            await NotifyUpdatesAsync($"แก้ไขเอกสาร {pr.Code}");
-        }
-
-        public async Task DeleteAsync(int id)
-        {
-            var requestRepo = _unitOfWork.Repository<Request>();
-            var pr = await requestRepo.GetByIdAsync(id);
-            if (pr != null)
-            {
-                var code = pr.Code; // เก็บไว้ log
-                await requestRepo.DeleteAsync(pr);
+                await requestRepo.UpdateAsync(pr);
                 await _unitOfWork.CommitAsync();
 
-                // ✅ แจ้งเตือน Real-time
-                await NotifyUpdatesAsync($"ลบเอกสาร {code}");
+                // ✅ 2. Commit Transaction
+                await transaction.CommitAsync();
+
+                // ✅ 3. Notify
+                await NotifyUpdatesAsync($"แก้ไขเอกสาร {pr.Code}");
+            }
+            catch
+            {
+                // ✅ 4. Rollback
+                await transaction.RollbackAsync();
+                throw;
             }
         }
 

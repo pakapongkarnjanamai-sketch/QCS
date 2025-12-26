@@ -1,4 +1,5 @@
-﻿using QCS.Application.Services;
+﻿using Microsoft.EntityFrameworkCore.Storage;
+using QCS.Application.Services;
 using QCS.Infrastructure.Data;
 using System;
 using System.Collections;
@@ -12,6 +13,8 @@ namespace QCS.Infrastructure.Services
 
         // เมธอดสำหรับสั่งบันทึกข้อมูลทั้งหมดลง Database ทีเดียว
         Task<int> CommitAsync();
+
+        IDbContextTransaction BeginTransaction();
     }
     public class UnitOfWork : IUnitOfWork
     {
@@ -45,7 +48,10 @@ namespace QCS.Infrastructure.Services
             // สั่ง SaveChanges ทีเดียวตรงนี้
             return await _context.SaveChangesAsync();
         }
-
+        public IDbContextTransaction BeginTransaction()
+        {
+            return _context.Database.BeginTransaction();
+        }
         public void Dispose()
         {
             _context.Dispose();
