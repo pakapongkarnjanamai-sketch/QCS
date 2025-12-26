@@ -8,9 +8,9 @@ namespace QCS.Domain.Models
     {
         public int Id { get; set; }
 
-        [Required]
-        [StringLength(255)]
-        public string FileName { get; set; }
+        //[Required]
+        //[StringLength(255)]
+        //public string FileName { get; set; }
 
         [StringLength(100)]
         public string ContentType { get; set; } // เช่น application/pdf

@@ -16,7 +16,7 @@ namespace QCS.API.Controllers
             var data = new
             {
                 RequestStatus = EnumHelper.ToList<RequestStatus>(),
-                WorkflowStep = EnumHelper.ToList<WorkflowStep>(),
+                //WorkflowStep = EnumHelper.ToList<WorkflowStep>(),
                 DocumentType = EnumHelper.ToList<DocumentType>(),
                 approvalStatus = EnumHelper.ToList<ApprovalStatus>()
             };

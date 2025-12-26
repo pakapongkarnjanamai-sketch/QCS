@@ -15,16 +15,16 @@ namespace QCS.Domain.Enum
 
         // ขั้นตอนตาม Workflow Route (ID ต้องตรงกับ Database Workflow)
         [Display(Name = "บันทึก")]
-        Purchaser = 1,  
+        Purchaser = 1,
         [Display(Name = "รออนุมัติ")]
-        Verifier = 2,   
+        Verifier = 2,
         [Display(Name = "รออนุมัติ")]
-        Manager = 3,   
+        Manager = 3,
 
         // สถานะจบการทำงาน
         [Display(Name = "อนุมัติครบถ้วน")]
-        Completed = 99, 
+        Completed = 99,
         [Display(Name = "ไม่อนุมัติ")]
-        Rejected = -1   
+        Rejected = -1
     }
 }

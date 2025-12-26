@@ -25,9 +25,9 @@ namespace QCS.Domain.Enum
         [Description("ไม่อนุมัติ")]
         Rejected = 9,
 
-        [Display(Name = "ยกเลิก")]
-        [Description("ยกเลิก")]
-        Cancelled = 99
+        //[Display(Name = "ยกเลิก")]
+        //[Description("ยกเลิก")]
+        //Cancelled = 99
     }
 
   

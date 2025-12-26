@@ -51,7 +51,7 @@ namespace QCS.Application.Services
                     // สร้าง Object ลูก AttachmentFile (สำหรับเก็บ Binary Data)
                     AttachmentFile = new AttachmentFile
                     {
-                        FileName = file.FileName,
+                        //FileName = file.FileName,
                         ContentType = file.ContentType,
                         FileSize = file.Length,
                         Data = ms.ToArray()
