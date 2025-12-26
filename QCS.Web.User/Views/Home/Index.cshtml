@@ -251,12 +251,12 @@
         // รับ Event จาก Server
         connection.on("ReceiveUpdate", function (message) {
             console.log("SignalR Update Received:", message);
-            DevExpress.ui.notify({
-                message: "ข้อมูลมีการเปลี่ยนแปลง: " + message,
-                type: "info",
-                displayTime: 3000,
-                position: { my: "bottom right", at: "bottom right", offset: "-20 -20" }
-            });
+            // DevExpress.ui.notify({
+            //     message: "ข้อมูลมีการเปลี่ยนแปลง: " + message,
+            //     type: "info",
+            //     displayTime: 3000,
+            //     position: { my: "bottom right", at: "bottom right", offset: "-20 -20" }
+            // });
             refreshAllData();
         });
 
