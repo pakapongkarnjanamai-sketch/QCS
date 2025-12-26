@@ -41,6 +41,7 @@ namespace QCS.Application.Services
         // ✅ Constants
         private const int MainWorkflowId = 1;
         private const int CompletedStepId = 99;
+        private const int RejectedStepId = -1;
         private const string SignalREventName = "ReceiveUpdate"; // ชื่อ Event สำหรับ Client
 
         public RequestService(
@@ -248,7 +249,6 @@ namespace QCS.Application.Services
 
         public async Task ApproveAsync(ApprovalActionDto input)
         {
-            // ใช้ Helper ดึงข้อมูลและตรวจสอบ Step
             var (request, currentStepObj) = await GetRequestAndCurrentStepAsync(input.RequestId);
 
             var currentUserId = _currentUserService.UserId;
@@ -269,25 +269,24 @@ namespace QCS.Application.Services
 
             if (nextStep != null)
             {
-                request.CurrentStepId = nextStep.Sequence;
+                request.CurrentStepId = nextStep.Sequence; // ใช้ Sequence จาก DB/API โดยตรง
                 nextStep.Status = (int)RequestStatus.Pending;
             }
             else
             {
                 request.Status = (int)RequestStatus.Approved;
-                request.CurrentStep = WorkflowStep.Completed;
+                // ✅ เปลี่ยนจาก WorkflowStep.Completed เป็น CompletedStepId (int)
+                request.CurrentStepId = CompletedStepId;
             }
 
             await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();
 
-            // ✅ แจ้งเตือน Real-time
             await NotifyUpdatesAsync($"อนุมัติเอกสาร {request.Code}");
         }
 
         public async Task RejectAsync(ApprovalActionDto input)
         {
-            // ใช้ Helper ดึงข้อมูลและตรวจสอบ Step
             var (request, currentStepObj) = await GetRequestAndCurrentStepAsync(input.RequestId);
 
             var currentUserId = _currentUserService.UserId;
@@ -300,13 +299,27 @@ namespace QCS.Application.Services
             currentStepObj.ApproverName = approverName;
 
             request.Status = (int)RequestStatus.Rejected;
-            request.CurrentStep = WorkflowStep.Rejected;
+            // ✅ เปลี่ยนจาก WorkflowStep.Rejected เป็น RejectedStepId (int)
+            request.CurrentStepId = RejectedStepId;
 
             await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();
 
-            // ✅ แจ้งเตือน Real-time
             await NotifyUpdatesAsync($"ไม่อนุมัติเอกสาร {request.Code}");
+        }
+        public async Task DeleteAsync(int id)
+        {
+            var requestRepo = _unitOfWork.Repository<Request>();
+            var pr = await requestRepo.GetByIdAsync(id);
+            if (pr != null)
+            {
+                var code = pr.Code; // เก็บไว้ log
+                await requestRepo.DeleteAsync(pr);
+                await _unitOfWork.CommitAsync();
+
+                // ✅ แจ้งเตือน Real-time
+                await NotifyUpdatesAsync($"ลบเอกสาร {code}");
+            }
         }
 
         // =================================================================================================
@@ -622,5 +635,7 @@ namespace QCS.Application.Services
             }
             return null;
         }
+
+       
     }
 }

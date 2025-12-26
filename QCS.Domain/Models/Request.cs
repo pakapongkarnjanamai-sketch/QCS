@@ -11,12 +11,6 @@ namespace QCS.Domain.Models
         public DateTime RequestDate { get; set; }
         public int Status { get; set; }
         public int CurrentStepId { get; set; }
-        [NotMapped]
-        public WorkflowStep CurrentStep
-        {
-            get => (WorkflowStep)CurrentStepId;
-            set => CurrentStepId = (int)value;
-        }
 
         public string VendorCode { get; set; }
         public string VendorName { get; set; }
