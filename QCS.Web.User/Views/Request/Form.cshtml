@@ -318,8 +318,7 @@
 
                 // ตรวจสอบเอกสารตาม DocumentType (10 = ORIGINAL QUOTATION, 20 = COMPARISON DOCUMENT)
                 if (!ds.some(f => f.documentTypeId === 10)) { DevExpress.ui.notify("กรุณาแนบ 'ORIGINAL QUOTATION' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
-                if (!ds.some(f => f.documentTypeId === 20)) { DevExpress.ui.notify("กรุณาแนบ 'COMPARISON DOCUMENT' อย่างน้อย 1 ไฟล์", "error", 4000); return; }
-
+              
                 if (isSubmit) openActionPopup('Submit');
                 else executeSaveOrSubmit(false, null);
             }
