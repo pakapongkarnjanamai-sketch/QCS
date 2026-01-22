@@ -362,9 +362,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-QCS.Web.Admin/wwwroot
-QCS.API/wwwroot
-QCS.Web.User/wwwroot
+/QCS.Web.Admin/wwwroot
+/QCS.API/wwwroot
+/QCS.Web.User/wwwroot
 
 C:\Users\n4734\source\repos\QCS\QCS.Web.User\wwwroot\
 C:\Users\n4734\source\repos\QCS\QCS.API\wwwroot\
