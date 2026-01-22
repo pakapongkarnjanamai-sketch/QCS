@@ -362,6 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+# Project specific wwwroot folders
 QCS.Web.User/wwwroot/
 QCS.API/wwwroot/
 QCS.Web.Admin/wwwroot/
