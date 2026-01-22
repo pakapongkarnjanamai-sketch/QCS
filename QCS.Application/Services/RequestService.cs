@@ -518,7 +518,11 @@ namespace QCS.Application.Services
                     RequesterName = r.ApprovalSteps
                             .Where(s => s.Sequence == 1)
                             .Select(s => s.ApproverName)
-                            .FirstOrDefault() ?? "Unknown"
+                            .FirstOrDefault() ?? "Unknown",
+
+                    // [New] เพิ่มการ Map ข้อมูลตรงนี้
+                    ValidFrom = r.ValidFrom,
+                    ValidUntil = r.ValidUntil
                 });
         }
 
