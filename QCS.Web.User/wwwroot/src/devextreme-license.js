@@ -1,2 +1,0 @@
-const license_key = 'ewogICJmb3JtYXQiOiAxLAogICJjdXN0b21lcklkIjogIjQzMzdjY2M1LTA4ZjYtNDE2NS05NmJiLWU3MmY1NmY2MjA4MCIsCiAgIm1heFZlcnNpb25BbGxvd2VkIjogMjUyCn0=.msUWqj0CLKKVTKUeCMJaSMQVVJywgLDSkWDBfPtwwreYLfwUyK/UvfODZGJNx7wAaZlPK4SIgVLQZGkGwaKEpGXSTkOp20qOjyy0xCUGBN73QilDt/zJHzjAFvDXkJcsEr6Pgg=='
-DevExpress.config({ licenseKey: license_key });
