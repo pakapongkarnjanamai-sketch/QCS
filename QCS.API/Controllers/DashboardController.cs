@@ -15,12 +15,11 @@ namespace QCS.API.Controllers
     public class DashboardController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
-        public DashboardController(AppDbContext context, WorkflowService workflowService, ICurrentUserService currentUserService)
+
+        public DashboardController(AppDbContext context, ICurrentUserService currentUserService)
         {
             _context = context;
-            _workflowService = workflowService;
             _currentUserService = currentUserService;
         }
 
@@ -32,26 +31,12 @@ namespace QCS.API.Controllers
                 var nId = _currentUserService.UserId;
                 var myTaskCount = 0;
 
-                // 1. ดึง Workflow เพื่อดูว่า User อยู่ Step ไหน (เน้นเฉพาะที่เกี่ยวข้องกับ Task)
-                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(1);
+                // ปรับปรุง: นับจำนวนงานจาก DB ApprovalSteps โดยตรง แม่นยำกว่าการ Resolve Workflow สดๆ
+                // เงื่อนไข: สถานะเอกสารเป็น Pending และ User เป็นผู้อนุมัติใน Step ปัจจุบัน
+                myTaskCount = await _context.Requests.AsNoTracking()
+                    .CountAsync(r => r.Status == (int)RequestStatus.Pending &&
+                                     r.ApprovalSteps.Any(s => s.Sequence == r.CurrentStepId && s.ApproverNId == nId));
 
-                if (routeData?.Steps != null)
-                {
-                    var myStepSequences = routeData.Steps
-                        .Where(s => s.Assignments != null && s.Assignments.Any(a => a.NId == nId))
-                        .Select(s => s.SequenceNo)
-                        .ToList();
-
-                    if (myStepSequences.Any())
-                    {
-                        // Query เฉพาะจำนวนงานที่ต้องทำ
-                        myTaskCount = await _context.Requests.AsNoTracking()
-                            .CountAsync(r => r.Status == (int)RequestStatus.Pending &&
-                                             myStepSequences.Contains(r.CurrentStepId));
-                    }
-                }
-
-         
                 return Ok(new DashboardDto
                 {
                     MyTaskCount = myTaskCount,

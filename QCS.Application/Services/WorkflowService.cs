@@ -4,6 +4,7 @@ using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using System.Text.Json;
+using System.Text;
 
 namespace QCS.Application.Services
 {
@@ -11,21 +12,20 @@ namespace QCS.Application.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<WorkflowService> _logger;
-        private readonly ICurrentUserService _currentUserService; // ✅ ใช้ Service ใหม่
+        private readonly ICurrentUserService _currentUserService;
         private readonly string _workflowApiBaseUrl;
 
         public WorkflowService(
             HttpClient httpClient,
             ILogger<WorkflowService> logger,
-            ICurrentUserService currentUserService, // ✅ Inject เข้ามา
+            ICurrentUserService currentUserService,
             IConfiguration configuration)
         {
             _httpClient = httpClient;
             _logger = logger;
             _currentUserService = currentUserService;
-            _workflowApiBaseUrl = configuration["WorkflowApi:BaseUrl"] ?? "http://ap-ntc2138-qawb/WorkflowApi/";
+            _workflowApiBaseUrl = configuration["ExternalServices:WorkflowApi"] ?? "http://ap-ntc2138-qawb/WorkflowApi/";
         }
-        // ใน QCS.Application/Services/WorkflowService.cs
 
         public PermissionDto GetPermissions(Request request, WorkflowRouteDetailDto? workflowRoute)
         {
@@ -33,13 +33,9 @@ namespace QCS.Application.Services
             bool canReject = false;
             bool canEdit = request.Status == (int)RequestStatus.Draft;
 
-            // ตรวจสอบสิทธิ์การ Approve/Reject
             if (request.Status == (int)RequestStatus.Pending && workflowRoute?.Steps != null)
             {
-                // ค้นหาการตั้งค่าของ Step ปัจจุบันที่เอกสารค้างอยู่
                 var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
-
-                // เช็คว่า User ปัจจุบันอยู่ในรายชื่อคนที่มีสิทธิ์ใน Step นี้หรือไม่
                 if (currentStepConfig?.Assignments != null && currentStepConfig.Assignments.Any(a => a.IsCurrentUser))
                 {
                     canApprove = true;
@@ -54,22 +50,57 @@ namespace QCS.Application.Services
                 CanEdit = canEdit
             };
         }
-        public async Task<WorkflowRouteDetailDto?> GetWorkflowRouteDetailAsync(int routeId)
+
+        public async Task<WorkflowRouteDetailDto?> GetWorkflowRouteDetailAsync(int routeId, string? createdBy = null)
         {
             try
             {
-                string url = $"{_workflowApiBaseUrl.TrimEnd('/')}/api/WorkflowRoutes/{routeId}/detail";
-                var response = await _httpClient.GetAsync(url);
+                // ใช้ Current User ถ้าไม่ได้ระบุ createdBy
+                string creatorId = !string.IsNullOrEmpty(createdBy) ? createdBy : _currentUserService.UserId;
+
+                string url = $"{_workflowApiBaseUrl.TrimEnd('/')}/api/WorkflowResolutions/resolve";
+
+                var payload = new
+                {
+                    routeId = routeId,
+                    createdBy = creatorId
+                };
+
+                var jsonContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, jsonContent);
                 response.EnsureSuccessStatusCode();
 
                 var jsonString = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<WorkflowRouteDetailDto>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
+                // ใช้ Custom Model สำหรับรับค่าจาก API ใหม่
+                var apiResponse = JsonSerializer.Deserialize<WorkflowApiResponse>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (apiResponse == null) return null;
+
+                // Map กลับไปยัง DTO เดิมของระบบ
+                var result = new WorkflowRouteDetailDto
+                {
+                    Id = apiResponse.RouteId,
+                    RouteName = apiResponse.RouteName,
+                    Steps = apiResponse.Steps?.Select(s => new WorkflowStepDto
+                    {
+                        Id = s.StepId, // Map stepId -> Id
+                        SequenceNo = s.SequenceNo,
+                        StepName = s.StepName,
+                        Assignments = s.Assignees?.Select(a => new AssignmentDto
+                        {
+                            NId = a.NId,
+                            EmployeeName = a.EmployeeName,
+                            AssignmentType = a.AssignmentType
+                        }).ToList() ?? new List<AssignmentDto>()
+                    }).ToList() ?? new List<WorkflowStepDto>()
+                };
+
+                // Logic เดิม: Mark Current User และ Check Initiate
                 if (result != null)
                 {
                     MarkCurrentUser(result);
 
-                    // Logic: เช็คสิทธิ์เริ่มต้น
                     var firstStep = result.Steps?.MinBy(s => s.SequenceNo);
                     if (firstStep != null)
                     {
@@ -88,10 +119,9 @@ namespace QCS.Application.Services
             }
         }
 
-        public async Task<string?> GetEmployeeNameFromWorkflowAsync(int routeId, string nId)
+        public async Task<string?> GetEmployeeNameFromWorkflowAsync(int routeId, string nId, string? createdBy = null)
         {
-            // Optimization: ดึงข้อมูล Route มาแล้วใช้ LINQ ค้นหาทันที
-            var routeData = await GetWorkflowRouteDetailAsync(routeId);
+            var routeData = await GetWorkflowRouteDetailAsync(routeId, createdBy);
 
             return routeData?.Steps?
                 .SelectMany(s => s.Assignments ?? Enumerable.Empty<AssignmentDto>())
@@ -101,15 +131,11 @@ namespace QCS.Application.Services
 
         private void MarkCurrentUser(WorkflowRouteDetailDto routeData)
         {
-            // ✅ ใช้ Service ตรวจสอบสิทธิ์
             if (!_currentUserService.IsAuthenticated) return;
-
-            // ✅ ดึง ID ได้เลย ไม่ต้อง Split String เองแล้ว
             string currentNId = _currentUserService.UserId;
 
             if (routeData.Steps == null) return;
 
-            // ใช้ LINQ เพื่อ Update Flag IsCurrentUser
             var userAssignments = routeData.Steps
                 .SelectMany(s => s.Assignments ?? Enumerable.Empty<AssignmentDto>())
                 .Where(a => string.Equals(a.NId, currentNId, StringComparison.OrdinalIgnoreCase));
@@ -118,6 +144,29 @@ namespace QCS.Application.Services
             {
                 assign.IsCurrentUser = true;
             }
+        }
+
+        // Inner Classes for New API Response Mapping
+        private class WorkflowApiResponse
+        {
+            public int RouteId { get; set; }
+            public string RouteName { get; set; }
+            public List<WorkflowApiStep>? Steps { get; set; }
+        }
+
+        private class WorkflowApiStep
+        {
+            public int StepId { get; set; }
+            public int SequenceNo { get; set; }
+            public string StepName { get; set; }
+            public List<WorkflowApiAssignee>? Assignees { get; set; }
+        }
+
+        private class WorkflowApiAssignee
+        {
+            public string NId { get; set; }
+            public string EmployeeName { get; set; }
+            public string AssignmentType { get; set; }
         }
     }
 }
