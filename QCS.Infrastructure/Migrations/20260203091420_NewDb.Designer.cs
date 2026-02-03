@@ -12,15 +12,15 @@ using QCS.Infrastructure.Data;
 namespace QCS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251204034919_init")]
-    partial class init
+    [Migration("20260203091420_NewDb")]
+    partial class NewDb
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "9.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -33,15 +33,16 @@ namespace QCS.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ApprovalDate")
+                    b.Property<DateTime?>("ActionDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ApproverName")
-                        .IsRequired()
+                    b.Property<string>("ApproverNId")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Remark")
-                        .IsRequired()
+                    b.Property<string>("ApproverName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Comment")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -57,14 +58,13 @@ namespace QCS.Infrastructure.Migrations
                     b.Property<int>("RequestId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
 
-                    b.Property<string>("Status")
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StepName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -82,13 +82,18 @@ namespace QCS.Infrastructure.Migrations
                     b.ToTable("ApprovalSteps");
                 });
 
-            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
+            modelBuilder.Entity("QCS.Domain.Models.AttachmentFile", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -97,19 +102,119 @@ namespace QCS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("DocumentNo")
+                    b.Property<byte[]>("Data")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AttachmentFiles");
+                });
+
+            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AttachmentFileId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("DocumentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RequestId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttachmentFileId");
+
+                    b.HasIndex("RequestId");
+
+                    b.ToTable("Quotations");
+                });
+
+            modelBuilder.Entity("QCS.Domain.Models.Request", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CurrentStepId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Remark")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("RequestDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -122,52 +227,15 @@ namespace QCS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.HasKey("Id");
-
-                    b.ToTable("Requests");
-                });
-
-            modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime?>("ValidFrom")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsSelected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("RequestId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime?>("ValidUntil")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<string>("VendorCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("VendorName")
                         .IsRequired()
@@ -175,27 +243,35 @@ namespace QCS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RequestId");
-
-                    b.ToTable("Quotations");
+                    b.ToTable("Requests");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.ApprovalStep", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.Request", null)
+                    b.HasOne("QCS.Domain.Models.Request", "Request")
                         .WithMany("ApprovalSteps")
                         .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Request");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Quotation", b =>
                 {
-                    b.HasOne("QCS.Domain.Models.Request", null)
+                    b.HasOne("QCS.Domain.Models.AttachmentFile", "AttachmentFile")
+                        .WithMany()
+                        .HasForeignKey("AttachmentFileId");
+
+                    b.HasOne("QCS.Domain.Models.Request", "Request")
                         .WithMany("Quotations")
                         .HasForeignKey("RequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("AttachmentFile");
+
+                    b.Navigation("Request");
                 });
 
             modelBuilder.Entity("QCS.Domain.Models.Request", b =>

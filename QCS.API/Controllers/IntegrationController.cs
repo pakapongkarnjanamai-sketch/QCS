@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
+using QCS.Infrastructure.Services;
 
 namespace QCS.API.Controllers
 {
@@ -13,10 +14,11 @@ namespace QCS.API.Controllers
     public class IntegrationController : ControllerBase
     {
         private readonly IRequestService _requestService;
-
-        public IntegrationController(IRequestService requestService)
+        private readonly IDateTime  _dateTime;
+        public IntegrationController(IRequestService requestService, IDateTime dateTime)
         {
             _requestService = requestService;
+            _dateTime = dateTime;
         }
 
         /// <summary>
@@ -32,7 +34,7 @@ namespace QCS.API.Controllers
                 // ซึ่งมีการ Filter Status = Approved (2) ไว้ให้แล้วใน Service
                 var query = _requestService.GetApprovedListQuery();
 
-                var result = await query.ToListAsync();
+                var result = await query.Where(a=>a.ValidUntil >= _dateTime.Now).ToListAsync();
                 return Ok(result);
             }
             catch (Exception ex)
@@ -60,7 +62,7 @@ namespace QCS.API.Controllers
                 var query = _requestService.GetApprovedListQuery();
 
                 var result = await query
-                    .Where(r => r.VendorCode == vendorCode)
+                    .Where(r => r.VendorCode == vendorCode && r.ValidUntil >= _dateTime.Now)
                     .ToListAsync();
 
                 return Ok(result);

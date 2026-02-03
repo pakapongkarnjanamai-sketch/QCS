@@ -27,6 +27,7 @@ namespace QCS.Application.Services
 
         Task ApproveAsync(ApprovalActionDto input);
         Task RejectAsync(ApprovalActionDto input);
+        Task<int> GetMyPendingTaskCountAsync();
     }
 
     public class RequestService : IRequestService
@@ -453,17 +454,45 @@ namespace QCS.Application.Services
 
         public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
         {
-            // ปรับปรุง: ตรวจสอบ Task จากฐานข้อมูล (ApprovalSteps) โดยตรงแทนการเรียก Workflow API
-            // เนื่องจาก Workflow ขึ้นอยู่กับ Creator ทำให้ไม่สามารถใช้ Logic เดิม (Get Route 1 ครั้งแล้ว Filter) ได้ง่ายๆ
-            // การเช็คจาก DB จะแม่นยำกว่า เพราะ Step ถูก Generate และ Resolve Assignee ลง DB แล้วตอน Create/Update
-
             var currentUserId = _currentUserService.UserId;
 
-            // คืนค่า Queryable ที่ Filter จาก DB โดยตรง
-            var query = _unitOfWork.Repository<Request>().GetAll()
+            // 1. ดึง ID ของเอกสารที่เป็นงานของเราออกมา (ใช้ Logic เดียวกับข้างบน)
+            // ต้องทำแบบนี้เพราะ DataSourceLoader ของ DevExtreme ต้องการ IQueryable
+            // เราจึงต้องหา ID ก่อน แล้วค่อยส่ง Queryable ที่ Filter ID กลับไป
+
+            var allPending = await _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Pending &&
-                            r.ApprovalSteps.Any(s => s.Sequence == r.CurrentStepId && s.ApproverNId == currentUserId))
+                .Where(r => r.Status == (int)RequestStatus.Pending)
+                .Select(r => new { r.Id, r.CreatedBy, r.CurrentStepId })
+                .ToListAsync();
+
+            var myTaskIds = new List<int>();
+
+            // Group ใน Memory เพื่อลดการเรียก API
+            var groups = allPending.GroupBy(x => x.CreatedBy);
+
+            foreach (var group in groups)
+            {
+                var creator = group.Key;
+                if (string.IsNullOrEmpty(creator)) continue;
+
+                var route = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, creator);
+                if (route?.Steps == null) continue;
+
+                foreach (var item in group)
+                {
+                    var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == item.CurrentStepId);
+                    if (stepConfig != null && stepConfig.Assignments.Any(a => a.NId == currentUserId))
+                    {
+                        myTaskIds.Add(item.Id);
+                    }
+                }
+            }
+
+            // 2. คืนค่า Queryable ที่ Filter เฉพาะ ID ของเรา
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => myTaskIds.Contains(r.Id))
                 .Select(r => new RequestGridDto
                 {
                     Id = r.Id,
@@ -473,10 +502,11 @@ namespace QCS.Application.Services
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
                     CurrentStepId = r.CurrentStepId,
-                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown"
+                    // ดึงชื่อคนขอ (Step 1)
+                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
+                    ValidFrom = r.ValidFrom,
+                    ValidUntil = r.ValidUntil
                 });
-
-            return await Task.FromResult(query);
         }
 
         public IQueryable<RequestGridDto> GetMyApprovedListQuery()
@@ -577,7 +607,7 @@ namespace QCS.Application.Services
                     DocumentTypeId = q.DocumentTypeId,
                     OriginalFileName = q.FileName,
                     FilePath = q.FilePath
-                }).ToList(),
+                }).OrderBy(d=>d.DocumentTypeId).ToList(),
                 Permissions = permissions,
                 WorkflowRoute = workflowRoute
             };
@@ -612,6 +642,49 @@ namespace QCS.Application.Services
                 };
             }
             return null;
+        }
+
+        public async Task<int> GetMyPendingTaskCountAsync()
+        {
+            var currentUserId = _currentUserService.UserId;
+
+            // 1. ดึงข้อมูลเอกสาร Pending ทั้งหมด Group ตามคนสร้างและ Step
+            // วิธีนี้ลดปริมาณ Query ลงมหาศาลเทียบกับการดึงทุก Row
+            var pendingGroups = await _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Pending)
+                .GroupBy(r => new { r.CreatedBy, r.CurrentStepId })
+                .Select(g => new {
+                    CreatedBy = g.Key.CreatedBy,
+                    CurrentStepId = g.Key.CurrentStepId,
+                    Count = g.Count()
+                })
+                .ToListAsync();
+
+            int myTaskCount = 0;
+
+            // 2. วนลูปเช็คสิทธิ์ (WorkflowService มี Cache แล้ว ไม่ต้องห่วงเรื่องยิงซ้ำ)
+            foreach (var group in pendingGroups)
+            {
+                if (string.IsNullOrEmpty(group.CreatedBy)) continue;
+
+                // Resolve Workflow ของ Creator คนนี้
+                var route = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, group.CreatedBy);
+
+                if (route?.Steps != null)
+                {
+                    // ดูว่า Step ปัจจุบันของกลุ่มนี้ (CurrentStepId) มีเราเป็นคนรับผิดชอบไหม
+                    var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == group.CurrentStepId);
+
+                    if (stepConfig != null && stepConfig.Assignments.Any(a => a.IsCurrentUser))
+                    {
+                        // ถ้าใช่ แสดงว่าเอกสารกลุ่มนี้เป็นงานของเรา -> บวกจำนวนเข้าไป
+                        myTaskCount += group.Count;
+                    }
+                }
+            }
+
+            return myTaskCount;
         }
     }
 }

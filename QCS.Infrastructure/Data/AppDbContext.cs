@@ -28,11 +28,11 @@ namespace QCS.Infrastructure.Data
         public DbSet<Request> Requests { get; set; }
         public DbSet<Quotation> Quotations { get; set; }
         public DbSet<AttachmentFile> AttachmentFiles { get; set; }
-        public DbSet<Role> Roles { get; set; }
-        public DbSet<UserRole> UserRoles { get; set; }
-        public DbSet<Department> Departments { get; set; }
-        public DbSet<UserDepartment> UserDepartments { get; set; }
-        public DbSet<User> Users { get; set; }
+        //public DbSet<Role> Roles { get; set; }
+        //public DbSet<UserRole> UserRoles { get; set; }
+        //public DbSet<Department> Departments { get; set; }
+        //public DbSet<UserDepartment> UserDepartments { get; set; }
+        //public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

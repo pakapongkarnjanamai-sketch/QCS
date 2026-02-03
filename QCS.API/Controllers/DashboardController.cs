@@ -1,11 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
-using QCS.Domain.Enum;
-using QCS.Infrastructure.Data;
-using System.Security.Claims;
 
 namespace QCS.API.Controllers
 {
@@ -14,13 +10,13 @@ namespace QCS.API.Controllers
     [Authorize]
     public class DashboardController : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly ICurrentUserService _currentUserService;
+        // ✅ เปลี่ยน Type เป็น Interface
+        private readonly IRequestService _requestService;
 
-        public DashboardController(AppDbContext context, ICurrentUserService currentUserService)
+        // ✅ เปลี่ยน Parameter ใน Constructor เป็น Interface
+        public DashboardController(IRequestService requestService)
         {
-            _context = context;
-            _currentUserService = currentUserService;
+            _requestService = requestService;
         }
 
         [HttpGet("Summary")]
@@ -28,14 +24,7 @@ namespace QCS.API.Controllers
         {
             try
             {
-                var nId = _currentUserService.UserId;
-                var myTaskCount = 0;
-
-                // ปรับปรุง: นับจำนวนงานจาก DB ApprovalSteps โดยตรง แม่นยำกว่าการ Resolve Workflow สดๆ
-                // เงื่อนไข: สถานะเอกสารเป็น Pending และ User เป็นผู้อนุมัติใน Step ปัจจุบัน
-                myTaskCount = await _context.Requests.AsNoTracking()
-                    .CountAsync(r => r.Status == (int)RequestStatus.Pending &&
-                                     r.ApprovalSteps.Any(s => s.Sequence == r.CurrentStepId && s.ApproverNId == nId));
+                var myTaskCount = await _requestService.GetMyPendingTaskCountAsync();
 
                 return Ok(new DashboardDto
                 {
