@@ -412,6 +412,7 @@ namespace QCS.Application.Services
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
                     CurrentStepId = r.CurrentStepId,
+                    Remark = r.Remark
                 });
         }
 
@@ -428,7 +429,8 @@ namespace QCS.Application.Services
                     VendorCode = r.VendorCode,
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId
+                    CurrentStepId = r.CurrentStepId,
+                    Remark = r.Remark
                 });
         }
 
@@ -448,7 +450,8 @@ namespace QCS.Application.Services
                     CurrentStepId = r.CurrentStepId,
                     RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
                     ValidFrom = r.ValidFrom,
-                    ValidUntil = r.ValidUntil
+                    ValidUntil = r.ValidUntil,
+                    Remark = r.Remark
                 });
         }
 
@@ -502,6 +505,7 @@ namespace QCS.Application.Services
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
                     CurrentStepId = r.CurrentStepId,
+                    Remark = r.Remark,
                     // ดึงชื่อคนขอ (Step 1)
                     RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
                     ValidFrom = r.ValidFrom,
@@ -522,7 +526,9 @@ namespace QCS.Application.Services
                     VendorCode = r.VendorCode,
                     VendorName = r.VendorName,
                     RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId
+                    CurrentStepId = r.CurrentStepId,
+                    Remark = r.Remark
+                    
                 });
         }
 
