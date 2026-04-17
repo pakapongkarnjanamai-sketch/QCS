@@ -37,7 +37,16 @@ namespace QCS.Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            // เพิ่ม Configuration อื่นๆ ตรงนี้ถ้ามี
+
+            modelBuilder.Entity<Request>(entity =>
+            {
+                entity.Property(r => r.Code)
+                    .HasMaxLength(50);
+
+                entity.HasIndex(r => r.Code)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Requests_Code");
+            });
         }
 
         public override int SaveChanges()

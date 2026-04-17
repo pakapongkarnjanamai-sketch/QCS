@@ -41,7 +41,7 @@ namespace QCS.Application.Services
             {
                 var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
                 if (currentStepConfig?.Assignments != null &&
-                    currentStepConfig.Assignments.Any(a => a.NId == _currentUserService.UserId))
+                    currentStepConfig.Assignments.Any(a => string.Equals(a.NId, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase)))
                 {
                     canApprove = true;
                     canReject = true;
@@ -176,21 +176,21 @@ namespace QCS.Application.Services
         private class WorkflowApiResponse
         {
             public int RouteId { get; set; }
-            public string RouteName { get; set; }
+            public string RouteName { get; set; } = string.Empty;
             public List<WorkflowApiStep>? Steps { get; set; }
         }
         private class WorkflowApiStep
         {
             public int StepId { get; set; }
             public int SequenceNo { get; set; }
-            public string StepName { get; set; }
+            public string StepName { get; set; } = string.Empty;
             public List<WorkflowApiAssignee>? Assignees { get; set; }
         }
         private class WorkflowApiAssignee
         {
-            public string NId { get; set; }
-            public string EmployeeName { get; set; }
-            public string AssignmentType { get; set; }
+            public string NId { get; set; } = string.Empty;
+            public string EmployeeName { get; set; } = string.Empty;
+            public string AssignmentType { get; set; } = string.Empty;
         }
     }
 }

@@ -58,7 +58,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOrAbove", policy =>
         policy.RequireRole("User", "Manager", "Admin", "SuperAdmin"));
 
-    var domainPrefix = builder.Configuration["DomainSettings:DomainPrefix"];
+    var domainPrefix = builder.Configuration["DomainSettings:DomainPrefix"]
+        ?? throw new InvalidOperationException("DomainSettings:DomainPrefix configuration is required.");
     options.AddPolicy("DomainUser", policy =>
         policy.RequireAssertion(context =>
             context.User.Identity?.Name?.StartsWith(domainPrefix, StringComparison.OrdinalIgnoreCase) == true));
@@ -73,7 +74,8 @@ builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IFileService, FileService>();
 
-var allowedOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>();
+var allowedOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>()
+    ?? throw new InvalidOperationException("CorsOrigins configuration is required.");
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -84,9 +86,12 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+var vendorApiBaseUrl = builder.Configuration["ExternalServices:VendorApi"]
+    ?? throw new InvalidOperationException("ExternalServices:VendorApi configuration is required.");
+
 builder.Services.AddHttpClient("VendorApi", client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["ExternalServices:VendorApi"]);
+    client.BaseAddress = new Uri(vendorApiBaseUrl);
 });
 var app = builder.Build();
 

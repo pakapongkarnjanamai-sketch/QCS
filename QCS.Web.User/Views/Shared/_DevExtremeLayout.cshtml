@@ -19,6 +19,14 @@
     <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
     <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
     <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
+    <link href="~/css/core/variables.css" rel="stylesheet" />
+    <link href="~/css/layout/containers.css" rel="stylesheet" />
+    <link href="~/css/layout/navbar.css" rel="stylesheet" />
+    <link href="~/css/components/badges.css" rel="stylesheet" />
+    <link href="~/css/components/grid.css" rel="stylesheet" />
+    <link href="~/css/components/tabs.css" rel="stylesheet" />
+    <link href="~/css/components/attachments.css" rel="stylesheet" />
+    <link href="~/css/utilities/helpers.css" rel="stylesheet" />
     
     <script src="~/lib/microsoft-signalr/signalr.min.js"></script>
     <script src="~/js/devextreme/filesaver.min.js"></script>
@@ -30,272 +38,6 @@
     <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
     <script src="~/src/devextreme-license.js"></script>
     <script src="~/lib/font-awesome/js/all.min.js"></script>
-
-    <style>
-        /* ==================== CSS VARIABLES (DevExtreme Theme Colors) ==================== */
-        :root {
-            --dx-primary-color: #337ab7;
-            --dx-primary-dark: #2d6da3;
-            --dx-primary-light: #4a90d9;
-        }
-
-        /* ==================== GLOBAL RESET ==================== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f7fa;
-            color: #2c3e50;
-        }
-
-        /* ==================== LAYOUT & CONTAINER ==================== */
-        .full-height-container {
-            height: calc(100vh - 60px);
-            display: flex;
-            flex-direction: column;
-            padding-bottom: 20px;
-        }
-
-        .qcs-card,
-        .qcs-card-content {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            padding: 20px;
-            border: none;
-            margin-bottom: 20px;
-        }
-
-        .qcs-card-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .qcs-card {
-            min-width: 1200px;
-            padding: 25px;
-        }
-
-        /* ==================== HEADERS & SECTIONS ==================== */
-        .text-header,
-        .text-primary-header {
-            color: #2c3e50;
-        }
-
-        .text-highlight {
-            color: var(--dx-primary-color);
-        }
-
-        .section-header {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #2c3e50;
-            border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* ==================== LINKS ==================== */
-        .doc-link {
-            color: var(--dx-primary-color);
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-
-            .doc-link:hover {
-                color: var(--dx-primary-dark);
-                text-decoration: underline;
-            }
-
-        /* ==================== BADGES (Standardized) ==================== */
-        .status-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            display: inline-block;
-            text-align: center;
-            white-space: nowrap;
-        }
-
-        .bg-success-soft {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .bg-warning-soft {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .bg-danger-soft {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .bg-secondary-soft {
-            background: #e2e3e5;
-            color: #383d41;
-        }
-
-        .bg-info-soft {
-            background: #cff4fc;
-            color: #055160;
-        }
-
-        /* Legacy status classes */
-        .status-draft { background-color: #e9ecef; color: #495057; }
-        .status-pending { background-color: #fff3cd; color: #856404; }
-        .status-approved { background-color: #d4edda; color: #155724; }
-        .status-rejected { background-color: #f8d7da; color: #721c24; }
-
-        /* ==================== GRID & CONTENT ==================== */
-        .grid-wrapper {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            padding: 5px;
-        }
-
-            .grid-wrapper .dx-datagrid {
-                height: 100%;
-            }
-
-        /* ==================== TABPANEL CUSTOMIZATION ==================== */
-        #tabPanel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-
-            #tabPanel .dx-tabpanel-container,
-            #tabPanel .dx-multiview-wrapper,
-            #tabPanel .dx-multiview-item-container,
-            #tabPanel .dx-multiview-item,
-            #tabPanel .dx-multiview-item-content {
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-            }
-
-            #tabPanel .dx-tabs {
-                border-bottom: 1px solid #f1f3f5;
-                background-color: transparent;
-                flex-shrink: 0;
-                margin-bottom: 10px;
-            }
-
-            #tabPanel .dx-tab {
-                background-color: transparent !important;
-                padding: 10px 20px;
-            }
-
-            #tabPanel .dx-tab-text {
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 1rem;
-                font-weight: 600;
-                color: #6c757d;
-                text-transform: none;
-            }
-
-            #tabPanel .dx-tab-selected {
-                border-bottom: 3px solid var(--dx-primary-color);
-                color: var(--dx-primary-color);
-            }
-
-                #tabPanel .dx-tab-selected .dx-tab-text {
-                    color: var(--dx-primary-color);
-                }
-
-        /* ==================== WORKFLOW & ATTACHMENTS ==================== */
-        .row-current-step {
-            background-color: #f0f9ff !important;
-        }
-
-        .current-user-row {
-            font-weight: 700;
-            color: var(--dx-primary-color);
-        }
-
-        .unauthorized-overlay {
-            opacity: 0.6;
-            pointer-events: none;
-            filter: grayscale(100%);
-        }
-
-        .attachments-container {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            border: 1px dashed #dee2e6;
-        }
-
-        .file-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 500;
-        }
-
-            .file-info i {
-                color: #f05b41;
-                font-size: 1.3em;
-            }
-
-        /* ==================== NAVBAR CUSTOMIZATION ==================== */
-        .navbar {
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-            background: linear-gradient(135deg, var(--dx-primary-color) 0%, var(--dx-primary-dark) 100%) !important;
-        }
-
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.4rem;
-            color: #fff !important;
-        }
-
-        .navbar-nav .nav-link {
-            color: rgba(255,255,255,0.9) !important;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-
-            .navbar-nav .nav-link:hover {
-                color: #fff !important;
-                transform: translateY(-2px);
-            }
-
-        /* ==================== UTILITIES ==================== */
-        .text-nowrap { white-space: nowrap; }
-        .opacity-25 { opacity: 0.25; }
-        .opacity-50 { opacity: 0.5; }
-        .rounded-pill { border-radius: 50rem !important; }
-        .shadow-sm { box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important; }
-
-        /* ==================== RESPONSIVE ==================== */
-        @@media (max-width: 1200px) {
-            .qcs-card { min-width: auto; }
-        }
-
-        @@media (max-width: 768px) {
-            .full-height-container { height: auto; }
-            .section-header { font-size: 1rem; }
-        }
-    </style>
 
     @await RenderSectionAsync("Styles", required: false)
 </head>
@@ -314,21 +56,12 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="@Url.Action("Index", "Home")">
-                                <i class="fas fa-home me-1"></i> หน้าหลัก
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="@Url.Action("List", "Quotation")">
-                                <i class="fas fa-file-alt me-1"></i> ใบเสนอราคา
-                            </a>
-                        </li>
+                       
                     </ul>
                     <ul class="navbar-nav">
                         <li class="nav-item">
                             <a class="nav-link" href="#">
-                                <i class="fas fa-user-circle me-1"></i> @User.Identity.Name
+                                <i class="fas fa-user-circle me-1"></i> @(User.Identity?.Name ?? "Unknown User")
                             </a>
                         </li>
                     </ul>
@@ -341,18 +74,34 @@
         @RenderBody()
     </main>
 
-    @if (!hideNav)
-    {
-        <footer class="text-center text-muted py-3 mt-auto">
-            <small>&copy; @DateTime.Now.Year - Quotation Comparison System (QCS)</small>
-        </footer>
-    }
+
 
     <script>
         const API_BASE = '@Configuration["ApiSettings:BaseUrl"]';
         console.log("API_BASE:", API_BASE);
     </script>
+
+    @* Shared JS: Core runtime *@
     <script src="~/js/site.js"></script>
+    <script src="~/js/shared/loading.js"></script>
+    <script src="~/js/shared/async-action.js"></script>
+    <script src="~/js/shared/error-presenter.js"></script>
+    <script src="~/js/shared/utils.js"></script>
+    <script src="~/js/shared/status-badge.js"></script>
+
+    @* Shared JS: UI interactions *@
+    <script src="~/js/shared/file-view.js"></script>
+    <script src="~/js/shared/action-dialog.js"></script>
+    <script src="~/js/shared/toolbar.js"></script>
+    <script src="~/js/shared/signalr.js"></script>
+
+    @* Shared JS: Request domain helpers *@
+    <script src="~/js/shared/approval-action.js"></script>
+    <script src="~/js/shared/request-workflow.js"></script>
+    <script src="~/js/shared/attachment-grid.js"></script>
+    <script src="~/js/shared/request-form-validation.js"></script>
+    <script src="~/js/shared/request-submission.js"></script>
+    <script src="~/js/shared/request-grid.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

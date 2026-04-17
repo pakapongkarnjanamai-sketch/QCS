@@ -15,7 +15,7 @@ namespace QCS.Web.User.Controllers
 
         public IActionResult List()
         {
-            return View();
+            return RedirectToAction("Index", "Home", new { view = "all-approved" });
         }
 
         // แนะนำให้เปลี่ยนชื่อจาก View เป็น Detail หรือ Details เพื่อลดความสับสน

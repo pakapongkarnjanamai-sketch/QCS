@@ -11,8 +11,8 @@ namespace QCS.Infrastructure.Services
         public class EnumResultDto
         {
             public int Id { get; set; }
-            public string Name { get; set; }        // ชื่อภาษาอังกฤษ (Key)
-            public string DisplayName { get; set; } // ชื่อภาษาไทย (Value)
+            public string Name { get; set; } = string.Empty;        // ชื่อภาษาอังกฤษ (Key)
+            public string DisplayName { get; set; } = string.Empty; // ชื่อภาษาไทย (Value)
         }
 
         public static List<EnumResultDto> ToList<T>() where T : Enum
@@ -28,11 +28,12 @@ namespace QCS.Infrastructure.Services
                        .ToList();
         }
 
-        private static string GetDisplayValue(object value)
+        private static string GetDisplayValue<T>(T value) where T : Enum
         {
-            var field = value.GetType().GetField(value.ToString());
+            var name = value.ToString();
+            var field = typeof(T).GetField(name);
             var attribute = field?.GetCustomAttribute<DisplayAttribute>();
-            return attribute == null ? value.ToString() : attribute.Name;
+            return attribute?.GetName() ?? name;
         }
     }
 }

@@ -15,11 +15,13 @@ namespace QCS.Infrastructure.Services
         Task<int> CommitAsync();
 
         IDbContextTransaction BeginTransaction();
+
+        void ClearTrackedChanges();
     }
     public class UnitOfWork : IUnitOfWork
     {
         private readonly AppDbContext _context;
-        private Hashtable _repositories;
+        private Hashtable? _repositories;
 
         public UnitOfWork(AppDbContext context)
         {
@@ -28,7 +30,7 @@ namespace QCS.Infrastructure.Services
 
         public IRepository<T> Repository<T>() where T : class
         {
-            if (_repositories == null) _repositories = new Hashtable();
+            _repositories ??= new Hashtable();
 
             var type = typeof(T).Name;
 
@@ -40,7 +42,12 @@ namespace QCS.Infrastructure.Services
                 _repositories.Add(type, repositoryInstance);
             }
 
-            return (IRepository<T>)_repositories[type];
+            if (_repositories[type] is IRepository<T> repository)
+            {
+                return repository;
+            }
+
+            throw new InvalidOperationException($"Repository for type '{type}' could not be created.");
         }
 
         public async Task<int> CommitAsync()
@@ -52,6 +59,12 @@ namespace QCS.Infrastructure.Services
         {
             return _context.Database.BeginTransaction();
         }
+
+        public void ClearTrackedChanges()
+        {
+            _context.ChangeTracker.Clear();
+        }
+
         public void Dispose()
         {
             _context.Dispose();

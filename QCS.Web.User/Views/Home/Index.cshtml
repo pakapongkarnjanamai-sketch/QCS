@@ -2,387 +2,57 @@
 @using QCS.Infrastructure.Services
 
 @{
-    ViewData["Title"] = "My Tasks & Requests";
+    ViewData["Title"] = "Workspace";
     Layout = "_DevExtremeLayout";
+}
+
+@section Styles {
+    <link href="~/css/pages/workspace.css" rel="stylesheet" />
 }
 
 <div class="container-fluid full-height-container mt-3">
     <div class="qcs-card-content" id="main-dashboard-card">
 
-        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-shrink-0">
-            <h6 class="m-0 fw-bold text-header">
-                <i class="fas fa-clipboard-list me-2" style="color: var(--dx-primary-color);"></i> @ViewData["Title"]
-            </h6>
-
-            <button id="btnCreateHeader" class="btn btn-sm px-3 shadow-sm" style="background-color: var(--dx-primary-color); color: white; border: none;">
-                <i class="fas fa-plus me-1"></i> สร้างใบเสนอราคาใหม่
-            </button>
+        <div class="workspace-filter-panel mb-3">
+            <div class="d-flex flex-wrap align-items-center gap-3 workspace-filter-inline">
+                <div id="workspaceMyFilters" class="d-flex flex-wrap gap-2 workspace-filter-group"></div>
+                <div class="workspace-filter-separator"></div>
+                <div id="workspaceAllFilters" class="d-flex flex-wrap gap-2 workspace-filter-group"></div>
+                <div class="workspace-filter-separator"></div>
+                <div class="d-flex gap-2 workspace-filter-group">
+                    <button id="btnCreateHeader" type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 px-3 py-2 workspace-filter-btn workspace-action-btn">
+                        <i class="fas fa-plus"></i>
+                        <span>สร้างใบเสนอราคาใหม่</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <div id="tabPanel"></div>
 
-        <div id="emptyState" class="d-none text-center h-100 d-flex flex-column justify-content-center align-items-center">
-            <div class="p-4 rounded-circle bg-light mb-3">
+
+        <div id="workspaceGridWrapper" class="grid-wrapper">
+            <div id="workspaceGrid"></div>
+        </div>
+
+        <div id="emptyState" class="workspace-empty-state d-none text-center h-100 d-flex flex-column justify-content-center align-items-center">
+            <div class="workspace-empty-icon p-4 rounded-circle bg-light mb-3">
                 <i class="fas fa-inbox fa-3x text-muted opacity-50"></i>
             </div>
-            <h5 class="text-muted mb-3">ไม่มีข้อมูลเอกสารในขณะนี้</h5>
-            <button id="btnCreateEmpty" class="btn px-4 rounded-pill" style="background-color: var(--dx-primary-color); color: white; border: none;">
-                <i class="fas fa-plus me-2"></i>สร้างใบเสนอราคาใหม่
-            </button>
+            <h5 id="emptyStateTitle" class="text-muted mb-2">ไม่มีข้อมูลเอกสารในขณะนี้</h5>
+            <p id="emptyStateDescription" class="workspace-empty-description text-muted mb-3">สร้างใบเสนอราคาใหม่เพื่อเริ่มต้นการทำงาน</p>
         </div>
         <div id="loadingIndicator"></div>
     </div>
 </div>
 
-<script>
-    $(function () {
-        // === CONFIG ===
-        const FORM_URL = '@Url.Action("Form", "Request")';
-        const CODE_URL = '@Url.Action("View", "Quotation")'; // View Mode
-
-        // 1. ดึงข้อมูล Enum WorkflowStep จาก Server
-        const workflowStepsSource = @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>()));
-
-        // === HELPER: Status Badge ===
-        const getStatusBadgeInfo = (stepId) => {
-            let badgeClass = "bg-secondary-soft";
-
-            // 2. ค้นหาข้อความจาก Enum
-            const stepEnum = workflowStepsSource.find(x => x.Id === stepId);
-      
-            const text = stepEnum ? stepEnum.DisplayName : "Step " + stepId;
-
-            // 3. กำหนดสีตาม Step ID
-            switch (stepId) {
-                case 0: // Draft
-                    badgeClass = "bg-secondary-soft text-secondary";
-                    break;
-                case 1: // Purchaser
-                    badgeClass = "bg-info-soft text-dark";
-                    break;
-                case 2: // Verifier
-                    badgeClass = "bg-warning-soft text-dark";
-                    break;
-                case 3: // Manager
-                    badgeClass = "bg-warning-soft text-dark";
-                    break;
-                case 99: // Completed
-                    badgeClass = "bg-success-soft text-dark";
-                    break;
-                case -1: // Rejected
-                    badgeClass = "bg-danger-soft text-dark";
-                    break;
-                default:
-                    badgeClass = "bg-light text-muted border";
-            }
-
-            return { cls: badgeClass, txt: text };
+@section Scripts {
+    <script>
+        window.QcsPageConfig = {
+            formUrl: '@Url.Action("Form", "Request")',
+            codeUrl: '@Url.Action("View", "Quotation")',
+            homeUrl: '@Url.Action("Index", "Home")',
+            workflowStepsSource: @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>()))
         };
-
-        const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
-            shadingColor: "rgba(0,0,0,0.4)",
-            position: { of: "window" },
-            visible: false,
-            showIndicator: true,
-            showPane: true,
-            shading: true,
-            message: "กำลังโหลดข้อมูล..."
-        }).dxLoadPanel("instance");
-
-        const handleDocClick = (paramValue, baseUrl, openInNewWindow) => {
-            const url = `${baseUrl}/${encodeURIComponent(paramValue)}`;
-            if (openInNewWindow) window.open(url, '_blank');
-            else window.location.href = url;
-        };
-
-        function createRemoteStore(actionName) {
-            return DevExpress.data.AspNet.createStore({
-                key: "id",
-                loadUrl: `${API_BASE}/Request/${actionName}`,
-                onBeforeSend: (method, ajaxOptions) => {
-                    ajaxOptions.xhrFields = { withCredentials: true };
-                }
-            });
-        }
-
-        function createGridConfig(store, columns, placeholderText, targetUrl, openInNewWindow, paramField = 'id') {
-            return {
-                dataSource: {
-                    store: store,
-                    sort: [{ selector: "code", desc: true }],
-                },
-                remoteOperations: true,
-                height: "100%",
-                hoverStateEnabled: true,
-                showBorders: true,
-                rowAlternationEnabled: true,
-                hoverStateEnabled: true,
-                columnAutoWidth: true,
-                allowColumnResizing: true,
-                dateSerializationFormat: "yyyy-MM-ddTHH:mm:ss",
-                filterRow: { visible: true },
-                headerFilter: { visible: true },
-                scrolling: { mode: "virtual" },
-                paging: { pageSize: 20 },
-                searchPanel: { visible: true, width: 300, placeholder: placeholderText },
-                columns: columns,
-                onRowDblClick: function(e) {
-                    const val = e.data[paramField];
-                    handleDocClick(val, targetUrl, openInNewWindow);
-                }
-            };
-        }
-
-        const createColumns = (targetUrl, openInNewWindow, isTaskGrid = false, paramField = 'id') => {
-            const baseColumns = [
-                {
-                    dataField: "code",
-                    caption: "เลขที่เอกสาร",
-                    width: 120,
-                    cellTemplate: (container, options) => {
-                        const docNo = options.value || "(Draft)";
-                        const val = options.data[paramField];
-                        $("<a>").addClass("doc-link")
-                            .text(docNo)
-                            .attr("href", "javascript:void(0)")
-                            .on("click", (e) => {
-                                e.stopPropagation();
-                                handleDocClick(val, targetUrl, openInNewWindow);
-                            })
-                            .appendTo(container);
-                    }
-                },
-                { dataField: "title", caption: "หัวข้อ", minWidth: 150 },
-                { dataField: "remark", caption: "Remark", minWidth: 150 },
-                {
-                    dataField: "vendorName",
-                    caption: "ผู้ขาย (Vendor)",
-                    width: 320,
-                    calculateDisplayValue: function(rowData) {
-                        return rowData.vendorCode
-                            ? `${rowData.vendorCode} : ${rowData.vendorName}`
-                            : rowData.vendorName;
-                    }
-                },
-                {
-                    dataField: "requestDate",
-                    caption: "วันที่ขอ",
-                    dataType: "date",
-                    format: "yyyy-MM-dd",
-                    width: 120,
-                    alignment: "center"
-                },
-                {
-                    dataField: "currentStepId",
-                    caption: "สถานะ (Current Step)",
-                    width: 180,
-                    alignment: "center",
-                    lookup: {
-                        // 4. ใช้ DataSource จาก Enum จริง
-                        dataSource: workflowStepsSource,
-                        valueExpr: "id",
-                        displayExpr: "displayName"
-                    },
-                    cellTemplate: (container, options) => {
-                        const info = getStatusBadgeInfo(options.value);
-                        $("<span>").addClass(" status-badge " + info.cls).text(info.txt).appendTo(container);
-                    }
-                },
-                {
-                    type: "buttons",
-                    width: 70,
-                    buttons: [{
-                        hint: "เปิดดู",
-                        icon: "find",
-                        onClick: (e) => {
-                            const val = e.row.data[paramField];
-                            handleDocClick(val, targetUrl, openInNewWindow);
-                        }
-                    }]
-                }
-            ];
-            if (isTaskGrid) {
-                const requesterCol = { dataField: "requesterName", caption: "ผู้ขอ", width: 180 };
-                return [
-                    ...baseColumns.slice(0, 2),
-                    requesterCol,
-                    ...baseColumns.slice(2)
-                ];
-            }
-
-            return baseColumns;
-        };
-
-        // เริ่มต้นโหลดข้อมูล
-        loadSummaryData();
-        $("#btnCreateHeader, #btnCreateEmpty").on("click", function() {
-            window.location.href = FORM_URL;
-        });
-
-        // === REAL-TIME UPDATE FUNCTIONS ===
-
-        // ฟังก์ชันสำหรับ Refresh ข้อมูลทั้งหมดในหน้า
-        function refreshAllData() {
-            console.log("Refreshing Data...");
-            // 1. โหลด Badge Count ใหม่
-            loadSummaryData(true); // ส่ง true เพื่อบอกว่าเป็นการ refresh เงียบๆ
-
-            // 2. Refresh Grid ทุกตัวที่มีอยู่ใน DOM
-            const grids = ["#gridMyTasks", "#gridMyRequests", "#gridApproved", "#gridRejected"];
-            grids.forEach(id => {
-                if ($(id).length) {
-                    const gridInstance = $(id).dxDataGrid("instance");
-                    if (gridInstance) {
-                        gridInstance.refresh();
-                    }
-                }
-            });
-        }
-
-        // ✅ 2. SignalR Setup
-        const hubBaseUrl = (typeof API_BASE !== 'undefined') ? API_BASE : "https://localhost:7127";
-        const rootUrl = hubBaseUrl.replace(/\/api\/?$/, "");
-        const hubUrl = `${rootUrl}/notificationHub`;
-
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl(hubUrl)
-            .withAutomaticReconnect()
-            .configureLogging(signalR.LogLevel.Information)
-            .build();
-
-        // รับ Event จาก Server
-        connection.on("ReceiveUpdate", function (message) {
-            console.log("SignalR Update Received:", message);
-          
-            refreshAllData();
-        });
-
-        // เริ่มการเชื่อมต่อ
-        connection.start().then(function () {
-            console.log("SignalR Connected to " + hubUrl);
-        }).catch(function (err) {
-            console.error("SignalR Connection Error: ", err.toString());
-        });
-
-        // === DATA LOADING ===
-
-      function loadSummaryData(isSilentRefresh = false) {
-            if (!isSilentRefresh) loadingIndicator.show();
-            $.ajax({
-                url: `${API_BASE}/Dashboard/Summary`,
-                method: "GET",
-                xhrFields: { withCredentials: true },
-                success: function (data) {
-                    if (!isSilentRefresh) loadingIndicator.hide();
-
-                    const tabPanelInstance = $("#tabPanel").data("dxTabPanel");
-
-                    if (tabPanelInstance) {
-                        updateBadgeDOM(data.myTaskCount);
-                    } else {
-                        initTabPanel(data.myTaskCount);
-                    }
-                },
-                error: function(err) {
-                    if (!isSilentRefresh) loadingIndicator.hide();
-                    if (!$("#tabPanel").data("dxTabPanel")) {
-                        initTabPanel(0);
-                    }
-                }
-            });
-        }
-
-        function updateBadgeDOM(count) {
-            const badge = $(".dx-tab .badge");
-            if (count > 0) {
-                if (badge.length) {
-                    badge.text(count);
-                } else {
-                     const tabPanel = $("#tabPanel").dxTabPanel("instance");
-                     const items = tabPanel.option("items");
-                     if (items.length > 0 && items[0].icon === 'todo') {
-                         items[0].badgeCount = count;
-                         tabPanel.option("items", items);
-                     }
-                }
-            } else {
-                badge.remove();
-            }
-        }
-
-        function initTabPanel(taskCount) {
-            const tabs = [];
-            if (taskCount > 0) {
-                tabs.push({
-                    title: "งานรออนุมัติ (My Tasks)",
-                    icon: "todo",
-                    badgeCount: taskCount,
-                    template: () => {
-                        const grid = $("<div>").attr("id", "gridMyTasks");
-                        const store = createRemoteStore("GetMyTasks");
-                        const columns = createColumns(CODE_URL, true, true, 'code');
-                        grid.dxDataGrid(createGridConfig(store, columns, "ค้นหางานที่ต้องอนุมัติ...", CODE_URL, true, 'code'));
-                        return $("<div>").addClass("grid-wrapper").append(grid);
-                    }
-                });
-            }
-
-            tabs.push({
-                title: "เอกสารของฉัน (My Requests)",
-                icon: "user",
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridMyRequests");
-                    const store = createRemoteStore("GetMyRequests");
-                    const columns = createColumns(FORM_URL, false, false, 'id');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารของฉัน...", FORM_URL, false, 'id'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
-            tabs.push({
-                title: "อนุมัติแล้ว (Approved)",
-                icon: "check",
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridApproved");
-                    const store = createRemoteStore("MyApprovedList");
-                    const columns = createColumns(FORM_URL, false, false, 'id');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่อนุมัติแล้ว...", FORM_URL, false, 'id'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
-
-            tabs.push({
-                title: "ไม่อนุมัติ (Rejected)",
-                icon: "revert",
-                template: () => {
-                    const grid = $("<div>").attr("id", "gridRejected");
-                    const store = createRemoteStore("GetRejectedRequests");
-                    const columns = createColumns(FORM_URL, false, false, 'id');
-                    grid.dxDataGrid(createGridConfig(store, columns, "ค้นหาเอกสารที่ไม่อนุมัติ...", FORM_URL, false, 'id'));
-                    return $("<div>").addClass("grid-wrapper").append(grid);
-                }
-            });
-
-            $("#tabPanel").dxTabPanel({
-                items: tabs,
-                height: "100%",
-                deferRendering: true,
-                itemTitleTemplate: function(itemData) {
-                    const container = $("<div>").addClass("d-flex align-items-center gap-2");
-                    if(itemData.icon) container.append($("<i>").addClass("dx-icon-" + itemData.icon));
-                    container.append($("<span>").text(itemData.title));
-
-                    if (itemData.badgeCount !== undefined && itemData.badgeCount > 0) {
-                        container.append(
-                            $("<span>")
-                                .addClass("badge rounded-pill ms-2")
-                                .css({ "background-color": "#dc3545", "color": "white" })
-                                .text(itemData.badgeCount)
-                        );
-                    }
-
-                    return container;
-                }
-            });
-        }
-    });
-</script>
+    </script>
+    <script src="~/js/pages/home-index.js"></script>
+}

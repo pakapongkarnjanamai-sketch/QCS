@@ -13,8 +13,6 @@ namespace QCS.Domain.DTOs
         public int CurrentStepId { get; set; }    // สถานะ
         public string RequesterName { get; set; } // ชื่อผู้ขอ
         public string Remark { get; set; }
-
-        // [New] เพิ่ม 2 fields นี้
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
     }

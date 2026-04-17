@@ -1,12 +1,13 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using QCS.Application.Hubs;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Services;
+using System.Linq.Expressions;
 using System.Text.Json;
 
 namespace QCS.Application.Services
@@ -35,29 +36,61 @@ namespace QCS.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly WorkflowService _workflowService;
         private readonly ICurrentUserService _currentUserService;
-        private readonly IWebHostEnvironment _env;
+        private readonly IDateTime _dateTime;
         private readonly IFileService _fileService;
         private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly ILogger<RequestService> _logger;
 
         private const int MainWorkflowId = 1;
         private const int CompletedStepId = 99;
         private const int RejectedStepId = -1;
         private const string SignalREventName = "ReceiveUpdate";
+        private const int GenerateDocNoRetryLimit = 3;
+        private const string RequestCodeUniqueIndexName = "IX_Requests_Code";
+
+        private static readonly Expression<Func<Request, RequestGridDto>> RequestGridProjection = r => new RequestGridDto
+        {
+            Id = r.Id,
+            Code = r.Code,
+            Title = r.Title,
+            VendorCode = r.VendorCode,
+            VendorName = r.VendorName,
+            RequestDate = r.RequestDate,
+            CurrentStepId = r.CurrentStepId,
+            Remark = r.Remark ?? string.Empty
+        };
+
+        private static readonly Expression<Func<Request, RequestGridDto>> RequestGridWithRequesterProjection = r => new RequestGridDto
+        {
+            Id = r.Id,
+            Code = r.Code,
+            Title = r.Title,
+            VendorCode = r.VendorCode,
+            VendorName = r.VendorName,
+            RequestDate = r.RequestDate,
+            CurrentStepId = r.CurrentStepId,
+            Remark = r.Remark ?? string.Empty,
+            RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
+            ValidFrom = r.ValidFrom,
+            ValidUntil = r.ValidUntil
+        };
 
         public RequestService(
             IUnitOfWork unitOfWork,
             WorkflowService workflowService,
             ICurrentUserService currentUserService,
-            IWebHostEnvironment env,
+            IDateTime dateTime,
             IFileService fileService,
-            IHubContext<NotificationHub> hubContext)
+            IHubContext<NotificationHub> hubContext,
+            ILogger<RequestService> logger)
         {
             _unitOfWork = unitOfWork;
             _workflowService = workflowService;
             _currentUserService = currentUserService;
-            _env = env;
+            _dateTime = dateTime;
             _fileService = fileService;
             _hubContext = hubContext;
+            _logger = logger;
         }
 
         // =================================================================================================
@@ -66,87 +99,41 @@ namespace QCS.Application.Services
 
         public async Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit)
         {
-            using var transaction = _unitOfWork.BeginTransaction();
-            try
+            for (var attempt = 1; attempt <= GenerateDocNoRetryLimit; attempt++)
             {
-                var requestRepo = _unitOfWork.Repository<Request>();
-
-                // Pass current user as creator for route resolution
-                var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, _currentUserService.UserId);
-
-                if (routeData?.Steps == null) throw new Exception("Workflow definition not found");
-
-                var sortedSteps = routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
-                var newDocNo = await GenerateDocNoAsync();
-
-                int currentStepId = 1;
-                int docStatus = isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft;
-
-                if (isSubmit)
+                using var transaction = _unitOfWork.BeginTransaction();
+                try
                 {
-                    var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
-                    currentStepId = nextStep != null ? nextStep.SequenceNo : CompletedStepId;
-                    if (currentStepId == CompletedStepId) docStatus = (int)RequestStatus.Approved;
+                    var requestRepo = _unitOfWork.Repository<Request>();
+                    var request = await BuildRequestForCreateAsync(input, isSubmit);
+
+                    await requestRepo.AddAsync(request);
+                    await _unitOfWork.CommitAsync();
+                    await transaction.CommitAsync();
+                    await NotifyUpdatesAsync($"สร้างเอกสารใหม่ {request.Code}");
+
+                    return request;
                 }
-
-                var pr = new Request
+                catch (DbUpdateException ex) when (IsRequestCodeConflict(ex))
                 {
-                    Code = newDocNo,
-                    Title = input.Title,
-                    RequestDate = DateTime.Now,
-                    Status = docStatus,
-                    CurrentStepId = currentStepId,
-                    VendorCode = input.VendorCode,
-                    VendorName = input.VendorName,
-                    ValidFrom = input.ValidFrom,
-                    ValidUntil = input.ValidUntil,
-                    Remark = input.Remark
-                };
+                    await transaction.RollbackAsync();
+                    _unitOfWork.ClearTrackedChanges();
 
-                foreach (var step in sortedSteps)
-                {
-                    var actionDate = (step.SequenceNo == 1 && isSubmit) ? (DateTime?)DateTime.Now : null;
-                    var stepStatus = step.SequenceNo switch
+                    if (attempt == GenerateDocNoRetryLimit)
                     {
-                        1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Pending,
-                        2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
-                        _ => (int)RequestStatus.Draft
-                    };
-
-                    pr.ApprovalSteps.Add(new ApprovalStep
-                    {
-                        Sequence = step.SequenceNo,
-                        StepName = step.StepName,
-                        Status = stepStatus,
-                        ActionDate = actionDate,
-                        ApproverNId = (step.SequenceNo == 1 && isSubmit) ? _currentUserService.UserId : null,
-                        ApproverName = (step.SequenceNo == 1 && isSubmit) ? await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId, _currentUserService.UserId) : null,
-                        Comment = (step.SequenceNo == 1 && isSubmit) ? input.Comment : null
-                    });
-                }
-
-                var files = GetFilesFromInput(input);
-                if (files != null && files.Any())
-                {
-                    var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
-                    foreach (var q in newQuotations)
-                    {
-                        pr.Quotations.Add(q);
+                        throw new InvalidOperationException("Unable to generate a unique document number after multiple attempts.", ex);
                     }
+
+                    _logger.LogWarning(ex, "Request code conflict on create attempt {Attempt}. Retrying with a new document number.", attempt);
                 }
-
-                await requestRepo.AddAsync(pr);
-                await _unitOfWork.CommitAsync();
-                await transaction.CommitAsync();
-                await NotifyUpdatesAsync($"สร้างเอกสารใหม่ {pr.Code}");
-
-                return pr;
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+
+            throw new InvalidOperationException("Unable to create request.");
         }
 
         public async Task UpdateAsync(UpdateRequestDto input, bool isSubmit)
@@ -174,25 +161,7 @@ namespace QCS.Application.Services
 
                 if (isSubmit)
                 {
-                    pr.Status = (int)RequestStatus.Pending;
-                    var step1 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
-                    if (step1 != null)
-                    {
-                        step1.Status = (int)RequestStatus.Approved;
-                        step1.ActionDate = DateTime.Now;
-                        step1.ApproverNId = _currentUserService.UserId;
-                        step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId, pr.CreatedBy);
-                        step1.Comment = input.Comment;
-                    }
-
-                    var step2 = pr.ApprovalSteps.FirstOrDefault(s => s.Sequence == 2);
-                    if (step2 != null)
-                    {
-                        step2.Status = (int)RequestStatus.Pending;
-                        step2.ApproverNId = null;
-                        step2.ApproverName = null;
-                        pr.CurrentStepId = 2;
-                    }
+                    await ApplyDraftSubmissionStateAsync(pr, input.Comment);
                 }
 
                 if (!string.IsNullOrEmpty(input.UpdatedQuotationsJson))
@@ -213,9 +182,9 @@ namespace QCS.Application.Services
                 }
 
                 var files = GetFilesFromInput(input);
-                if (files != null && files.Any())
+                if (files.Count > 0)
                 {
-                    var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson);
+                    var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson ?? string.Empty);
                     foreach (var q in newQuotations)
                     {
                         pr.Quotations.Add(q);
@@ -227,7 +196,7 @@ namespace QCS.Application.Services
                 await transaction.CommitAsync();
                 await NotifyUpdatesAsync($"แก้ไขเอกสาร {pr.Code}");
             }
-            catch
+            catch (Exception)
             {
                 await transaction.RollbackAsync();
                 throw;
@@ -242,15 +211,12 @@ namespace QCS.Application.Services
             string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId, request.CreatedBy);
 
             currentStepObj.Status = (int)RequestStatus.Approved;
-            currentStepObj.ActionDate = DateTime.Now;
+            currentStepObj.ActionDate = _dateTime.Now;
             currentStepObj.Comment = input.Comment;
             currentStepObj.ApproverNId = currentUserId;
             currentStepObj.ApproverName = approverName;
 
-            var nextStep = request.ApprovalSteps
-                .Where(s => s.Sequence > currentStepObj.Sequence)
-                .OrderBy(s => s.Sequence)
-                .FirstOrDefault();
+            var nextStep = GetNextApprovalStep(request.ApprovalSteps, currentStepObj.Sequence);
 
             if (nextStep != null)
             {
@@ -277,14 +243,13 @@ namespace QCS.Application.Services
 
             if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
 
-            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
-            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบันของเอกสาร");
+            var currentStepObj = GetCurrentStepOrThrow(request);
 
             var currentUserId = _currentUserService.UserId;
             string approverName = await GetApproverNameAsync(MainWorkflowId, currentUserId, request.CreatedBy);
 
             currentStepObj.Status = (int)RequestStatus.Rejected;
-            currentStepObj.ActionDate = DateTime.Now;
+            currentStepObj.ActionDate = _dateTime.Now;
             currentStepObj.Comment = input.Comment;
             currentStepObj.ApproverNId = currentUserId;
             currentStepObj.ApproverName = approverName;
@@ -334,7 +299,7 @@ namespace QCS.Application.Services
                     await NotifyUpdatesAsync($"ลบเอกสาร {code}");
                 }
             }
-            catch
+            catch (Exception)
             {
                 await transaction.RollbackAsync();
                 throw;
@@ -351,7 +316,14 @@ namespace QCS.Application.Services
             {
                 await _hubContext.Clients.All.SendAsync(SignalREventName, message);
             }
-            catch { }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Notification broadcast was canceled for message: {Message}", message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast update notification: {Message}", message);
+            }
         }
 
         private async Task<(Request, ApprovalStep)> GetRequestAndCurrentStepAsync(int requestId)
@@ -362,18 +334,160 @@ namespace QCS.Application.Services
 
             if (request == null) throw new KeyNotFoundException("ไม่พบเอกสาร Purchase Request");
 
-            var currentStepObj = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
-            if (currentStepObj == null) throw new Exception("ไม่พบข้อมูล Step ปัจจุบันของเอกสาร");
+            return (request, GetCurrentStepOrThrow(request));
+        }
 
-            return (request, currentStepObj);
+        private async Task<Request> BuildRequestForCreateAsync(CreateRequestDto input, bool isSubmit)
+        {
+            var creatorUserId = _currentUserService.UserId;
+            var sortedSteps = await GetSortedWorkflowStepsAsync(creatorUserId);
+            var newDocNo = await GenerateDocNoAsync();
+            var (docStatus, currentStepId) = isSubmit
+                ? GetSubmittedDocumentState(sortedSteps)
+                : ((int)RequestStatus.Draft, 1);
+
+            var request = new Request
+            {
+                Code = newDocNo,
+                Title = input.Title,
+                RequestDate = _dateTime.Now,
+                Status = docStatus,
+                CurrentStepId = currentStepId,
+                VendorCode = input.VendorCode,
+                VendorName = input.VendorName,
+                ValidFrom = input.ValidFrom,
+                ValidUntil = input.ValidUntil,
+                Remark = input.Remark
+            };
+
+            foreach (var step in await BuildApprovalStepsAsync(sortedSteps, isSubmit, input.Comment, creatorUserId))
+            {
+                request.ApprovalSteps.Add(step);
+            }
+
+            var files = GetFilesFromInput(input);
+            if (files.Count > 0)
+            {
+                var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, input.QuotationsJson ?? string.Empty);
+                foreach (var quotation in newQuotations)
+                {
+                    request.Quotations.Add(quotation);
+                }
+            }
+
+            return request;
+        }
+
+        private async Task<List<WorkflowStepDto>> GetSortedWorkflowStepsAsync(string creatorUserId)
+        {
+            var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, creatorUserId);
+            if (routeData?.Steps == null)
+            {
+                throw new InvalidOperationException("Workflow definition not found");
+            }
+
+            return routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
+        }
+
+        private static (int status, int currentStepId) GetSubmittedDocumentState(IReadOnlyList<WorkflowStepDto> sortedSteps)
+        {
+            var nextStep = sortedSteps.FirstOrDefault(s => s.SequenceNo > 1);
+            if (nextStep == null)
+            {
+                return ((int)RequestStatus.Approved, CompletedStepId);
+            }
+
+            return ((int)RequestStatus.Pending, nextStep.SequenceNo);
+        }
+
+        private async Task<List<ApprovalStep>> BuildApprovalStepsAsync(
+            IReadOnlyList<WorkflowStepDto> sortedSteps,
+            bool isSubmit,
+            string? submitComment,
+            string creatorUserId)
+        {
+            string? submitterName = null;
+            if (isSubmit)
+            {
+                submitterName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId, creatorUserId);
+            }
+
+            return sortedSteps.Select(step => new ApprovalStep
+            {
+                Sequence = step.SequenceNo,
+                StepName = step.StepName,
+                Status = step.SequenceNo switch
+                {
+                    1 => isSubmit ? (int)RequestStatus.Approved : (int)RequestStatus.Draft,
+                    2 => isSubmit ? (int)RequestStatus.Pending : (int)RequestStatus.Draft,
+                    _ => (int)RequestStatus.Draft
+                },
+                ActionDate = step.SequenceNo == 1 && isSubmit ? _dateTime.Now : null,
+                ApproverNId = step.SequenceNo == 1 && isSubmit ? _currentUserService.UserId : null,
+                ApproverName = step.SequenceNo == 1 && isSubmit ? submitterName : null,
+                Comment = step.SequenceNo == 1 && isSubmit ? submitComment : null
+            }).ToList();
+        }
+
+        private async Task ApplyDraftSubmissionStateAsync(Request request, string? submitComment)
+        {
+            request.Status = (int)RequestStatus.Pending;
+
+            var step1 = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+            if (step1 != null)
+            {
+                step1.Status = (int)RequestStatus.Approved;
+                step1.ActionDate = _dateTime.Now;
+                step1.ApproverNId = _currentUserService.UserId;
+                step1.ApproverName = await GetApproverNameAsync(MainWorkflowId, _currentUserService.UserId, request.CreatedBy);
+                step1.Comment = submitComment;
+            }
+
+            var nextStep = GetNextApprovalStep(request.ApprovalSteps, 1);
+            if (nextStep == null)
+            {
+                request.Status = (int)RequestStatus.Approved;
+                request.CurrentStepId = CompletedStepId;
+                return;
+            }
+
+            nextStep.Status = (int)RequestStatus.Pending;
+            nextStep.ApproverNId = null;
+            nextStep.ApproverName = null;
+            request.CurrentStepId = nextStep.Sequence;
+        }
+
+        private static ApprovalStep? GetNextApprovalStep(IEnumerable<ApprovalStep> steps, int currentSequence)
+        {
+            return steps
+                .Where(s => s.Sequence > currentSequence)
+                .OrderBy(s => s.Sequence)
+                .FirstOrDefault();
+        }
+
+        private static ApprovalStep GetCurrentStepOrThrow(Request request)
+        {
+            var currentStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            if (currentStep == null)
+            {
+                throw new InvalidOperationException("ไม่พบข้อมูล Step ปัจจุบันของเอกสาร");
+            }
+
+            return currentStep;
         }
 
         private async Task<string> GenerateDocNoAsync()
         {
-            var todayStr = DateTime.Now.ToString("yyyyMMdd");
+            var todayStr = _dateTime.Now.ToString("yyyyMMdd");
             var prefix = $"QC-{todayStr}-";
             var countToday = await _unitOfWork.Repository<Request>().GetAll().CountAsync(x => x.Code.StartsWith(prefix));
             return $"{prefix}{(countToday + 1):D3}";
+        }
+
+        private static bool IsRequestCodeConflict(DbUpdateException exception)
+        {
+            return exception.InnerException?.Message.Contains(RequestCodeUniqueIndexName, StringComparison.OrdinalIgnoreCase) == true
+                || exception.Message.Contains(RequestCodeUniqueIndexName, StringComparison.OrdinalIgnoreCase);
         }
 
         private async Task<string> GetApproverNameAsync(int routeId, string nId, string? createdBy)
@@ -392,28 +506,28 @@ namespace QCS.Application.Services
             return new List<IFormFile>();
         }
 
+        private IQueryable<Request> GetActiveRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll().Where(r => r.IsActive);
+        }
+
+        private static bool IsCurrentUserAssignedToStep(WorkflowStepDto? step, string currentUserId)
+        {
+            return step?.Assignments?.Any(a => string.Equals(a.NId, currentUserId, StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
         // =================================================================================================
         // Query Methods
         // =================================================================================================
 
         public IQueryable<RequestGridDto> GetMyRequestsQuery()
         {
-            return _unitOfWork.Repository<Request>().GetAll()
+            return GetActiveRequestsQuery()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId
                          && r.Status != (int)RequestStatus.Approved
                          && r.Status != (int)RequestStatus.Rejected)
-                .Select(r => new RequestGridDto
-                {
-                    Id = r.Id,
-                    Code = r.Code,
-                    Title = r.Title,
-                    VendorCode = r.VendorCode,
-                    VendorName = r.VendorName,
-                    RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId,
-                    Remark = r.Remark
-                });
+                .Select(RequestGridProjection);
         }
 
         public IQueryable<RequestGridDto> GetRejectedRequestsQuery()
@@ -421,17 +535,7 @@ namespace QCS.Application.Services
             return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Rejected)
-                .Select(r => new RequestGridDto
-                {
-                    Id = r.Id,
-                    Code = r.Code,
-                    Title = r.Title,
-                    VendorCode = r.VendorCode,
-                    VendorName = r.VendorName,
-                    RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId,
-                    Remark = r.Remark
-                });
+                .Select(RequestGridProjection);
         }
 
         public IQueryable<RequestGridDto> GetApprovedListQuery()
@@ -439,20 +543,7 @@ namespace QCS.Application.Services
             return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Approved)
-                .Select(r => new RequestGridDto
-                {
-                    Id = r.Id,
-                    Code = r.Code,
-                    Title = r.Title,
-                    VendorCode = r.VendorCode,
-                    VendorName = r.VendorName,
-                    RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId,
-                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
-                    ValidFrom = r.ValidFrom,
-                    ValidUntil = r.ValidUntil,
-                    Remark = r.Remark
-                });
+                .Select(RequestGridWithRequesterProjection);
         }
 
         public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
@@ -463,7 +554,7 @@ namespace QCS.Application.Services
             // ต้องทำแบบนี้เพราะ DataSourceLoader ของ DevExtreme ต้องการ IQueryable
             // เราจึงต้องหา ID ก่อน แล้วค่อยส่ง Queryable ที่ Filter ID กลับไป
 
-            var allPending = await _unitOfWork.Repository<Request>().GetAll()
+            var allPending = await GetActiveRequestsQuery()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Pending)
                 .Select(r => new { r.Id, r.CreatedBy, r.CurrentStepId })
@@ -485,7 +576,7 @@ namespace QCS.Application.Services
                 foreach (var item in group)
                 {
                     var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == item.CurrentStepId);
-                    if (stepConfig != null && stepConfig.Assignments.Any(a => a.NId == currentUserId))
+                    if (IsCurrentUserAssignedToStep(stepConfig, currentUserId))
                     {
                         myTaskIds.Add(item.Id);
                     }
@@ -493,24 +584,10 @@ namespace QCS.Application.Services
             }
 
             // 2. คืนค่า Queryable ที่ Filter เฉพาะ ID ของเรา
-            return _unitOfWork.Repository<Request>().GetAll()
+            return GetActiveRequestsQuery()
                 .AsNoTracking()
                 .Where(r => myTaskIds.Contains(r.Id))
-                .Select(r => new RequestGridDto
-                {
-                    Id = r.Id,
-                    Code = r.Code,
-                    Title = r.Title,
-                    VendorCode = r.VendorCode,
-                    VendorName = r.VendorName,
-                    RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId,
-                    Remark = r.Remark,
-                    // ดึงชื่อคนขอ (Step 1)
-                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
-                    ValidFrom = r.ValidFrom,
-                    ValidUntil = r.ValidUntil
-                });
+                .Select(RequestGridWithRequesterProjection);
         }
 
         public IQueryable<RequestGridDto> GetMyApprovedListQuery()
@@ -518,18 +595,7 @@ namespace QCS.Application.Services
             return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Approved)
-                .Select(r => new RequestGridDto
-                {
-                    Id = r.Id,
-                    Code = r.Code,
-                    Title = r.Title,
-                    VendorCode = r.VendorCode,
-                    VendorName = r.VendorName,
-                    RequestDate = r.RequestDate,
-                    CurrentStepId = r.CurrentStepId,
-                    Remark = r.Remark
-                    
-                });
+                .Select(RequestGridProjection);
         }
 
         public async Task<RequestDetailDto?> GetByIdAsync(int id)
@@ -566,7 +632,7 @@ namespace QCS.Application.Services
                         ApproverNId = step.ApproverNId,
                         Comment = step.Comment,
                         Assignments = !string.IsNullOrEmpty(step.ApproverNId)
-                            ? new List<AssignmentDto> { new AssignmentDto { NId = step.ApproverNId, EmployeeName = step.ApproverName ?? "", IsCurrentUser = step.ApproverNId == _currentUserService.UserId } }
+                            ? new List<AssignmentDto> { new AssignmentDto { NId = step.ApproverNId, EmployeeName = step.ApproverName ?? "", IsCurrentUser = string.Equals(step.ApproverNId, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase) } }
                             : new List<AssignmentDto>()
                     }).OrderBy(s => s.SequenceNo).ToList()
                 };
@@ -594,6 +660,14 @@ namespace QCS.Application.Services
                 permissions = _workflowService.GetPermissions(request, workflowRoute);
             }
 
+            workflowRoute ??= new WorkflowRouteDetailDto
+            {
+                Id = 0,
+                RouteName = string.Empty,
+                CanInitiate = false,
+                Steps = new List<WorkflowStepDto>()
+            };
+
             return new RequestDetailDto
             {
                 RequestId = request.Id,
@@ -613,7 +687,7 @@ namespace QCS.Application.Services
                     DocumentTypeId = q.DocumentTypeId,
                     OriginalFileName = q.FileName,
                     FilePath = q.FilePath
-                }).OrderBy(d=>d.DocumentTypeId).ToList(),
+                }).OrderBy(d => d.DocumentTypeId).ToList(),
                 Permissions = permissions,
                 WorkflowRoute = workflowRoute
             };
@@ -656,11 +730,12 @@ namespace QCS.Application.Services
 
             // 1. ดึงข้อมูลเอกสาร Pending ทั้งหมด Group ตามคนสร้างและ Step
             // วิธีนี้ลดปริมาณ Query ลงมหาศาลเทียบกับการดึงทุก Row
-            var pendingGroups = await _unitOfWork.Repository<Request>().GetAll()
+            var pendingGroups = await GetActiveRequestsQuery()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Pending)
                 .GroupBy(r => new { r.CreatedBy, r.CurrentStepId })
-                .Select(g => new {
+                .Select(g => new
+                {
                     CreatedBy = g.Key.CreatedBy,
                     CurrentStepId = g.Key.CurrentStepId,
                     Count = g.Count()
@@ -682,7 +757,7 @@ namespace QCS.Application.Services
                     // ดูว่า Step ปัจจุบันของกลุ่มนี้ (CurrentStepId) มีเราเป็นคนรับผิดชอบไหม
                     var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == group.CurrentStepId);
 
-                    if (stepConfig != null && stepConfig.Assignments.Any(a => a.IsCurrentUser))
+                    if (IsCurrentUserAssignedToStep(stepConfig, currentUserId))
                     {
                         // ถ้าใช่ แสดงว่าเอกสารกลุ่มนี้เป็นงานของเรา -> บวกจำนวนเข้าไป
                         myTaskCount += group.Count;

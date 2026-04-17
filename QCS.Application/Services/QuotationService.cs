@@ -20,17 +20,20 @@ namespace QCS.Application.Services
     {
         // ✅ 1. เปลี่ยนมาใช้ UnitOfWork แทน Repository แยก
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IDateTime _dateTime;
         private readonly IWebHostEnvironment _env;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
 
         public QuotationService(
             IUnitOfWork unitOfWork, // ✅ Inject เข้ามาแทน
+            IDateTime dateTime,
             IWebHostEnvironment env,
             HttpClient httpClient,
             IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
+            _dateTime = dateTime;
             _env = env;
             _httpClient = httpClient;
             _configuration = configuration;
@@ -47,6 +50,8 @@ namespace QCS.Application.Services
                 .FirstOrDefaultAsync(r => r.Id == requestId);
 
             if (request == null) throw new KeyNotFoundException("Request not found");
+
+            var fallbackApprovalDate = _dateTime.Now;
 
             var pdfRequest = new MergeAndStampRequestDto
             {
@@ -72,7 +77,7 @@ namespace QCS.Application.Services
                         {
                             StepName = s.StepName,
                             Approver = s.ApproverName ?? s.ApproverNId ?? "Unknown",
-                            ApprovalDate = s.ActionDate ?? DateTime.Now
+                            ApprovalDate = s.ActionDate ?? fallbackApprovalDate
                         }).ToList()
                 },
                 DrawSetting = new DrawSettingDto { Color = "#000000", FontSize = 8 }
