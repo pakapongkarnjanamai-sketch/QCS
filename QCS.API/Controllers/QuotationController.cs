@@ -1,6 +1,4 @@
-﻿using DevExtreme.AspNet.Data; // จำเป็นสำหรับ DataSourceLoader
-using DevExtreme.AspNet.Mvc;  // จำเป็นสำหรับ DataSourceLoadOptions
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QCS.Application.Services;
 
@@ -12,39 +10,109 @@ namespace QCS.API.Controllers
     public class QuotationController : ControllerBase
     {
         private readonly IRequestService _requestService;
-        // ใช้ QuotationService สำหรับฟังก์ชันเฉพาะ เช่น การสร้าง PDF
         private readonly IQuotationService _quotationService;
+
         public QuotationController(
-              IRequestService requestService,
-              IQuotationService quotationService)
+            IRequestService requestService,
+            IQuotationService quotationService)
         {
             _requestService = requestService;
             _quotationService = quotationService;
         }
 
-        // ==========================================================
-        // 🔍 GET BY CODE (ย้ายมาจาก RequestController)
-        // ==========================================================
         [HttpGet("ByCode")]
-        public async Task<IActionResult> GetByCode(string code)
+        [HttpGet("ByCode/{code}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetByCode([FromRoute(Name = "code")] string? routeCode, [FromQuery(Name = "code")] string? queryCode, CancellationToken cancellationToken)
         {
-            // เรียกใช้ได้เลย Service จะรู้เองว่าถ้า Approved แล้วต้องทำงานเร็วๆ
+            var resolvedCode = string.IsNullOrWhiteSpace(routeCode) ? queryCode : routeCode;
+            return await GetByCodeCore(resolvedCode);
+        }
+
+        private async Task<IActionResult> GetByCodeCore(string? code)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Query parameter 'code' is required.");
+            }
+
             var result = await _requestService.GetByCodeAsync(code);
 
-            if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
+            if (result == null)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: "ไม่พบข้อมูลเอกสาร");
+            }
 
             return Ok(result);
         }
 
         [HttpGet("ViewFile/{id}")]
-        public async Task<IActionResult> ViewFile(int id)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status502BadGateway)]
+        [ProducesResponseType(StatusCodes.Status504GatewayTimeout)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> ViewFile(int id, CancellationToken cancellationToken)
         {
-            var fileDto = await _quotationService.GenerateStampedPdfAsync(id);
+            if (id <= 0)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'id' must be greater than 0.");
+            }
 
-            if (fileDto == null || fileDto.Data == null)
-                return NotFound("File content missing");
+            try
+            {
+                var fileDto = await _quotationService.GenerateStampedPdfAsync(id, cancellationToken);
 
-            return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
+                if (fileDto?.Data == null)
+                {
+                    return Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        title: "File not found",
+                        detail: "File content missing");
+                }
+
+                return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: "ไม่พบข้อมูลเอกสาร");
+            }
+            catch (PdfServiceException ex)
+            {
+                var statusCode = ex.UpstreamStatusCode == StatusCodes.Status504GatewayTimeout
+                    || ex.UpstreamStatusCode == StatusCodes.Status408RequestTimeout
+                    ? StatusCodes.Status504GatewayTimeout
+                    : StatusCodes.Status502BadGateway;
+
+                return Problem(
+                    statusCode: statusCode,
+                    title: statusCode == StatusCodes.Status504GatewayTimeout
+                        ? "PDF service timeout"
+                        : "PDF service unavailable",
+                    detail: ex.Message);
+            }
+            catch (InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status500InternalServerError,
+                    title: "Server configuration error",
+                    detail: "PDF service configuration is invalid.");
+            }
         }
     }
 }

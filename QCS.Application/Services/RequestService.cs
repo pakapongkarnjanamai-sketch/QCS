@@ -516,6 +516,55 @@ namespace QCS.Application.Services
             return step?.Assignments?.Any(a => string.Equals(a.NId, currentUserId, StringComparison.OrdinalIgnoreCase)) ?? false;
         }
 
+        private sealed class MyPendingTaskResult
+        {
+            public List<int> TaskIds { get; } = new List<int>();
+            public int TotalCount { get; set; }
+        }
+
+        private async Task<MyPendingTaskResult> GetMyPendingTaskResultAsync(string currentUserId)
+        {
+            var pendingCandidates = await GetActiveRequestsQuery()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Pending && !string.IsNullOrEmpty(r.CreatedBy))
+                .Select(r => new { r.Id, r.CreatedBy, r.CurrentStepId })
+                .ToListAsync();
+
+            var groupedCandidates = pendingCandidates
+                .GroupBy(x => new { x.CreatedBy, x.CurrentStepId })
+                .Select(g => new
+                {
+                    CreatedBy = g.Key.CreatedBy,
+                    CurrentStepId = g.Key.CurrentStepId,
+                    Count = g.Count(),
+                    TaskIds = g.Select(x => x.Id).ToList()
+                })
+                .ToList();
+
+            var result = new MyPendingTaskResult();
+
+            foreach (var group in groupedCandidates)
+            {
+                if (string.IsNullOrEmpty(group.CreatedBy))
+                {
+                    continue;
+                }
+
+                var route = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, group.CreatedBy);
+                var stepConfig = route?.Steps?.FirstOrDefault(s => s.SequenceNo == group.CurrentStepId);
+
+                if (!IsCurrentUserAssignedToStep(stepConfig, currentUserId))
+                {
+                    continue;
+                }
+
+                result.TotalCount += group.Count;
+                result.TaskIds.AddRange(group.TaskIds);
+            }
+
+            return result;
+        }
+
         // =================================================================================================
         // Query Methods
         // =================================================================================================
@@ -550,43 +599,18 @@ namespace QCS.Application.Services
         {
             var currentUserId = _currentUserService.UserId;
 
-            // 1. ดึง ID ของเอกสารที่เป็นงานของเราออกมา (ใช้ Logic เดียวกับข้างบน)
-            // ต้องทำแบบนี้เพราะ DataSourceLoader ของ DevExtreme ต้องการ IQueryable
-            // เราจึงต้องหา ID ก่อน แล้วค่อยส่ง Queryable ที่ Filter ID กลับไป
-
-            var allPending = await GetActiveRequestsQuery()
-                .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Pending)
-                .Select(r => new { r.Id, r.CreatedBy, r.CurrentStepId })
-                .ToListAsync();
-
-            var myTaskIds = new List<int>();
-
-            // Group ใน Memory เพื่อลดการเรียก API
-            var groups = allPending.GroupBy(x => x.CreatedBy);
-
-            foreach (var group in groups)
+            var taskResult = await GetMyPendingTaskResultAsync(currentUserId);
+            if (taskResult.TaskIds.Count == 0)
             {
-                var creator = group.Key;
-                if (string.IsNullOrEmpty(creator)) continue;
-
-                var route = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, creator);
-                if (route?.Steps == null) continue;
-
-                foreach (var item in group)
-                {
-                    var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == item.CurrentStepId);
-                    if (IsCurrentUserAssignedToStep(stepConfig, currentUserId))
-                    {
-                        myTaskIds.Add(item.Id);
-                    }
-                }
+                return GetActiveRequestsQuery()
+                    .AsNoTracking()
+                    .Where(r => false)
+                    .Select(RequestGridWithRequesterProjection);
             }
 
-            // 2. คืนค่า Queryable ที่ Filter เฉพาะ ID ของเรา
             return GetActiveRequestsQuery()
                 .AsNoTracking()
-                .Where(r => myTaskIds.Contains(r.Id))
+                .Where(r => taskResult.TaskIds.Contains(r.Id))
                 .Select(RequestGridWithRequesterProjection);
         }
 
@@ -727,45 +751,8 @@ namespace QCS.Application.Services
         public async Task<int> GetMyPendingTaskCountAsync()
         {
             var currentUserId = _currentUserService.UserId;
-
-            // 1. ดึงข้อมูลเอกสาร Pending ทั้งหมด Group ตามคนสร้างและ Step
-            // วิธีนี้ลดปริมาณ Query ลงมหาศาลเทียบกับการดึงทุก Row
-            var pendingGroups = await GetActiveRequestsQuery()
-                .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Pending)
-                .GroupBy(r => new { r.CreatedBy, r.CurrentStepId })
-                .Select(g => new
-                {
-                    CreatedBy = g.Key.CreatedBy,
-                    CurrentStepId = g.Key.CurrentStepId,
-                    Count = g.Count()
-                })
-                .ToListAsync();
-
-            int myTaskCount = 0;
-
-            // 2. วนลูปเช็คสิทธิ์ (WorkflowService มี Cache แล้ว ไม่ต้องห่วงเรื่องยิงซ้ำ)
-            foreach (var group in pendingGroups)
-            {
-                if (string.IsNullOrEmpty(group.CreatedBy)) continue;
-
-                // Resolve Workflow ของ Creator คนนี้
-                var route = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, group.CreatedBy);
-
-                if (route?.Steps != null)
-                {
-                    // ดูว่า Step ปัจจุบันของกลุ่มนี้ (CurrentStepId) มีเราเป็นคนรับผิดชอบไหม
-                    var stepConfig = route.Steps.FirstOrDefault(s => s.SequenceNo == group.CurrentStepId);
-
-                    if (IsCurrentUserAssignedToStep(stepConfig, currentUserId))
-                    {
-                        // ถ้าใช่ แสดงว่าเอกสารกลุ่มนี้เป็นงานของเรา -> บวกจำนวนเข้าไป
-                        myTaskCount += group.Count;
-                    }
-                }
-            }
-
-            return myTaskCount;
+            var taskResult = await GetMyPendingTaskResultAsync(currentUserId);
+            return taskResult.TotalCount;
         }
     }
 }
