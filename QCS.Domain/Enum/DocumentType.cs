@@ -7,6 +7,9 @@ namespace QCS.Domain.Enum
         [Display(Name = "ORIGINAL QUOTATION")]
         OriginalQuotation = 10,
 
+        [Display(Name = "EXPIRED QUOTATION")]
+        ExpiredQuotation = 50,
+
         [Display(Name = "COMPARISON DOCUMENT")]
         Comparison = 20,
 
