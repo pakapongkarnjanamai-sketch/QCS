@@ -29,12 +29,14 @@ namespace QCS.API.Controllers
                 var myTaskCount = await _requestService.GetMyPendingTaskCountAsync();
                 var myApprovedCount = await _requestService.GetMyApprovedListQuery().CountAsync();
                 var myRejectedCount = await _requestService.GetRejectedRequestsQuery().CountAsync();
+                var myRequestCount = await _requestService.GetMyRequestsQuery().CountAsync();
 
                 return Ok(new DashboardDto
                 {
                     MyTaskCount = myTaskCount,
                     MyApprovedCount = myApprovedCount,
                     MyRejectedCount = myRejectedCount,
+                    MyRequestCount = myRequestCount,
                 });
             }
             catch (Exception ex)
