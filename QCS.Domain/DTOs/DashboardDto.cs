@@ -16,5 +16,9 @@ namespace QCS.Domain.DTOs
 
         // [New] จำนวนใน Tab "เอกสารที่อนุมัติแล้ว"
         public int ApprovedCount { get; set; }
+
+        // จำนวนใน workspace "อนุมัติแล้วของฉัน" และ "ไม่อนุมัติของฉัน"
+        public int MyApprovedCount { get; set; }
+        public int MyRejectedCount { get; set; }
     }
 }

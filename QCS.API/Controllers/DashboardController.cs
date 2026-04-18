@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
 
@@ -24,11 +25,16 @@ namespace QCS.API.Controllers
         {
             try
             {
+                // NOTE: These queries must run sequentially because they share the same DbContext.
                 var myTaskCount = await _requestService.GetMyPendingTaskCountAsync();
+                var myApprovedCount = await _requestService.GetMyApprovedListQuery().CountAsync();
+                var myRejectedCount = await _requestService.GetRejectedRequestsQuery().CountAsync();
 
                 return Ok(new DashboardDto
                 {
                     MyTaskCount = myTaskCount,
+                    MyApprovedCount = myApprovedCount,
+                    MyRejectedCount = myRejectedCount,
                 });
             }
             catch (Exception ex)
