@@ -1,5 +1,6 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration _config
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -63,27 +64,9 @@
             $("#menu").dxMenu({
                  dataSource: [
                     {
-                        text: "Dashboard",
-                        icon: "home",
-                        path: "@Url.Action("Index", "Home")"
-                    },
-                    {
-                        text: "Documents",
-                        icon: "file",
-                        items: [
-                            { text: "ใบขอซื้อ (Purchase Requests)", icon: "cart", path: "@Url.Action("PurchaseRequest", "Home")" },
-                            { text: "ใบเสนอราคา (Quotations)", icon: "doc", path: "@Url.Action("Quotation", "Home")" }
-                        ]
-                    },
-                   {
-                        text: "Settings",
-                        icon: "preferences",
-                        items: [
-                             { text: "ลำดับการอนุมัติ (Approval Steps)", icon: "orderedlist", path: "@Url.Action("ApprovalStep", "Home")" },
-                            { text: "Departments", icon: "orderedlist", path: "@Url.Action("Departments", "Account")" },
-                            { text: "Users", icon: "group",  path: "@Url.Action("Users", "Account")" } ,
-                            { text: "Roles", icon: "group",  path: "@Url.Action("Roles", "Account")" } ,
-                        ]
+                        text: "Procurement Workspace",
+                        icon: "folder",
+                        path: "@Url.Action("Workspace", "Home")"
                     }
                 ],
                 displayExpr: "text",
@@ -107,6 +90,12 @@
                 }
             });
         });
+    </script>
+
+    <script>
+        // API base URL from server configuration — do not hard-code in views
+        window.QCS_API_BASE = '@(_config.GetValue<string>("ApiSettings:BaseUrl") ?? "https://localhost:7127")' + '/api/';
+        window.QCS_FILE_BASE = '@(_config.GetValue<string>("ApiSettings:BaseUrl") ?? "https://localhost:7127")';
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

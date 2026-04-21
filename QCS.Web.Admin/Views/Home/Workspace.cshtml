@@ -1,0 +1,315 @@
+@{
+    ViewData["Title"] = "Procurement Workspace";
+}
+
+<div class="workspace-shell m-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Procurement Workspace</h5>
+        <span class="text-muted small">Master-Detail: Purchase Request -> Quotation / Approval Step</span>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Purchase Requests</div>
+        <div class="card-body">
+            <div id="workspacePrGrid"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE_URL = window.QCS_API_BASE;
+
+        const statusLookup = [
+            { id: 0, name: "Draft" },
+            { id: 1, name: "Pending" },
+            { id: 2, name: "Approved" },
+            { id: 3, name: "Rejected" },
+            { id: 4, name: "Completed" },
+            { id: 9, name: "Rejected" }
+        ];
+
+        const documentTypeMap = {
+            10: "ใบเสนอราคา (Quotation)",
+            20: "เอกสารเปรียบเทียบ/แนบอ้างอิง",
+            30: "เอกสารประกอบเพิ่มเติม"
+        };
+
+        function getDocumentTypeName(id) {
+            const numericId = Number(id);
+            return documentTypeMap[numericId] || `ประเภท ${numericId}`;
+        }
+
+        function statusCellTemplate(element, info) {
+            const statusName = info.displayValue || "Unknown";
+            const statusId = info.value;
+
+            let colorClass = "badge bg-secondary";
+            if (statusId === 1) colorClass = "badge bg-warning text-dark";
+            else if (statusId === 2 || statusId === 4) colorClass = "badge bg-success";
+            else if (statusId === 3 || statusId === 9) colorClass = "badge bg-danger";
+
+            element.append(`<span class="${colorClass}">${statusName}</span>`);
+        }
+
+        $(function () {
+            const prStore = createDataStore(API_BASE_URL, "CRUDPurchaseRequests");
+            const quotationStore = createDataStore(API_BASE_URL, "CRUDQuotations");
+            const approvalStore = createDataStore(API_BASE_URL, "CRUDApprovalSteps");
+
+            const prLookupStore = DevExpress.data.AspNet.createStore({
+                key: "id",
+                loadUrl: API_BASE_URL + "CRUDPurchaseRequests",
+                onBeforeSend: function (method, ajaxOptions) {
+                    ajaxOptions.xhrFields = { withCredentials: true };
+                }
+            });
+
+            function deletePurchaseRequest(prGrid, id, code) {
+                const message = `ยืนยันการลบเอกสาร ${code}?\nข้อมูลที่เกี่ยวข้องจะถูกลบตามไปด้วย`;
+                DevExpress.ui.dialog.confirm(message, "Confirm Delete").done(function (confirmed) {
+                    if (!confirmed) return;
+
+                    $.ajax({
+                        url: API_BASE_URL + "CRUDPurchaseRequests?key=" + encodeURIComponent(id),
+                        method: "DELETE",
+                        xhrFields: { withCredentials: true }
+                    }).done(function () {
+                        DevExpress.ui.notify("ลบเอกสารเรียบร้อย", "success", 2000);
+                        prGrid.refresh();
+                    }).fail(function (xhr) {
+                        const messageText = xhr?.responseJSON?.Message || "ไม่สามารถลบเอกสารได้";
+                        DevExpress.ui.notify(messageText, "error", 3000);
+                    });
+                });
+            }
+
+            const prGrid = $("#workspacePrGrid").dxDataGrid({
+                dataSource: prStore,
+                keyExpr: "id",
+                remoteOperations: true,
+                showBorders: true,
+                columnAutoWidth: true,
+                rowAlternationEnabled: true,
+                hoverStateEnabled: true,
+                paging: { pageSize: 20 },
+                pager: { showPageSizeSelector: true, allowedPageSizes: [10, 20, 50], showInfo: true },
+                filterRow: { visible: true },
+                searchPanel: { visible: true, width: 260, placeholder: "ค้นหา PR..." },
+                columns: [
+                    { dataField: "code", caption: "เลขที่เอกสาร", width: 160 },
+                    { dataField: "title", caption: "หัวข้อ", minWidth: 220 },
+                    { dataField: "vendorName", caption: "ผู้ขาย", minWidth: 200 },
+                    {
+                        dataField: "requestDate",
+                        caption: "วันที่ขอ",
+                        dataType: "date",
+                        format: "dd/MM/yyyy",
+                        width: 120,
+                        sortOrder: "desc"
+                    },
+                    {
+                        dataField: "status",
+                        caption: "สถานะ",
+                        width: 120,
+                        lookup: {
+                            dataSource: statusLookup,
+                            valueExpr: "id",
+                            displayExpr: "name"
+                        },
+                        cellTemplate: statusCellTemplate
+                    },
+                    {
+                        dataField: "isActive",
+                        caption: "Active",
+                        width: 90,
+                        cellTemplate: function (element, info) {
+                            const isActive = info.value === true;
+                            const badgeClass = isActive ? "badge bg-success" : "badge bg-secondary";
+                            const text = isActive ? "Yes" : "No";
+                            element.append(`<span class="${badgeClass}">${text}</span>`);
+                        }
+                    },
+                    {
+                        type: "buttons",
+                        width: 80,
+                        buttons: [{
+                            hint: "Delete PR",
+                            icon: "trash",
+                            onClick: function (e) {
+                                e.event.preventDefault();
+                                deletePurchaseRequest(prGrid, e.row.data.id, e.row.data.code);
+                            }
+                        }]
+                    }
+                ],
+                masterDetail: {
+                    enabled: true,
+                    template: function (container, options) {
+                        const currentPr = options.data;
+
+                        const validFromText = currentPr.validFrom
+                            ? DevExpress.localization.formatDate(new Date(currentPr.validFrom), 'dd/MM/yyyy')
+                            : '-';
+                        const validUntilText = currentPr.validUntil
+                            ? DevExpress.localization.formatDate(new Date(currentPr.validUntil), 'dd/MM/yyyy')
+                            : '-';
+                        const statusDisplay = (statusLookup.find(x => x.id === currentPr.status) || {}).name || currentPr.status;
+
+                        $('<div>')
+                            .addClass('small text-muted mb-2')
+                            .text(`รายละเอียดเอกสาร ${currentPr.code}: Quotations และ Approval Steps`)
+                            .appendTo(container);
+
+                        const summary = $('<div>').addClass('row g-2 mb-3').appendTo(container);
+
+                        $('<div>')
+                            .addClass('col-md-3 col-sm-6')
+                            .html(`<div class="small text-muted">Vendor Code</div><div class="fw-semibold">${currentPr.vendorCode || '-'}</div>`)
+                            .appendTo(summary);
+
+                        $('<div>')
+                            .addClass('col-md-3 col-sm-6')
+                            .html(`<div class="small text-muted">Status</div><div class="fw-semibold">${statusDisplay}</div>`)
+                            .appendTo(summary);
+
+                        $('<div>')
+                            .addClass('col-md-3 col-sm-6')
+                            .html(`<div class="small text-muted">Valid From</div><div class="fw-semibold">${validFromText}</div>`)
+                            .appendTo(summary);
+
+                        $('<div>')
+                            .addClass('col-md-3 col-sm-6')
+                            .html(`<div class="small text-muted">Valid Until</div><div class="fw-semibold">${validUntilText}</div>`)
+                            .appendTo(summary);
+
+                        $('<div>')
+                            .addClass('col-12')
+                            .html(`<div class="small text-muted">Remark</div><div class="fw-semibold">${currentPr.remark || '-'}</div>`)
+                            .appendTo(summary);
+
+                        const detailRow = $('<div>').addClass('row g-3').appendTo(container);
+                        const quotationCol = $('<div>').addClass('col-lg-6').appendTo(detailRow);
+                        const approvalCol = $('<div>').addClass('col-lg-6').appendTo(detailRow);
+
+                        $('<div>')
+                            .addClass('mb-2 fw-semibold')
+                            .text('Quotations')
+                            .appendTo(quotationCol);
+
+                        $('<div>')
+                            .dxDataGrid({
+                                dataSource: new DevExpress.data.DataSource({
+                                    store: quotationStore,
+                                    filter: ['requestId', '=', options.key]
+                                }),
+                                keyExpr: 'id',
+                                remoteOperations: true,
+                                showBorders: true,
+                                columnAutoWidth: true,
+                                rowAlternationEnabled: true,
+                                paging: { pageSize: 6 },
+                                pager: { showInfo: true, showPageSizeSelector: true, allowedPageSizes: [6, 12] },
+                                columns: [
+                                    { dataField: 'fileName', caption: 'File', minWidth: 160 },
+                                    {
+                                        dataField: 'documentTypeId',
+                                        caption: 'ประเภทเอกสาร',
+                                        width: 170,
+                                        calculateCellValue: function (rowData) {
+                                            return getDocumentTypeName(rowData.documentTypeId);
+                                        }
+                                    },
+                                    {
+                                        dataField: 'fileSize',
+                                        caption: 'Size',
+                                        width: 95,
+                                        customizeText: function (cellInfo) {
+                                            const bytes = Number(cellInfo.value || 0);
+                                            if (bytes <= 0) return '-';
+                                            const kb = bytes / 1024;
+                                            if (kb < 1024) return kb.toFixed(1) + ' KB';
+                                            return (kb / 1024).toFixed(1) + ' MB';
+                                        }
+                                    },
+                                    {
+                                        dataField: 'isActive',
+                                        caption: 'Active',
+                                        width: 90,
+                                        cellTemplate: function (element, info) {
+                                            const isActive = info.value === true;
+                                            const badgeClass = isActive ? 'badge bg-success' : 'badge bg-secondary';
+                                            const text = isActive ? 'Yes' : 'No';
+                                            element.append(`<span class="${badgeClass}">${text}</span>`);
+                                        }
+                                    }
+                                ]
+                            })
+                            .appendTo(quotationCol);
+
+                        $('<div>')
+                            .addClass('mb-2 fw-semibold')
+                            .text('Approval Steps')
+                            .appendTo(approvalCol);
+
+                        $('<div>')
+                            .dxDataGrid({
+                                dataSource: new DevExpress.data.DataSource({
+                                    store: approvalStore,
+                                    filter: ['requestId', '=', options.key]
+                                }),
+                                keyExpr: 'id',
+                                remoteOperations: true,
+                                showBorders: true,
+                                columnAutoWidth: true,
+                                rowAlternationEnabled: true,
+                                paging: { pageSize: 6 },
+                                pager: { showInfo: true, showPageSizeSelector: true, allowedPageSizes: [6, 12] },
+                                columns: [
+                                    { dataField: 'sequence', caption: 'Seq', width: 70, sortOrder: 'asc' },
+                                    { dataField: 'stepName', caption: 'Step', width: 110 },
+                                    { dataField: 'approverNId', caption: 'Approver ID', width: 120 },
+                                    { dataField: 'approverName', caption: 'Approver Name', minWidth: 140 },
+                                    {
+                                        dataField: 'status',
+                                        caption: 'Status',
+                                        width: 105,
+                                        lookup: {
+                                            dataSource: statusLookup,
+                                            valueExpr: 'id',
+                                            displayExpr: 'name'
+                                        },
+                                        cellTemplate: statusCellTemplate
+                                    },
+                                    {
+                                        dataField: 'actionDate',
+                                        caption: 'Action Date',
+                                        dataType: 'datetime',
+                                        format: 'dd/MM/yyyy HH:mm',
+                                        width: 150
+                                    },
+                                    {
+                                        dataField: 'comment',
+                                        caption: 'Comment',
+                                        minWidth: 180
+                                    },
+                                    {
+                                        dataField: 'isActive',
+                                        caption: 'Active',
+                                        width: 90,
+                                        cellTemplate: function (element, info) {
+                                            const isActive = info.value === true;
+                                            const badgeClass = isActive ? 'badge bg-success' : 'badge bg-secondary';
+                                            const text = isActive ? 'Yes' : 'No';
+                                            element.append(`<span class="${badgeClass}">${text}</span>`);
+                                        }
+                                    }
+                                ]
+                            })
+                            .appendTo(approvalCol);
+                    }
+                }
+            }).dxDataGrid("instance");
+        });
+    </script>
+}

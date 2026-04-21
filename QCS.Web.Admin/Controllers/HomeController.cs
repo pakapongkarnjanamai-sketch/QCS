@@ -6,17 +6,10 @@ namespace QCS.Web.Admin.Controllers
     {
         public IActionResult Index()
         {
-            return View();
+            return RedirectToAction(nameof(Workspace));
         }
-        public IActionResult PurchaseRequest()
-        {
-            return View();
-        }
-        public IActionResult Quotation()
-        {
-            return View();
-        }
-        public IActionResult ApprovalStep()
+
+        public IActionResult Workspace()
         {
             return View();
         }

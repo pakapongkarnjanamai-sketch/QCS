@@ -1,4 +1,4 @@
-@using Microsoft.Extensions.Configuration
+﻿@using Microsoft.Extensions.Configuration
 @inject IConfiguration Configuration
 
 @{
@@ -7,7 +7,7 @@
 }
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -32,12 +32,6 @@
     <script defer src="~/lib/microsoft-signalr/signalr.min.js"></script>
     <script defer src="~/js/devextreme/filesaver.min.js"></script>
     <script defer src="~/js/devextreme/dx-exceljs-fork.min.js"></script>
-    <script src="~/js/devextreme/jquery.js"></script>
-    <script src="~/js/devextreme/bootstrap.js"></script>
-    <script src="~/js/devextreme/dx.all.js"></script>
-    <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
-    <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
-    <script src="~/src/devextreme-license.js"></script>
     <script defer src="~/lib/font-awesome/js/all.min.js"></script>
 
     @await RenderSectionAsync("Styles", required: false)
@@ -47,14 +41,14 @@
     <a href="#main-content" class="skip-link visually-hidden-focusable p-3" style="position: absolute; z-index: 9999; background: var(--text-primary); color: white; left: 0; top: 0;">ข้ามไปยังเนื้อหาหลัก (Skip to main content)</a>
     @if (!hideNav)
     {
-        <nav class="navbar navbar-expand-lg navbar-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark" aria-label="เมนูหลัก (Main navigation)">
             <div class="container-fluid">
                 <a class="navbar-brand" href="@Url.Action("Index", "Home")">
-                    <i class="fas fa-file-invoice-dollar me-2"></i>
+                    <i class="fas fa-file-invoice-dollar me-2" aria-hidden="true"></i>
                     QCS
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                    <span class="navbar-toggler-icon"></span>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="เปิด/ปิดเมนู (Toggle navigation)">
+                    <span class="navbar-toggler-icon" aria-hidden="true"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
@@ -72,7 +66,7 @@
         </nav>
     }
 
-    <main id="main-content">
+    <main id="main-content" aria-label='@ViewData["Title"]'>
         @RenderBody()
     </main>
 
@@ -80,8 +74,15 @@
 
     <script>
         const API_BASE = '@Configuration["ApiSettings:BaseUrl"]';
-        console.log("API_BASE:", API_BASE);
     </script>
+
+    @* Core dependencies *@
+    <script src="~/js/devextreme/jquery.js"></script>
+    <script src="~/js/devextreme/bootstrap.js"></script>
+    <script src="~/js/devextreme/dx.all.js"></script>
+    <script src="~/js/devextreme/aspnet/dx.aspnet.mvc.js"></script>
+    <script src="~/js/devextreme/aspnet/dx.aspnet.data.js"></script>
+    <script src="~/src/devextreme-license.js"></script>
 
     @* Shared JS: Core runtime *@
     <script src="~/js/site.js" asp-append-version="true"></script>

@@ -70,15 +70,17 @@
 </div>
 
 <div id="actionPopup">
-    <div class="p-2">
-        <script>
-            window.QcsPageConfig = {
-                docCode: '@Model',
-                documentTypes: @Html.Raw(Json.Serialize(EnumHelper.ToList<DocumentType>())),
-                workflowStepSource: @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>())),
-                approvalStatuses: @Html.Raw(Json.Serialize(EnumHelper.ToList<ApprovalStatus>()))
-            };
-        </script>
-        <script src="~/js/pages/quotation-view.js"></script>
-    </div>
+    <div class="p-2"></div>
 </div>
+
+@section Scripts {
+    <script>
+        window.QcsPageConfig = {
+            docCode: '@Model',
+            documentTypes: @Html.Raw(Json.Serialize(EnumHelper.ToList<DocumentType>())),
+            workflowStepSource: @Html.Raw(Json.Serialize(EnumHelper.ToList<WorkflowStep>())),
+            approvalStatuses: @Html.Raw(Json.Serialize(EnumHelper.ToList<ApprovalStatus>()))
+        };
+    </script>
+    <script src="~/js/pages/quotation-view.js"></script>
+}
