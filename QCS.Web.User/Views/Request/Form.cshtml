@@ -3,7 +3,7 @@
 @using QCS.Infrastructure.Services
 
 @{
-    ViewData["Title"] = "สร้างใบเสนอราคา";
+    ViewData["Title"] = "สร้างใบเสนอราคา (Create Quotation)";
     Layout = "_DevExtremeLayout";
 }
 
@@ -24,7 +24,7 @@
                         @if (Model.HasValue)
                         {
                             <span class="mx-2 text-muted opacity-25">|</span>
-                            <span id="lblDocNo" class="fw-bold text-brand">กำลังโหลด...</span>
+                            <span id="lblDocNo" class="fw-bold text-brand">กำลังโหลด... (Loading...)</span>
                         }
                     </div>
                 </h1>
@@ -39,7 +39,7 @@
     <div class="qcs-card" id="formContainer">
         <div class="section-header">
             <i class="fas fa-info-circle" style="color: var(--dx-primary-color);"></i>
-            ข้อมูล
+            ข้อมูล (Information)
         </div>
         <div id="quotationForm"></div>
     </div>
@@ -47,7 +47,7 @@
     <div class="qcs-card">
         <div class="section-header">
             <i class="fas fa-route" style="color: var(--dx-primary-color);"></i>
-            เส้นทางอนุมัติ
+            เส้นทางอนุมัติ (Approval Route)
         </div>
         <div id="workflowRouteGrid"></div>
     </div>

@@ -18,21 +18,21 @@
         <div class="pdf-toolbar">
             <div class="pdf-title">
                 <i class="fas fa-file-alt"></i>
-                <span id="docTitleLabel">ตัวอย่างเอกสาร</span>
+                <span id="docTitleLabel">เอกสาร (Document)</span>
             </div>
 
-            <button class="btn btn-sm btn-outline-primary ms-auto me-1" id="btnDownload" style="display:none;" disabled aria-label="ดาวน์โหลดเอกสาร PDF" title="ดาวน์โหลดเอกสาร PDF">
-                <i class="fas fa-download"></i> ดาวน์โหลด
+            <button class="btn btn-sm btn-outline-primary ms-auto me-1" id="btnDownload" style="display:none;" disabled aria-label="ดาวน์โหลดเอกสาร PDF (Download PDF)" title="ดาวน์โหลดเอกสาร PDF (Download PDF)">
+                <i class="fas fa-download"></i> ดาวน์โหลด (Download)
             </button>
 
-            <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen" aria-label="เปิดเอกสารแบบเต็มจอ" title="เปิดหรือปิดโหมดเต็มจอ">
-                <i class="fas fa-expand"></i> เต็มจอ
+            <button class="btn btn-sm btn-outline-secondary" id="btnFullscreen" aria-label="เปิดเอกสารแบบเต็มจอ (Fullscreen)" title="เปิดหรือปิดโหมดเต็มจอ (Toggle Fullscreen)">
+                <i class="fas fa-expand"></i> เต็มจอ (Fullscreen)
             </button>
         </div>
         <div id="pdfViewer" class="pdf-body">
             <div class="pdf-placeholder">
                 <i class="fas fa-search fa-3x mb-3 opacity-50"></i>
-                <div>กำลังสร้างเอกสาร...</div>
+                <div>กำลังโหลดเอกสาร... (Loading Document...)</div>
             </div>
         </div>
     </div>
@@ -45,7 +45,7 @@
         <div class="info-scroll-wrapper">
             <div class="info-card">
                 <div class="card-header-text">
-                    <span><i class="fas fa-info-circle"></i> ข้อมูล</span>
+                    <span><i class="fas fa-info-circle"></i> ข้อมูล (Information)</span>
                     <span id="headerStatus"></span>
                 </div>
                 <div id="requestInfoForm"></div>
@@ -53,7 +53,7 @@
 
             <div class="info-card" style="min-height: 200px;">
                 <div class="card-header-text">
-                    <span><i class="fas fa-paperclip"></i> เอกสารแนบ</span>
+                    <span><i class="fas fa-paperclip"></i> เอกสารแนบ (Attachments)</span>
                     <span id="attachmentCount" class="badge rounded-pill bg-secondary text-white">0</span>
                 </div>
                 <div id="documentList"></div>
@@ -61,7 +61,7 @@
 
             <div class="info-card">
                 <div class="card-header-text">
-                    <span><i class="fas fa-route"></i> ลำดับอนุมัติ</span>
+                    <span><i class="fas fa-route"></i> ลำดับอนุมัติ (Approval Workflow)</span>
                 </div>
                 <div id="approvalList" class="timeline"></div>
             </div>
