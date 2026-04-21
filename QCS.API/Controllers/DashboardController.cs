@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using QCS.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;

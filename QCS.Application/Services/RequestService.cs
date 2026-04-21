@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using QCS.Application.Abstractions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,6 @@ using QCS.Application.Hubs;
 using QCS.Domain.DTOs;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
-using QCS.Infrastructure.Services;
 using System.Linq.Expressions;
 using System.Text.Json;
 

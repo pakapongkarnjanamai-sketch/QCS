@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using QCS.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;

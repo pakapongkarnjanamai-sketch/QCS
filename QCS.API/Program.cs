@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.Negotiate;
+using QCS.Application.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Hubs;
 using QCS.Application.Services;

@@ -1,3 +1,0 @@
-﻿@using PDF.Admin
-@namespace PDF.Admin.Pages
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
