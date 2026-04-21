@@ -1,117 +1,36 @@
-﻿using Microsoft.AspNetCore.Authentication.Negotiate;
-using Microsoft.EntityFrameworkCore;
+using QCS.API.Extensions;
+using QCS.API.Middleware;
+using QCS.Application;
 using QCS.Application.Hubs;
-using QCS.Application.Services;
-using QCS.Infrastructure.Data;
-using QCS.Infrastructure.Services;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using QCS.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddSignalR();
-builder.Services.AddMemoryCache();
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        options.JsonSerializerOptions.DictionaryKeyPolicy = null;
-    });
+// Composition root — one call per layer.
+builder.Services.AddApiServices(builder.Configuration);
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { Title = "QCS API", Version = "v1" });
-});
+// Global exception handler — translates unhandled exceptions to ProblemDetails.
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-    .AddNegotiate();
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddHttpClient<QCS.Application.Services.WorkflowService>();
-builder.Services.Configure<IISOptions>(options =>
-{
-    options.AutomaticAuthentication = true;
-    options.AuthenticationDisplayName = "Windows";
-});
-
-builder.Services.AddAuthorization(options =>
-{
-    // Default policy - require authentication
-    options.FallbackPolicy = options.DefaultPolicy;
-
-    // Role-based policies
-    options.AddPolicy("AdminOnly", policy =>
-        policy.RequireRole("Admin", "SuperAdmin"));
-
-    options.AddPolicy("SuperAdminOnly", policy =>
-        policy.RequireRole("SuperAdmin"));
-
-    options.AddPolicy("ManagerOrAbove", policy =>
-        policy.RequireRole("Manager", "Admin", "SuperAdmin"));
-
-    options.AddPolicy("UserOrAbove", policy =>
-        policy.RequireRole("User", "Manager", "Admin", "SuperAdmin"));
-
-    var domainPrefix = builder.Configuration["DomainSettings:DomainPrefix"]
-        ?? throw new InvalidOperationException("DomainSettings:DomainPrefix configuration is required.");
-    options.AddPolicy("DomainUser", policy =>
-        policy.RequireAssertion(context =>
-            context.User.Identity?.Name?.StartsWith(domainPrefix, StringComparison.OrdinalIgnoreCase) == true));
-});
-
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddTransient<IDateTime, DateTimeService>();
-builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-builder.Services.AddScoped<IRequestService, RequestService>();
-builder.Services.AddScoped<IQuotationService, QuotationService>();
-builder.Services.AddScoped<IFileService, FileService>();
-
-var allowedOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>()
-    ?? throw new InvalidOperationException("CorsOrigins configuration is required.");
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.WithOrigins(allowedOrigins) // อ่านจาก Config
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
-    });
-});
-var vendorApiBaseUrl = builder.Configuration["ExternalServices:VendorApi"]
-    ?? throw new InvalidOperationException("ExternalServices:VendorApi configuration is required.");
-
-builder.Services.AddHttpClient("VendorApi", client =>
-{
-    client.BaseAddress = new Uri(vendorApiBaseUrl);
-});
 var app = builder.Build();
 
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseDeveloperExceptionPage();
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "QCS API V1");
-    });
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "QCS API V1"));
 }
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 app.MapHub<NotificationHub>("/notificationHub");
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

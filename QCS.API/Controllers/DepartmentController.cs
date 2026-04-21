@@ -1,4 +1,5 @@
 ﻿using DevExtreme.AspNet.Data;
+using QCS.Application.Abstractions;
 using DevExtreme.AspNet.Mvc;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

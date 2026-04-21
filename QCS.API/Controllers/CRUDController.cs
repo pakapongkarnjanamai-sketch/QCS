@@ -1,4 +1,5 @@
 ﻿using QCS.Application.Services;
+using QCS.Application.Abstractions;
 using QCS.Domain.Models;
 
 namespace QCS.Api.Controllers

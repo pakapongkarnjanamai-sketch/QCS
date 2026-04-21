@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
-namespace QCS.Web.User.Controllers
+namespace QCS.Web.Admin.Controllers
 {
     public class HomeController : Controller
     {

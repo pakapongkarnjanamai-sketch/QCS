@@ -1,19 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using QCS.Application.Abstractions;
 
-namespace QCS.Application.Services
+namespace QCS.Infrastructure.Services
 {
-    public interface ICurrentUserService
-    {
-        // คืนค่า User Id เช่น "N4734" (ตัด Domain ออกแล้ว)
-        string UserId { get; }
-
-        // คืนค่าชื่อเต็มจาก AD เช่น "DOMAIN\N4734" (เผื่อต้องใช้)
-        string FullName { get; }
-
-        // เช็คว่า User Login อยู่จริงไหม
-        bool IsAuthenticated { get; }
-    }
+    /// <summary>
+    /// HttpContext-based implementation of <see cref="ICurrentUserService"/>.
+    /// </summary>
     public class CurrentUserService : ICurrentUserService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -29,15 +21,13 @@ namespace QCS.Application.Services
             {
                 var user = _httpContextAccessor.HttpContext?.User;
 
-                // กรณีไม่มี User Login หรือเป็น System ให้ return "SYSTEM" หรือค่าว่างตาม Business Rule
                 if (user?.Identity?.IsAuthenticated != true)
                     return "SYSTEM";
 
-                var fullName = user.Identity.Name; // ex: "NIKONOA\N4734"
+                var fullName = user.Identity.Name;
                 if (string.IsNullOrEmpty(fullName))
                     return "SYSTEM";
 
-                // Logic ตัด Domain: ถ้ามี Backslash ให้เอาข้างหลัง, ถ้าไม่มีให้เอาทั้งหมด
                 var parts = fullName.Split('\\');
                 return parts.Length > 1 ? parts[1] : parts[0];
             }

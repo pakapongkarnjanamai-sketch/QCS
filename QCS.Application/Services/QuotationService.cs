@@ -1,9 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using QCS.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using QCS.Domain.DTOs;
 using QCS.Domain.Models;
-using QCS.Infrastructure.Services;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
