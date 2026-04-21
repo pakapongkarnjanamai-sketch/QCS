@@ -1,0 +1,22 @@
+using Microsoft.Extensions.DependencyInjection;
+using QCS.Application.Abstractions;
+using QCS.Application.Services;
+
+namespace QCS.Application
+{
+    /// <summary>
+    /// Composition root for the Application layer.
+    /// Registers application services that depend only on the Application/Domain layers.
+    /// </summary>
+    public static class DependencyInjection
+    {
+        public static IServiceCollection AddApplication(this IServiceCollection services)
+        {
+            services.AddScoped<IRequestService, RequestService>();
+            services.AddScoped<IQuotationService, QuotationService>();
+            services.AddScoped<IFileService, FileService>();
+
+            return services;
+        }
+    }
+}
