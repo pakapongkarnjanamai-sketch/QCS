@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -15,8 +15,9 @@
     <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
     <link href="~/css/devextreme/dx.light.compact.css" rel="stylesheet" />
     <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
-    <script src="~/js/devextreme/filesaver.min.js"></script>
-    <script src="~/js/devextreme/dx-exceljs-fork.min.js"></script>
+    <link href="~/css/layout.css" rel="stylesheet" />
+    <script defer src="~/js/devextreme/filesaver.min.js"></script>
+    <script defer src="~/js/devextreme/dx-exceljs-fork.min.js"></script>
 
     <script src="~/js/devextreme/jquery.js"></script>
     <script src="~/js/devextreme/bootstrap.js"></script>
@@ -35,54 +36,13 @@
         <script src="~/host/production.js"></script>
     </environment>
 
-    <style>
-        .navbar {
-            padding-left: 24px;
-            padding-right: 24px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .navbar-brand {
-            /* color: white !important; */
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-            .navbar-brand:hover {
-                color: #255C8C !important;
-                text-decoration: none;
-            }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding-top: 80px;
-        }
-
-
-        .gridContainer {
-            margin: 0px 20px;
-            padding: 20px;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            height: calc(100vh - 120px);
-            min-width: 1280px;
-            min-height: 840px;
-        }
-
-    </style>
 
     @await RenderSectionAsync("Styles", required: false)
 
 </head>
 
 <body>
+    <a href="#main-content" class="skip-link">ข้ามไปยังเนื้อหาหลัก (Skip to main content)</a>
     <nav class="navbar navbar-light bg-light fixed-top navbar-expand-md">
         <a class="navbar-brand" href="@Url.Action("Index", "Home")">
             QCS
@@ -93,7 +53,9 @@
     </nav>
 
 
-    @RenderBody()
+    <main id="main-content">
+        @RenderBody()
+    </main>
 
 
     <script>

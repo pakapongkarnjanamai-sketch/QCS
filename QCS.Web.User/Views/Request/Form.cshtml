@@ -1,4 +1,4 @@
-﻿@model int?
+@model int?
 @using QCS.Domain.Enum
 @using QCS.Infrastructure.Services
 
@@ -16,18 +16,18 @@
         <div class="row align-items-center g-3">
 
             <div class="col-12 col-xl me-auto">
-                <h5 class="m-0 d-flex align-items-center text-primary-header">
-                    <i class="fas fa-file-invoice-dollar me-2 flex-shrink-0" style="color: var(--dx-primary-color);"></i>
+                <h1 class="h5 m-0 d-flex align-items-center text-primary-header">
+                    <i class="fas fa-file-invoice-dollar me-2 flex-shrink-0 text-brand"></i>
 
                     <div class="text-wrap lh-sm">
                         <span id="lblPageTitle" class="fw-bold">@ViewData["Title"]</span>
                         @if (Model.HasValue)
                         {
                             <span class="mx-2 text-muted opacity-25">|</span>
-                            <span id="lblDocNo" class="fw-bold" style="color: var(--dx-primary-color);">กำลังโหลด...</span>
+                            <span id="lblDocNo" class="fw-bold text-brand">กำลังโหลด...</span>
                         }
                     </div>
-                </h5>
+                </h1>
             </div>
 
             <div class="col-12 col-xl-auto">

@@ -1,4 +1,4 @@
-﻿@model string
+@model string
 @using QCS.Domain.Enum
 @using QCS.Infrastructure.Services
 
@@ -13,6 +13,7 @@
 }
 
 <div class="viewer-container">
+    <h1 class="visually-hidden">@ViewData["Title"]</h1>
     <div class="pdf-section">
         <div class="pdf-toolbar">
             <div class="pdf-title">
@@ -37,7 +38,7 @@
     </div>
 
     <div class="info-section">
-        <div id="actionCard" class="info-card" style="display:none;">
+        <div id="actionCard" class="info-card d-none">
             <div id="actionButtonContainer" class="d-flex gap-2 w-100"></div>
         </div>
 
@@ -53,7 +54,7 @@
             <div class="info-card" style="min-height: 200px;">
                 <div class="card-header-text">
                     <span><i class="fas fa-paperclip"></i> เอกสารแนบ</span>
-                    <span id="attachmentCount" class="badge rounded-pill" style="background-color: #6c757d; color: white;">0</span>
+                    <span id="attachmentCount" class="badge rounded-pill bg-secondary text-white">0</span>
                 </div>
                 <div id="documentList"></div>
             </div>

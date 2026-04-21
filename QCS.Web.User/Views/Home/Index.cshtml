@@ -1,4 +1,4 @@
-﻿@using QCS.Domain.Enum
+@using QCS.Domain.Enum
 @using QCS.Infrastructure.Services
 
 @{
@@ -11,6 +11,7 @@
 }
 
 <div class="container-fluid full-height-container mt-3">
+    <h1 class="visually-hidden">@ViewData["Title"]</h1>
     <div class="qcs-card-content" id="main-dashboard-card">
 
         <div class="workspace-filter-panel mb-3">
@@ -38,7 +39,7 @@
             <div class="workspace-empty-icon p-4 rounded-circle bg-light mb-3">
                 <i class="fas fa-inbox fa-3x text-muted opacity-50"></i>
             </div>
-            <h5 id="emptyStateTitle" class="text-muted mb-2">ยังไม่มีรายการ</h5>
+            <h2 id="emptyStateTitle" class="h5 text-muted mb-2">ยังไม่มีรายการ</h2>
         </div>
         <div id="loadingIndicator"></div>
     </div>
