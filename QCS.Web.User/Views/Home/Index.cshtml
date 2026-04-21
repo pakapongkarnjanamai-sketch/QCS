@@ -15,14 +15,17 @@
     <div class="qcs-card-content" id="main-dashboard-card">
 
         <div class="workspace-filter-panel mb-3">
-            <div class="d-flex flex-wrap align-items-center gap-3 workspace-filter-inline">
-                <div id="workspaceAllFilters" class="d-flex flex-wrap gap-2 workspace-filter-group"></div>
-                <div class="workspace-filter-separator"></div>
-                <div id="workspaceMyFilters" class="d-flex flex-wrap gap-2 workspace-filter-group"></div>
-                <div class="workspace-filter-separator"></div>
-                <div class="d-flex gap-2 workspace-filter-group workspace-action-group ms-auto">
+            <div class="workspace-filter-bar">
+                <!-- Scrollable filter chips area -->
+                <div class="workspace-filter-scroll">
+                    <div id="workspaceAllFilters" class="d-flex gap-2 workspace-filter-group"></div>
+                    <div class="workspace-filter-separator"></div>
+                    <div id="workspaceMyFilters" class="d-flex gap-2 workspace-filter-group"></div>
+                </div>
+                <!-- Pinned action button — always visible -->
+                <div class="workspace-action-group">
                     <button id="btnCreateHeader" type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 px-3 py-2 workspace-filter-btn workspace-action-btn">
-                        <i class="fas fa-plus"></i>
+                        <i class="fas fa-plus" aria-hidden="true"></i>
                         <span>สร้างใบเสนอราคา (Create Quotation)</span>
                     </button>
                 </div>
