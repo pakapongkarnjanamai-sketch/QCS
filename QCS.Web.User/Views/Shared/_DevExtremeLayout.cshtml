@@ -19,15 +19,15 @@
     <link href="~/css/devextreme/bootstrap.min.css" rel="stylesheet" />
     <link href="~/css/devextreme/dx.fluent.blue.light.css" rel="stylesheet" />
     <link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
-    <link href="~/css/core/variables.css" rel="stylesheet" />
-    <link href="~/css/layout/containers.css" rel="stylesheet" />
-    <link href="~/css/layout/navbar.css" rel="stylesheet" />
-    <link href="~/css/components/badges.css" rel="stylesheet" />
-    <link href="~/css/components/grid.css" rel="stylesheet" />
-    <link href="~/css/components/tabs.css" rel="stylesheet" />
-    <link href="~/css/components/attachments.css" rel="stylesheet" />
-    <link href="~/css/components/timeline.css" rel="stylesheet" />
-    <link href="~/css/utilities/helpers.css" rel="stylesheet" />
+    <link href="~/css/core/variables.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/layout/containers.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/layout/navbar.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/components/badges.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/components/grid.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/components/tabs.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/components/attachments.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/components/timeline.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/utilities/helpers.css" rel="stylesheet" asp-append-version="true" />
     
     <script defer src="~/lib/microsoft-signalr/signalr.min.js"></script>
     <script defer src="~/js/devextreme/filesaver.min.js"></script>
@@ -84,27 +84,27 @@
     </script>
 
     @* Shared JS: Core runtime *@
-    <script src="~/js/site.js"></script>
-    <script src="~/js/shared/loading.js"></script>
-    <script src="~/js/shared/async-action.js"></script>
-    <script src="~/js/shared/error-presenter.js"></script>
-    <script src="~/js/shared/utils.js"></script>
-    <script src="~/js/shared/status-badge.js"></script>
-    <script src="~/js/shared/button-defaults.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/shared/loading.js" asp-append-version="true"></script>
+    <script src="~/js/shared/async-action.js" asp-append-version="true"></script>
+    <script src="~/js/shared/error-presenter.js" asp-append-version="true"></script>
+    <script src="~/js/shared/utils.js" asp-append-version="true"></script>
+    <script src="~/js/shared/status-badge.js" asp-append-version="true"></script>
+    <script src="~/js/shared/button-defaults.js" asp-append-version="true"></script>
 
     @* Shared JS: UI interactions *@
-    <script src="~/js/shared/file-view.js"></script>
-    <script src="~/js/shared/action-dialog.js"></script>
-    <script src="~/js/shared/toolbar.js"></script>
-    <script src="~/js/shared/signalr.js"></script>
+    <script src="~/js/shared/file-view.js" asp-append-version="true"></script>
+    <script src="~/js/shared/action-dialog.js" asp-append-version="true"></script>
+    <script src="~/js/shared/toolbar.js" asp-append-version="true"></script>
+    <script src="~/js/shared/signalr.js" asp-append-version="true"></script>
 
     @* Shared JS: Request domain helpers *@
-    <script src="~/js/shared/approval-action.js"></script>
-    <script src="~/js/shared/request-workflow.js"></script>
-    <script src="~/js/shared/attachment-grid.js"></script>
-    <script src="~/js/shared/request-form-validation.js"></script>
-    <script src="~/js/shared/request-submission.js"></script>
-    <script src="~/js/shared/request-grid.js"></script>
+    <script src="~/js/shared/approval-action.js" asp-append-version="true"></script>
+    <script src="~/js/shared/request-workflow.js" asp-append-version="true"></script>
+    <script src="~/js/shared/attachment-grid.js" asp-append-version="true"></script>
+    <script src="~/js/shared/request-form-validation.js" asp-append-version="true"></script>
+    <script src="~/js/shared/request-submission.js" asp-append-version="true"></script>
+    <script src="~/js/shared/request-grid.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
