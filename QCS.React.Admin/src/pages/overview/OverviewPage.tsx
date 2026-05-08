@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { appConfig } from '../../config/appConfig.ts'
+import Chart, {
+  Series as ChartSeries,
+  CommonSeriesSettings,
+  SeriesTemplate,
+  Tooltip as ChartTooltip,
+  ArgumentAxis,
+  ValueAxis,
+  Legend as ChartLegend,
+} from 'devextreme-react/chart'
+import TreeMap, { Tooltip as TreeMapTooltip, Colorizer } from 'devextreme-react/tree-map'
+import PieChart, {
+  Series as PieSeries,
+  Tooltip as PieTooltip,
+  Legend as PieLegend,
+} from 'devextreme-react/pie-chart'
 
 type DashboardSummary = {
   myTaskCount: number
@@ -31,6 +46,38 @@ type TopRequesterRow = {
   requesterNId: string
   requesterName: string
   quotationCount: number
+}
+
+type TrendPoint = {
+  year: number
+  month: number
+  label: string
+  count: number
+}
+
+type SeriesTrendPoint = {
+  label: string
+  name: string
+  count: number
+}
+
+type Granularity = 'week' | 'month' | 'year'
+
+type ValidityStatus = {
+  active: number
+  expiringSoon: number
+  expired: number
+}
+
+type ActiveVendorPoint = {
+  name: string
+  value: number
+}
+
+type StaticData = {
+  requesterTrend: SeriesTrendPoint[]
+  activeVendors: ActiveVendorPoint[]
+  validityStatus: ValidityStatus
 }
 
 type OverviewData = {
@@ -90,6 +137,12 @@ function formatCount(value: number): string {
   return numberFormat.format(value)
 }
 
+const GRANULARITY_OPTIONS: Array<{ key: Granularity; label: string; rangeLabel: string }> = [
+  { key: 'week', label: 'Week', rangeLabel: 'Last 7 days' },
+  { key: 'month', label: 'Month', rangeLabel: 'Last 4 weeks' },
+  { key: 'year', label: 'Year', rangeLabel: 'Last 12 months' },
+]
+
 function toErrorMessage(reason: unknown): string {
   if (reason instanceof DOMException && reason.name === 'AbortError') {
     return 'Request was aborted.'
@@ -140,7 +193,16 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
     ),
   ])
 
-  const [summaryResult, allResult, draftResult, pendingResult, approvedResult, rejectedResult, vendorsResult, requestersResult] = results
+  const [
+    summaryResult,
+    allResult,
+    draftResult,
+    pendingResult,
+    approvedResult,
+    rejectedResult,
+    vendorsResult,
+    requestersResult,
+  ] = results
 
   const issues: LoadIssue[] = []
 
@@ -219,72 +281,95 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
   }
 }
 
+async function fetchTrendData(granularity: Granularity, signal: AbortSignal): Promise<TrendPoint[]> {
+  return fetchJson<TrendPoint[]>(`/api/Dashboard/RequestTrend?granularity=${granularity}`, signal)
+}
+
+async function fetchStaticData(signal: AbortSignal): Promise<StaticData> {
+  const [requesterTrendResult, activeVendorsResult, validityResult] = await Promise.allSettled([
+    fetchJson<SeriesTrendPoint[]>('/api/Dashboard/RequesterTrend?days=15&top=5', signal),
+    fetchJson<ActiveVendorPoint[]>('/api/Dashboard/ActiveVendors?top=10', signal),
+    fetchJson<ValidityStatus>('/api/Dashboard/ValidityStatus', signal),
+  ])
+  return {
+    requesterTrend: requesterTrendResult.status === 'fulfilled' ? requesterTrendResult.value : [],
+    activeVendors: activeVendorsResult.status === 'fulfilled' ? activeVendorsResult.value : [],
+    validityStatus:
+      validityResult.status === 'fulfilled'
+        ? validityResult.value
+        : { active: 0, expiringSoon: 0, expired: 0 },
+  }
+}
+
 export function OverviewPage() {
   const [data, setData] = useState<OverviewData | null>(null)
+  const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [trendLoading, setTrendLoading] = useState(false)
+  const [staticData, setStaticData] = useState<StaticData>({
+    requesterTrend: [],
+    activeVendors: [],
+    validityStatus: { active: 0, expiringSoon: 0, expired: 0 },
+  })
   const [issues, setIssues] = useState<LoadIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [granularity, setGranularity] = useState<Granularity>('week')
 
+  // Load static data once
   useEffect(() => {
     const controller = new AbortController()
+    void fetchStaticData(controller.signal).then((result) => {
+      setStaticData(result)
+    })
+    return () => { controller.abort() }
+  }, [])
 
+  // Load initial page data once
+  useEffect(() => {
+    const controller = new AbortController()
     const load = async () => {
       setLoading(true)
       setError(null)
       setIssues([])
-
       try {
         const result = await fetchOverviewData(controller.signal)
         setData(result.data)
         setIssues(result.issues)
       } catch (reason) {
-        if (reason instanceof DOMException && reason.name === 'AbortError') {
-          return
-        }
-
-        const message = reason instanceof Error ? reason.message : 'Cannot load overview data.'
-        setError(message)
+        if (reason instanceof DOMException && reason.name === 'AbortError') return
+        setError(reason instanceof Error ? reason.message : 'Cannot load overview data.')
         setData(null)
       } finally {
         setLoading(false)
       }
     }
-
     void load()
-
-    return () => {
-      controller.abort()
-    }
+    return () => { controller.abort() }
   }, [])
 
-  const topSummary = useMemo(() => {
-    if (!data) {
-      return []
+  // Reload only the trend chart on granularity change
+  useEffect(() => {
+    const controller = new AbortController()
+    const load = async () => {
+      setTrendLoading(true)
+      try {
+        const result = await fetchTrendData(granularity, controller.signal)
+        setTrend(result)
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return
+        setTrend([])
+      } finally {
+        setTrendLoading(false)
+      }
     }
+    void load()
+    return () => { controller.abort() }
+  }, [granularity])
 
-    return [
-      {
-        label: 'My pending tasks',
-        value: data.summary.myTaskCount,
-        note: 'Approvals assigned to your account now.',
-      },
-      {
-        label: 'My requests',
-        value: data.summary.myRequestCount,
-        note: 'Requests created by your account.',
-      },
-      {
-        label: 'My approved',
-        value: data.summary.myApprovedCount,
-        note: 'Your requests that passed all approval steps.',
-      },
-      {
-        label: 'My rejected',
-        value: data.summary.myRejectedCount,
-        note: 'Requests that need rework before resubmission.',
-      },
-    ]
-  }, [data])
+  const activeRangeLabel = useMemo(
+    () => GRANULARITY_OPTIONS.find((g) => g.key === granularity)?.rangeLabel ?? '',
+    [granularity],
+  )
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -328,62 +413,223 @@ export function OverviewPage() {
             </section>
           )}
 
-          <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <article className={cardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
-                Workload now
+          <section className={cardClassName}>
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-(--border-subtle) pb-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                  Trend window
+                </p>
+                <h3
+                  className="mt-1 text-[18px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  Aggregation: {activeRangeLabel}
+                </h3>
+              </div>
+              <div
+                role="group"
+                aria-label="Trend granularity"
+                className="inline-flex border border-(--border-subtle)"
+              >
+                {GRANULARITY_OPTIONS.map((opt) => {
+                  const active = opt.key === granularity
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setGranularity(opt.key)}
+                      aria-pressed={active}
+                      className={`focus-ring min-h-11 px-4 text-[12px] font-medium ${
+                        active
+                          ? 'bg-(--ink-strong) text-(--surface-panel)'
+                          : 'bg-(--surface-panel) text-(--ink-muted) hover:bg-(--surface-muted)'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                Request volume
               </p>
-              <div className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="rounded-sm border border-(--border-subtle) bg-(--surface-muted) px-4 py-4">
-                  <p className="text-[12px] font-medium text-(--ink-muted)">Pending approvals</p>
+              {trendLoading ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex h-60 items-center justify-center text-[12px] text-(--ink-muted)"
+                >
+                  Loading…
+                </div>
+              ) : (
+                <Chart dataSource={trend} height={240}>
+                  <ChartSeries
+                    valueField="count"
+                    argumentField="label"
+                    type="bar"
+                    color="#3b82f6"
+                    name="Requests"
+                  />
+                  <ArgumentAxis />
+                  <ValueAxis allowDecimals={false} />
+                  <ChartLegend visible={false} />
+                  <ChartTooltip
+                    enabled
+                    customizeTooltip={(arg: { argument: string; value: number }) => ({
+                      text: `${arg.argument}: ${formatCount(arg.value)}`,
+                    })}
+                  />
+                </Chart>
+              )}
+            </div>
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            <article className={cardClassName}>
+              <div className="mb-3 border-b border-(--border-subtle) pb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                  Top requesters
+                </p>
+                <h3
+                  className="mt-1 text-[16px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  Requests created by top 5 requesters
+                </h3>
+              </div>
+              {staticData.requesterTrend.length === 0 ? (
+                <p className="text-[12px] text-(--ink-muted)">No requester activity found.</p>
+              ) : (
+                <Chart dataSource={staticData.requesterTrend} height={260}>
+                  <CommonSeriesSettings argumentField="label" valueField="count" type="line" />
+                  <SeriesTemplate nameField="name" />
+                  <ArgumentAxis />
+                  <ValueAxis allowDecimals={false} />
+                  <ChartLegend visible verticalAlignment="bottom" horizontalAlignment="center" />
+                  <ChartTooltip
+                    enabled
+                    customizeTooltip={(arg: { seriesName: string; argument: string; value: number }) => ({
+                      text: `${arg.seriesName}\n${arg.argument}: ${formatCount(arg.value)}`,
+                    })}
+                  />
+                </Chart>
+              )}
+            </article>
+
+            <article className={cardClassName}>
+              <div className="mb-3 border-b border-(--border-subtle) pb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                  Top vendors
+                </p>
+                <h3
+                  className="mt-1 text-[16px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  Active quotations by vendor
+                </h3>
+              </div>
+              {staticData.activeVendors.length === 0 ? (
+                <p className="text-[12px] text-(--ink-muted)">No active quotations found.</p>
+              ) : (
+                <TreeMap
+                  dataSource={staticData.activeVendors}
+                  valueField="value"
+                  labelField="name"
+                  height={260}
+                >
+                  <Colorizer type="discrete" palette="Soft Pastel" />
+                  <TreeMapTooltip
+                    enabled
+                    customizeTooltip={(arg: { node: { label: () => string }; value: number }) => ({
+                      text: `${arg.node.label()}\n${formatCount(arg.value)} active quotations`,
+                    })}
+                  />
+                </TreeMap>
+              )}
+            </article>
+          </section>
+
+          <section className={cardClassName}>
+            <div className="mb-4 border-b border-(--border-subtle) pb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                Validity health
+              </p>
+              <h3
+                className="mt-1 text-[18px] font-semibold leading-none text-(--ink-strong)"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                Quotation expiry status
+              </h3>
+            </div>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_auto] items-start gap-4 border border-(--border-subtle) bg-(--surface-muted) px-3 py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-(--ink-strong)">Active</p>
+                    <p className="text-[12px] text-(--ink-muted)">No expiry set, or more than 30 days remaining</p>
+                  </div>
                   <p
-                    className="mt-2 text-[40px] font-semibold leading-none text-(--ink-strong)"
-                    style={{ fontFamily: 'var(--font-display)' }}
+                    className="pt-0.5 text-[24px] font-semibold leading-none"
+                    style={{ fontFamily: 'var(--font-display)', color: '#16a34a' }}
                   >
-                    {formatCount(data.summary.myTaskCount)}
-                  </p>
-                  <p className="mt-2 text-[12px] text-(--ink-muted)">
-                    Priority queue assigned to your account.
+                    {formatCount(staticData.validityStatus.active)}
                   </p>
                 </div>
-
-                <dl className="grid content-start gap-2">
-                  {topSummary
-                    .filter((item) => item.label !== 'My pending tasks')
-                    .map((item) => (
-                      <div
-                        key={item.label}
-                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-(--border-subtle) py-2"
-                      >
-                        <dt className="text-[12px] text-(--ink-muted)">{item.label}</dt>
-                        <dd
-                          className="text-[22px] font-semibold leading-none text-(--ink-strong)"
-                          style={{ fontFamily: 'var(--font-display)' }}
-                        >
-                          {formatCount(item.value)}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
+                <div className="grid grid-cols-[1fr_auto] items-start gap-4 border border-(--border-subtle) bg-(--surface-muted) px-3 py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-(--ink-strong)">Expiring this month</p>
+                    <p className="text-[12px] text-(--ink-muted)">Valid now but expires within 30 days</p>
+                  </div>
+                  <p
+                    className="pt-0.5 text-[24px] font-semibold leading-none"
+                    style={{ fontFamily: 'var(--font-display)', color: '#d97706' }}
+                  >
+                    {formatCount(staticData.validityStatus.expiringSoon)}
+                  </p>
+                </div>
+                <div className="grid grid-cols-[1fr_auto] items-start gap-4 border border-(--border-subtle) bg-(--surface-muted) px-3 py-2">
+                  <div>
+                    <p className="text-[13px] font-medium text-(--ink-strong)">Expired</p>
+                    <p className="text-[12px] text-(--ink-muted)">Past the ValidUntil date</p>
+                  </div>
+                  <p
+                    className="pt-0.5 text-[24px] font-semibold leading-none text-(--status-danger-text)"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {formatCount(staticData.validityStatus.expired)}
+                  </p>
+                </div>
               </div>
-            </article>
 
-            <article className={cardClassName}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
-                Operational notes
-              </p>
-              <ul className="mt-3 space-y-2 text-[12px] text-(--ink-muted)">
-                <li className="border border-(--border-subtle) px-3 py-2.5">
-                  Requests remain the single source for queue actions and approvals.
-                </li>
-                <li className="border border-(--border-subtle) px-3 py-2.5">
-                  Quotation links here preserve requester and vendor filters for direct follow-up.
-                </li>
-                <li className="border border-(--border-subtle) px-3 py-2.5">
-                  If fallback values appear, the page keeps partial data instead of blocking all operations.
-                </li>
-              </ul>
-            </article>
+              <div>
+                {(staticData.validityStatus.active + staticData.validityStatus.expiringSoon + staticData.validityStatus.expired) === 0 ? (
+                  <p className="text-[12px] text-(--ink-muted)">No validity data available.</p>
+                ) : (
+                  <PieChart
+                    type="doughnut"
+                    palette={['#16a34a', '#d97706', '#dc2626']}
+                    dataSource={[
+                      { label: 'Active', count: staticData.validityStatus.active },
+                      { label: 'Expiring soon', count: staticData.validityStatus.expiringSoon },
+                      { label: 'Expired', count: staticData.validityStatus.expired },
+                    ].filter((d) => d.count > 0)}
+                    height={220}
+                  >
+                    <PieSeries argumentField="label" valueField="count" />
+                    <PieLegend visible verticalAlignment="bottom" horizontalAlignment="center" />
+                    <PieTooltip
+                      enabled
+                      customizeTooltip={(arg: { argumentText: string; value: number; percentText: string }) => ({
+                        text: `${arg.argumentText}: ${formatCount(arg.value)} (${arg.percentText})`,
+                      })}
+                    />
+                  </PieChart>
+                )}
+              </div>
+            </div>
           </section>
 
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">

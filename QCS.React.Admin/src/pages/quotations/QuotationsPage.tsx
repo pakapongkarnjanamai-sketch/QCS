@@ -12,6 +12,8 @@ import type { RowClickEvent } from 'devextreme/ui/data_grid'
 import { createDataSource } from '../../lib/createDataSource.ts'
 import { appConfig } from '../../config/appConfig.ts'
 
+const portalBase = appConfig.portalBaseUrl
+
 type QuotationRow = {
   id: number
   code: string
@@ -436,7 +438,26 @@ export function QuotationsPage() {
             <HeaderFilter visible={true} />
             <Scrolling mode="virtual" rowRenderingMode="virtual" />
 
-            <Column dataField="code" caption="Doc No." width={130} />
+            <Column
+              dataField="code"
+              caption="Doc No."
+              width={130}
+              cellRender={({ data }: { data: QuotationRow }) =>
+                portalBase ? (
+                  <a
+                    href={`${portalBase}/Quotation/View/${encodeURIComponent(data.code)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[13px] text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
+                  >
+                    {data.code}
+                  </a>
+                ) : (
+                  <span>{data.code}</span>
+                )
+              }
+            />
             <Column dataField="vendorCode" caption="Vendor" minWidth={130}>
               <Lookup
                 dataSource={vendorLookupDataSource}

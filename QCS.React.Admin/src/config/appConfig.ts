@@ -59,8 +59,15 @@ function resolveHubUrl(apiBaseUrl: string) {
 
 const apiBaseUrl = resolveApiBaseUrl()
 
+const normalizePortalUrl = (value?: string) => {
+  const trimmed = value?.trim()
+  if (!trimmed) return ''
+  return trimmed.replace(/\/+$/, '')
+}
+
 export const appConfig = {
   appBasePath: normalizeBasePath(import.meta.env.VITE_QCS_ADMIN_APP_BASE_PATH),
   apiBaseUrl,
   hubUrl: resolveHubUrl(apiBaseUrl),
+  portalBaseUrl: normalizePortalUrl(import.meta.env.VITE_QCS_PORTAL_BASE_URL),
 } as const
