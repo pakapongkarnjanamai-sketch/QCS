@@ -117,9 +117,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           >
             QCS
           </p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-            Admin workspace
-          </p>
+        
         </div>
 
         <button
@@ -172,8 +170,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </nav>
 
       <div className="border-t border-[var(--border-subtle)] px-4 py-4 text-[11px] text-[var(--ink-soft)]">
-        <p>Windows-auth-ready shell</p>
-        <p className="mt-1">React + TypeScript + Tailwind</p>
+       
+        <p className="mt-1">© 2026 - Quotation Compare System</p>
       </div>
     </aside>
   )

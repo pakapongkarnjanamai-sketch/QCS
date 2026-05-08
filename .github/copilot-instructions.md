@@ -125,3 +125,36 @@ src/
 - One component per file; file name matches exported function name.
 - No `useEffect` for derived state — compute directly or use `useMemo`.
 - Do not add JSDoc, comments, or type annotations to code you did not change.
+
+---
+
+## Design Context
+
+### Users
+- Primary scope for frontend work: `QCS.React.Admin`.
+- Primary users: IT/System Admin.
+- Secondary users: procurement admin staff.
+- Working context: office/daytime operations with direct, grid-first navigation.
+
+### Brand Personality
+- Friendly, clever, clean.
+- Emotional goal: confidence and trust through predictable, unambiguous UI behavior.
+
+### Aesthetic Direction
+- Corporate-refined, data-dense.
+- Light mode only, English-first UI copy for React Admin.
+- DevExtreme Fluent Blue Light is fixed; blue primary remains anchor.
+- Reference feel: GitHub clarity/density and Google AI Studio clean framing.
+- Avoid overusing color, inconsistent button styles, decorative effects, and generic SaaS metric-hero layouts.
+
+### Design Principles
+1. Confidence through clarity.
+2. Data-first density with clear scanability.
+3. Consistent action language (button styles and states).
+4. Restrained color usage with blue as anchor.
+5. Quiet, purposeful interaction and motion.
+6. Admin precision.
+
+### Accessibility & Motion Baseline
+- Accessibility target: WCAG 2.1 AA baseline.
+- Motion policy: keep current motion behavior by default (no automatic reduced-motion override unless explicitly requested per feature).

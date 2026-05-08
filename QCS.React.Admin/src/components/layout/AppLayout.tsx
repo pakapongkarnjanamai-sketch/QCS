@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { getPageTitle } from '../../config/navigation.ts'
+import { appConfig } from '../../config/appConfig.ts'
 import { Sidebar } from './Sidebar.tsx'
 
 const formatToday = () =>
@@ -30,8 +31,39 @@ const MenuIcon = () => (
 export function AppLayout() {
   const location = useLocation()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [userName, setUserName] = useState('Unknown User')
   const pageTitle = useMemo(() => getPageTitle(location.pathname), [location.pathname])
   const today = useMemo(() => formatToday(), [])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch(`${appConfig.apiBaseUrl}/api/Session/Me`, {
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          return
+        }
+
+        const payload = (await response.json()) as { displayName?: string }
+        const nextName = payload.displayName?.trim()
+        if (!isCancelled && nextName) {
+          setUserName(nextName)
+        }
+      } catch {
+        // Keep fallback display name when profile endpoint is unavailable.
+      }
+    }
+
+    void loadCurrentUser()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [])
 
   return (
     <div className="h-screen overflow-hidden bg-[var(--surface-app)] text-[var(--ink-strong)]">
@@ -72,9 +104,9 @@ export function AppLayout() {
             <div className="hidden items-center gap-4 md:flex">
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
-                  Environment
+                  User
                 </p>
-                <p className="text-[13px] font-medium text-[var(--ink-strong)]">Local</p>
+                <p className="text-[13px] font-medium text-[var(--ink-strong)]">{userName}</p>
               </div>
 
               <div className="h-8 w-px bg-[var(--border-subtle)]" aria-hidden="true" />

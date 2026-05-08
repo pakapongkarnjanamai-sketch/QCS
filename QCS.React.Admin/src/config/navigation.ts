@@ -26,16 +26,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/requests', label: 'Requests', icon: 'requests' },
       { to: '/quotations', label: 'Quotations', icon: 'quotations' },
       { to: '/workflow', label: 'Workflow', icon: 'workflow' },
-    ],
-  },
-  {
-    label: 'Administration',
-    items: [
-      { to: '/vendors', label: 'Vendors', icon: 'vendors' },
+        { to: '/vendors', label: 'Vendors', icon: 'vendors' },
       { to: '/users', label: 'Users', icon: 'users' },
       { to: '/departments', label: 'Departments', icon: 'departments' },
     ],
   },
+ 
 ]
 
 export const PAGE_TITLES = Object.fromEntries(
