@@ -1,0 +1,117 @@
+/* QCS Timeline Component - Minimalist & Refined */
+.qcs-timeline {
+    position: relative;
+    padding: 1.5rem 1rem;
+    margin: 0;
+    list-style: none;
+    background: transparent;
+}
+
+/* Timeline Item */
+.qcs-timeline-item {
+    position: relative;
+    padding-left: 24px;
+    margin-bottom: 1.25rem;
+    background: transparent !important; /* Ensure no global background bleeds */
+    color: inherit !important;
+}
+
+.qcs-timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Timeline Node */
+.qcs-timeline-node {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--surface-card);
+    border: 2px solid var(--border-subtle);
+    z-index: 2;
+}
+
+/* Status variants for node */
+.qcs-timeline-item.qcs-timeline-status-approved .qcs-timeline-node {
+    background-color: var(--status-success-fg);
+    border-color: var(--status-success-fg);
+}
+
+.qcs-timeline-item.qcs-timeline-status-rejected .qcs-timeline-node {
+    background-color: var(--status-danger-fg);
+    border-color: var(--status-danger-fg);
+}
+
+.qcs-timeline-item.qcs-timeline-status-current .qcs-timeline-node {
+    border-color: var(--dx-primary-color);
+    border-width: 4px;
+    background-color: var(--surface-card);
+}
+
+.qcs-timeline-item.qcs-timeline-status-pending .qcs-timeline-node {
+    background-color: var(--status-draft-bg);
+    border-color: var(--status-draft-bg);
+}
+
+/* Content Container */
+.qcs-timeline-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px; 
+}
+
+/* Header: Step Name and Badge */
+.qcs-timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.qcs-timeline-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+/* Body / Meta: Approver and Date byline */
+.qcs-timeline-byline {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* Comment Box (Distilled) */
+.qcs-timeline-comment {
+    margin-top: 4px;
+    padding: 2px 0 2px 12px;
+    background-color: transparent;
+    border-left: 2px solid var(--border-subtle);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Responsive Adaptation (Mobile Focus) */
+@media (max-width: 576px) {
+    .qcs-timeline {
+        padding: 1rem 0.5rem;
+    }
+    
+    .qcs-timeline-item {
+        padding-left: 20px;
+        margin-bottom: 1rem;
+    }
+    
+    .qcs-timeline-node {
+        left: 0;
+    }
+    
+    .qcs-timeline-header {
+        align-items: flex-start;
+        gap: 4px;
+    }
+}

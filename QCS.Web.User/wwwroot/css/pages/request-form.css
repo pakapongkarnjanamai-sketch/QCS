@@ -1,0 +1,92 @@
+/* Attachment group caption inside dxForm */
+.dx-form-group-custom-caption {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+
+/* Main page sections */
+.section-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+}
+
+/* Form labels and fields */
+.dx-field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dx-field .dx-textbox,
+.dx-field .dx-selectbox,
+.dx-field .dx-datebox,
+.dx-field .dx-textarea {
+    font-size: 13px;
+}
+
+.dx-field .dx-textbox-input,
+.dx-field .dx-selectbox-input,
+.dx-field .dx-datebox-input,
+.dx-field .dx-textarea-input {
+    font-size: 13px;
+}
+
+/* Grid headers */
+#workflowRouteGrid .dx-datagrid-headers {
+    font-size: 13px;
+}
+
+#workflowRouteGrid .dx-datagrid-rowsview .dx-row {
+    font-size: 13px;
+}
+
+/* Popup and dialog styling */
+#historyPopup .dx-popup-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#actionPopup .dx-popup-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* Attachment section */
+.dx-field-item .dx-label {
+    font-size: 13px;
+}
+
+.file-item-name {
+    font-size: 13px;
+}
+
+.file-item-size {
+    font-size: 12px;
+}
+
+/* Validation messages */
+.dx-validation-message {
+    font-size: 12px;
+}
+
+/* Required indicator */
+.dx-field-label-required::after {
+    color: var(--text-danger);
+}
+
+/* Title styling */
+.text-primary-header {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+#lblDocNo {
+    font-size: 15px;
+    font-weight: 700;
+}

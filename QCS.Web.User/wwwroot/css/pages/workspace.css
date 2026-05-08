@@ -1,0 +1,246 @@
+.workspace-filter-panel {
+    padding: 10px 16px;
+    border: 1px solid var(--border-light);
+    border-radius: 16px;
+    background: var(--surface-card);
+}
+
+/* Outer bar: chips scroll on the left, action button pinned on the right */
+.workspace-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Scrollable chip zone — shrinks to give space to the action button */
+.workspace-filter-scroll {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+    padding-bottom: 4px;
+    padding-top: 2px;
+}
+
+.workspace-filter-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+.workspace-filter-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.workspace-filter-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--border-subtle);
+    border-radius: 10px;
+}
+
+/* Action group — never shrinks, always visible on the right */
+.workspace-action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding-left: 4px;
+}
+
+.workspace-filter-separator {
+    width: 1px;
+    height: 28px;
+    background: var(--border-subtle);
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.workspace-filter-label {
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+.workspace-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.workspace-filter-btn {
+    border: 1px solid var(--border-subtle);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: var(--fs-button);
+    min-height: 44px;
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevent buttons from squishing */
+    transition: box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.workspace-filter-btn:hover {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.workspace-filter-btn:focus-visible {
+    outline: 0;
+    box-shadow: var(--focus-ring);
+}
+
+.workspace-filter-btn.active {
+    background: var(--dx-primary-color);
+    border-color: var(--dx-primary-color);
+    color: var(--surface-card);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.workspace-filter-btn.active:hover {
+    color: var(--surface-card);
+}
+
+.workspace-action-btn {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+    color: var(--surface-main);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.workspace-action-btn:hover,
+.workspace-action-btn:focus-visible {
+    color: var(--surface-card);
+    border-color: var(--dx-primary-color);
+    background: var(--dx-primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.workspace-action-btn i {
+    color: var(--surface-subtle);
+}
+
+/* Badge Styling & Animations */
+.workspace-filter-badge {
+    min-width: 24px;
+    line-height: 1.3;
+    opacity: 0;
+    transition: opacity 0.2s ease, background-color 0.3s ease;
+}
+
+.workspace-filter-badge.badge-show {
+    opacity: 1;
+}
+
+.workspace-filter-badge.badge-pulse {
+    /* animation removed: non-essential motion per design mandate */
+}
+
+.workspace-header {
+    padding: 4px 4px 0;
+}
+
+.workspace-header-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.workspace-title {
+    font-size: var(--fs-2xl);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.workspace-description {
+    max-width: 640px;
+    font-size: var(--fs-label);
+    color: var(--text-secondary);
+}
+
+.workspace-empty-state {
+    gap: 0;
+    padding: 40px 20px;
+}
+
+.workspace-empty-icon {
+    background: linear-gradient(180deg, var(--surface-main) 0%, var(--surface-subtle) 100%) !important;
+}
+
+.workspace-empty-description {
+    max-width: 480px;
+}
+
+/* ── 1260px: Scroll-zone chips collapse to icon-only, action button stays full ── */
+@media (max-width: 1260px) {
+    .workspace-filter-scroll .workspace-filter-btn span:not(.workspace-filter-badge) {
+        display: none;
+    }
+
+    .workspace-filter-scroll .workspace-filter-btn {
+        min-height: 36px;
+        min-width: 36px;
+        padding: 0 10px !important;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .workspace-filter-panel {
+        padding: 12px 14px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .workspace-filter-panel {
+        padding: 10px 12px;
+        border-radius: 14px;
+    }
+
+    .workspace-header {
+        padding-top: 0;
+    }
+
+    .workspace-title {
+        font-size: var(--fs-xl);
+    }
+
+    .workspace-description {
+        font-size: var(--fs-label);
+    }
+
+    /* On mobile: hide scrollbar entirely, still scrollable */
+    .workspace-filter-scroll {
+        scrollbar-width: none;
+    }
+
+    .workspace-filter-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* On mobile: icon-only mode for all filter buttons */
+    .workspace-filter-btn span:not(.workspace-filter-badge),
+    .workspace-action-btn span:not(.workspace-filter-badge) {
+        display: none;
+    }
+
+    /* Tighten button size for icon-only display */
+    .workspace-filter-btn {
+        min-height: 36px;
+        min-width: 36px;
+        padding: 0 10px !important;
+        justify-content: center;
+    }
+
+    .workspace-empty-state {
+        padding: 32px 16px;
+    }
+
+    .workspace-empty-description {
+        font-size: var(--fs-label);
+    }
+}

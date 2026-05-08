@@ -1,0 +1,313 @@
+/* Quotation viewer layout */
+.viewer-container {
+    display: grid;
+    grid-template-columns: 1fr clamp(340px, 30%, 480px);
+    gap: 20px;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: var(--surface-main);
+}
+
+.pdf-section {
+    background: var(--surface-card);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--overlay-bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: none;
+}
+
+.pdf-toolbar {
+    padding: 12px 15px;
+    background: var(--surface-card);
+    border-bottom: 2px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.pdf-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pdf-title i {
+    color: var(--dx-primary-color);
+}
+
+.pdf-body {
+    flex: 1;
+    background: oklch(50% 0.02 250);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.pdf-placeholder {
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.error-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-danger);
+}
+
+.info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%;
+    overflow: hidden;
+}
+
+#actionCard {
+    flex-shrink: 0;
+}
+
+.info-scroll-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-muted) var(--surface-subtle);
+}
+
+.info-scroll-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.info-scroll-wrapper::-webkit-scrollbar-track {
+    background: var(--surface-subtle);
+    border-radius: 10px;
+}
+
+.info-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 10px;
+}
+
+.info-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+.info-card {
+    background: var(--surface-card);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px var(--overlay-bg);
+    flex-shrink: 0;
+    border: none;
+}
+
+.card-header-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--border-light);
+    padding-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-header-text i {
+    color: var(--dx-primary-color);
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    background: var(--surface-card);
+}
+
+.file-item:hover {
+    background-color: var(--surface-subtle);
+    border-color: var(--dx-primary-color);
+    transform: translateX(2px);
+}
+
+.file-item.active {
+    background-color: var(--surface-active);
+    border-color: var(--dx-primary-color);
+}
+
+.file-item.disabled {
+    cursor: default;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.file-item.disabled:hover {
+    background-color: var(--surface-card);
+    border-color: var(--border-light);
+    transform: none;
+}
+
+.file-icon {
+    font-size: 24px;
+    color: var(--icon-accent);
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.file-details {
+    flex: 1;
+    overflow: hidden;
+}
+
+.file-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 25px;
+    margin-top: 10px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 5px;
+    bottom: 5px;
+    width: 2px;
+    background: var(--border-light);
+}
+
+.timeline-item {
+    position: relative;
+    padding-bottom: 25px;
+}
+
+.timeline-item:last-child {
+    padding-bottom: 0;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -25px;
+    top: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: 3px solid var(--border-light);
+    z-index: 1;
+}
+
+.timeline-dot.completed {
+    border-color: var(--status-success-bg);
+    background: var(--status-success-bg);
+}
+
+.timeline-dot.current {
+    border-color: var(--status-warning-bg);
+    background: var(--surface-card);
+}
+
+.timeline-dot.rejected {
+    border-color: var(--text-danger);
+    background: var(--text-danger);
+}
+
+.timeline-step {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.timeline-user {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 2px;
+}
+
+.timeline-user i {
+    color: var(--dx-primary-color);
+}
+
+.timeline-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.timeline-comment {
+    margin-top: 8px;
+    font-size: 12px;
+    background: var(--surface-subtle);
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: var(--surface-subtle);
+    color: var(--text-secondary);
+    font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.pdf-toolbar .btn {
+    font-size: 13px;
+}
+
+@media (max-width: 1024px) {
+    .viewer-container {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow-y: auto;
+    }
+
+    .pdf-section {
+        height: 500px;
+    }
+
+    .info-section {
+        height: auto;
+        overflow: visible;
+    }
+
+    .info-scroll-wrapper {
+        overflow: visible;
+        height: auto;
+    }
+}
