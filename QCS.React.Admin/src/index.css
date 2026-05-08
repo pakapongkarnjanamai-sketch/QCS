@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --font-body: 'Public Sans', sans-serif;
+  --font-display: 'Barlow Semi Condensed', sans-serif;
+  --surface-app: oklch(0.965 0.004 95);
+  --surface-panel: oklch(0.988 0.002 95);
+  --surface-muted: oklch(0.945 0.004 95);
+  --border-subtle: oklch(0.885 0.005 95);
+  --border-strong: oklch(0.77 0.008 95);
+  --ink-strong: oklch(0.24 0.01 95);
+  --ink-muted: oklch(0.44 0.01 95);
+  --ink-soft: oklch(0.58 0.008 95);
+  --accent: oklch(0.42 0.045 165);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--surface-app);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--surface-app);
+  color: var(--ink-strong);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--accent) 18%, white);
+  color: var(--ink-strong);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes shell-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shell-enter {
+  animation: shell-fade 180ms ease-out;
+}

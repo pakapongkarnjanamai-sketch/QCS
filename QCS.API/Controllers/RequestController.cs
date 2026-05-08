@@ -62,6 +62,40 @@ namespace QCS.API.Controllers
         }
 
         // ==========================================================
+        // ⚡ ADMIN DATA GRID ENDPOINTS
+        // ==========================================================
+
+        [HttpGet("Admin/All")]
+        public object GetAllRequests(DataSourceLoadOptions loadOptions)
+        {
+            return LoadGrid(_service.GetAllRequestsQuery(), loadOptions);
+        }
+
+        [HttpGet("Admin/Draft")]
+        public object GetAllDraftRequests(DataSourceLoadOptions loadOptions)
+        {
+            return LoadGrid(_service.GetAllDraftRequestsQuery(), loadOptions);
+        }
+
+        [HttpGet("Admin/Pending")]
+        public object GetAllPendingRequests(DataSourceLoadOptions loadOptions)
+        {
+            return LoadGrid(_service.GetAllPendingRequestsQuery(), loadOptions);
+        }
+
+        [HttpGet("Admin/Approved")]
+        public object GetAllApprovedRequests(DataSourceLoadOptions loadOptions)
+        {
+            return LoadGrid(_service.GetAllApprovedRequestsQuery(), loadOptions);
+        }
+
+        [HttpGet("Admin/Rejected")]
+        public object GetAllRejectedRequests(DataSourceLoadOptions loadOptions)
+        {
+            return LoadGrid(_service.GetAllRejectedRequestsQuery(), loadOptions);
+        }
+
+        // ==========================================================
         // 📥 Detail & Actions
         // ==========================================================
 
@@ -301,13 +335,45 @@ namespace QCS.API.Controllers
                 }
             };
 
-            var previewFile = await _quotationService.GeneratePreviewMergedPdfAsync(previewRequest, "Preview", cancellationToken);
-            if (previewFile.Data == null)
+            try
             {
-                return StatusCode(500, "ไม่สามารถสร้างไฟล์ Preview ได้");
-            }
+                var previewFile = await _quotationService.GeneratePreviewMergedPdfAsync(previewRequest, "Preview", cancellationToken);
+                if (previewFile.Data == null)
+                {
+                    return Problem(
+                        statusCode: StatusCodes.Status500InternalServerError,
+                        title: "Preview generation failed",
+                        detail: "ไม่สามารถสร้างไฟล์ Preview ได้");
+                }
 
-            return File(previewFile.Data, previewFile.ContentType, previewFile.FileName);
+                return File(previewFile.Data, previewFile.ContentType, previewFile.FileName);
+            }
+            catch (PdfServiceException ex)
+            {
+                var statusCode = ex.UpstreamStatusCode == StatusCodes.Status504GatewayTimeout
+                    || ex.UpstreamStatusCode == StatusCodes.Status408RequestTimeout
+                    ? StatusCodes.Status504GatewayTimeout
+                    : StatusCodes.Status502BadGateway;
+
+                return Problem(
+                    statusCode: statusCode,
+                    title: statusCode == StatusCodes.Status504GatewayTimeout
+                        ? "PDF service timeout"
+                        : "PDF service unavailable",
+                    detail: ex.Message);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Client cancelled request (browser navigated away / aborted upload).
+                return StatusCode(499);
+            }
+            catch (InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status500InternalServerError,
+                    title: "Server configuration error",
+                    detail: "PDF service configuration is invalid.");
+            }
         }
 
         [HttpGet("Rejected")]

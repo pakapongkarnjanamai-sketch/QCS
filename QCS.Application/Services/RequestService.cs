@@ -19,6 +19,13 @@ namespace QCS.Application.Services
         IQueryable<RequestGridDto> GetMyApprovedListQuery();
         IQueryable<RequestGridDto> GetApprovedListQuery();
         IQueryable<RequestGridDto> GetRejectedRequestsQuery();
+
+        // Admin views — no current-user filter
+        IQueryable<RequestGridDto> GetAllRequestsQuery();
+        IQueryable<RequestGridDto> GetAllDraftRequestsQuery();
+        IQueryable<RequestGridDto> GetAllPendingRequestsQuery();
+        IQueryable<RequestGridDto> GetAllApprovedRequestsQuery();
+        IQueryable<RequestGridDto> GetAllRejectedRequestsQuery();
         Task<RequestDetailDto?> GetByCodeAsync(string code);
         Task<RequestDetailDto?> GetByIdAsync(int id);
         Task<Request> CreateAsync(CreateRequestDto input, bool isSubmit);
@@ -620,6 +627,45 @@ namespace QCS.Application.Services
                 .AsNoTracking()
                 .Where(r => r.CreatedBy == _currentUserService.UserId && r.Status == (int)RequestStatus.Approved)
                 .Select(RequestGridProjection);
+        }
+
+        public IQueryable<RequestGridDto> GetAllRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Select(RequestGridWithRequesterProjection);
+        }
+
+        public IQueryable<RequestGridDto> GetAllDraftRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Draft)
+                .Select(RequestGridWithRequesterProjection);
+        }
+
+        public IQueryable<RequestGridDto> GetAllPendingRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Pending)
+                .Select(RequestGridWithRequesterProjection);
+        }
+
+        public IQueryable<RequestGridDto> GetAllApprovedRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Approved)
+                .Select(RequestGridWithRequesterProjection);
+        }
+
+        public IQueryable<RequestGridDto> GetAllRejectedRequestsQuery()
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Rejected)
+                .Select(RequestGridWithRequesterProjection);
         }
 
         public async Task<RequestDetailDto?> GetByIdAsync(int id)

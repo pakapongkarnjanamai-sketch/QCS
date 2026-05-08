@@ -1,0 +1,31 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppLayout } from './components/layout/AppLayout.tsx'
+import { WorkspacePage } from './pages/WorkspacePage.tsx'
+import { RequestsPage } from './pages/requests/RequestsPage.tsx'
+import { QuotationsPage } from './pages/quotations/QuotationsPage.tsx'
+import { workspacePages } from './pages/pageData.ts'
+
+function App() {
+  return (
+    <Routes>
+      <Route element={<AppLayout />}>
+        {workspacePages.map((page) =>
+          page.path === '/' ? (
+            <Route key={page.path} index element={<WorkspacePage page={page} />} />
+          ) : (
+            <Route
+              key={page.path}
+              path={page.path.slice(1)}
+              element={<WorkspacePage page={page} />}
+            />
+          ),
+        )}
+        <Route path="requests" element={<RequestsPage />} />
+        <Route path="quotations" element={<QuotationsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  )
+}
+
+export default App

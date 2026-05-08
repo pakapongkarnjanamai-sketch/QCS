@@ -26,6 +26,13 @@ namespace QCS.API.Middleware
             Exception exception,
             CancellationToken cancellationToken)
         {
+            if (exception is OperationCanceledException
+                && (httpContext.RequestAborted.IsCancellationRequested || cancellationToken.IsCancellationRequested))
+            {
+                // Request was cancelled by the caller; treat as handled without error logging noise.
+                return true;
+            }
+
             _logger.LogError(
                 exception,
                 "Unhandled exception while processing {Method} {Path}",
@@ -59,6 +66,7 @@ namespace QCS.API.Middleware
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
+            OperationCanceledException => (StatusCodes.Status408RequestTimeout, "Request cancelled"),
             InvalidOperationException => (StatusCodes.Status409Conflict, "Operation not allowed in current state"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };

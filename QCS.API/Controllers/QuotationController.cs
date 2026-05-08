@@ -107,6 +107,11 @@ namespace QCS.API.Controllers
                         : "PDF service unavailable",
                     detail: ex.Message);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Client cancelled request while PDF was being prepared.
+                return StatusCode(499);
+            }
             catch (InvalidOperationException)
             {
                 return Problem(
