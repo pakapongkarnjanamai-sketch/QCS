@@ -3,6 +3,7 @@ using QCS.Application.Abstractions;
 using DevExtreme.AspNet.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QCS.API.Services;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
 using System;
@@ -21,11 +22,13 @@ namespace QCS.API.Controllers
     {
         private readonly IRequestService _service;
         private readonly IQuotationService _quotationService;
+        private readonly IEmployeeLookupService _employeeLookupService;
 
-        public RequestController(IRequestService service, IQuotationService quotationService)
+        public RequestController(IRequestService service, IQuotationService quotationService, IEmployeeLookupService employeeLookupService)
         {
             _service = service;
             _quotationService = quotationService;
+            _employeeLookupService = employeeLookupService;
         }
 
         private static object LoadGrid(IQueryable<RequestGridDto> query, DataSourceLoadOptions loadOptions)
@@ -87,6 +90,100 @@ namespace QCS.API.Controllers
         public object GetAllApprovedRequests(DataSourceLoadOptions loadOptions)
         {
             return LoadGrid(_service.GetAllApprovedRequestsQuery(), loadOptions);
+        }
+
+        [HttpGet("Admin/ApprovedByVendor/{vendorCode}")]
+        public IActionResult GetAllApprovedRequestsByVendor(string vendorCode, DataSourceLoadOptions loadOptions)
+        {
+            if (string.IsNullOrWhiteSpace(vendorCode))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'vendorCode' is required.");
+            }
+
+            var normalized = vendorCode.Trim().ToUpper();
+            var query = _service
+                .GetAllApprovedRequestsQuery()
+                .Where(request => (request.VendorCode ?? string.Empty).ToUpper() == normalized);
+
+            return Ok(LoadGrid(query, loadOptions));
+        }
+
+        [HttpGet("Admin/Requesters")]
+        public async Task<object> GetApprovedRequesters(DataSourceLoadOptions loadOptions)
+        {
+            var requesterRows = _service
+                .GetAllApprovedRequestsQuery()
+                .Where(request => !string.IsNullOrWhiteSpace(request.RequesterName) && !string.IsNullOrWhiteSpace(request.RequesterNId))
+                .GroupBy(request => new
+                {
+                    RequesterNId = (request.RequesterNId ?? string.Empty).Trim().ToUpper(),
+                    RequesterName = (request.RequesterName ?? string.Empty).Trim(),
+                })
+                .Select(group => new RequesterGridDto
+                {
+                    RequesterNId = group.Key.RequesterNId,
+                    RequesterName = group.Key.RequesterName,
+                    QuotationCount = group.Count(),
+                })
+                .ToList();
+
+            var requesterNIds = requesterRows
+                .Select(row => row.RequesterNId)
+                .Where(nId => !string.IsNullOrWhiteSpace(nId))
+                .Distinct()
+                .ToList();
+
+            var departmentMap = await _employeeLookupService.GetDepartmentMapByNIdsAsync(requesterNIds);
+
+            foreach (var row in requesterRows)
+            {
+                row.DepartmentName = departmentMap.TryGetValue(row.RequesterNId, out var department) ? department : "-";
+            }
+
+            var query = requesterRows.AsQueryable();
+
+            return DataSourceLoader.Load(query, loadOptions);
+        }
+
+        [HttpGet("Admin/ApprovedByRequesterNId/{requesterNId}")]
+        public IActionResult GetAllApprovedRequestsByRequesterNId(string requesterNId, DataSourceLoadOptions loadOptions)
+        {
+            if (string.IsNullOrWhiteSpace(requesterNId))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'requesterNId' is required.");
+            }
+
+            var normalized = requesterNId.Trim().ToUpper();
+            var query = _service
+                .GetAllApprovedRequestsQuery()
+                .Where(request => (request.RequesterNId ?? string.Empty).ToUpper() == normalized);
+
+            return Ok(LoadGrid(query, loadOptions));
+        }
+
+        [HttpGet("Admin/ApprovedByRequester/{requesterName}")]
+        public IActionResult GetAllApprovedRequestsByRequester(string requesterName, DataSourceLoadOptions loadOptions)
+        {
+            if (string.IsNullOrWhiteSpace(requesterName))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'requesterName' is required.");
+            }
+
+            var normalized = requesterName.Trim().ToUpper();
+            var query = _service
+                .GetAllApprovedRequestsQuery()
+                .Where(request => (request.RequesterName ?? string.Empty).ToUpper() == normalized);
+
+            return Ok(LoadGrid(query, loadOptions));
         }
 
         [HttpGet("Admin/Rejected")]

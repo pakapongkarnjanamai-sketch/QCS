@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using QCS.API.Services;
 
 namespace QCS.API.Extensions
 {
@@ -16,6 +17,7 @@ namespace QCS.API.Extensions
             services.AddSignalR();
             services.AddMemoryCache();
             services.AddHttpContextAccessor();
+            services.AddScoped<IEmployeeLookupService, EmployeeLookupService>();
 
             services.AddControllers()
                 .AddJsonOptions(options =>

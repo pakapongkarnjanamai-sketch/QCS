@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DataGrid, {
   Column,
   FilterRow,
   HeaderFilter,
+  Lookup,
   RemoteOperations,
   Scrolling,
 } from 'devextreme-react/data-grid'
@@ -349,10 +351,36 @@ function DetailPane({ code, onClose }: { code: string; onClose: () => void }) {
 }
 
 export function QuotationsPage() {
+  const [searchParams] = useSearchParams()
   const [selectedCode, setSelectedCode] = useState<string | null>(null)
 
+  const vendorCodeFilter = (searchParams.get('vendorCode') ?? '').trim()
+  const requesterNIdFilter = (searchParams.get('requesterNId') ?? '').trim()
+  const vendorNameFilter = (searchParams.get('vendorName') ?? '').trim()
+  const requesterNameFilter = (searchParams.get('requesterName') ?? '').trim()
+
+  const dataPath = useMemo(() => {
+    if (vendorCodeFilter) {
+      return `/api/Request/Admin/ApprovedByVendor/${encodeURIComponent(vendorCodeFilter)}`
+    }
+
+    if (requesterNIdFilter) {
+      return `/api/Request/Admin/ApprovedByRequesterNId/${encodeURIComponent(requesterNIdFilter)}`
+    }
+
+    if (requesterNameFilter) {
+      return `/api/Request/Admin/ApprovedByRequester/${encodeURIComponent(requesterNameFilter)}`
+    }
+
+    return '/api/Request/Admin/Approved'
+  }, [requesterNIdFilter, requesterNameFilter, vendorCodeFilter])
+
   const dataSource = useMemo(
-    () => createDataSource<QuotationRow>('/api/Request/Admin/Approved', 'id'),
+    () => createDataSource<QuotationRow>(dataPath, 'id'),
+    [dataPath],
+  )
+  const vendorLookupDataSource = useMemo(
+    () => createDataSource<{ vendorCode: string; vendorName: string }>('/api/Vendor/Lookup', 'vendorCode'),
     [],
   )
 
@@ -361,7 +389,30 @@ export function QuotationsPage() {
   }, [])
 
   return (
-    <div className="flex min-h-0 gap-0" style={{ height: 'calc(100vh - 200px)' }}>
+    <div className="space-y-3">
+      {(vendorCodeFilter || requesterNameFilter) && (
+        <section className="rounded-sm border border-(--border-subtle) bg-(--surface-panel) px-4 py-2 text-[13px] text-(--ink-muted)">
+          {vendorCodeFilter ? (
+            <>
+              Showing quotations for vendor:
+              <span className="ml-1 font-medium text-(--ink-strong)">
+                {vendorNameFilter || vendorCodeFilter}
+              </span>
+              <span className="ml-1 text-(--ink-soft)">({vendorCodeFilter})</span>
+            </>
+          ) : (
+            <>
+              Showing quotations for requester:
+              <span className="ml-1 font-medium text-(--ink-strong)">
+                {requesterNameFilter || requesterNIdFilter}
+              </span>
+              {requesterNIdFilter && <span className="ml-1 text-(--ink-soft)">({requesterNIdFilter})</span>}
+            </>
+          )}
+        </section>
+      )}
+
+      <div className="flex min-h-0 gap-0" style={{ height: 'calc(100vh - 240px)' }}>
       {/* Grid — narrows when detail pane is open */}
       <div
         className={`min-w-0 transition-all duration-150 ${selectedCode ? 'w-95 shrink-0' : 'flex-1'}`}
@@ -386,7 +437,13 @@ export function QuotationsPage() {
             <Scrolling mode="virtual" rowRenderingMode="virtual" />
 
             <Column dataField="code" caption="Doc No." width={130} />
-            <Column dataField="vendorName" caption="Vendor" minWidth={130} />
+            <Column dataField="vendorCode" caption="Vendor" minWidth={130}>
+              <Lookup
+                dataSource={vendorLookupDataSource}
+                valueExpr="vendorCode"
+                displayExpr="vendorName"
+              />
+            </Column>
             <Column
               dataField="requestDate"
               caption="Date"
@@ -427,6 +484,7 @@ export function QuotationsPage() {
           <DetailPane key={selectedCode} code={selectedCode} onClose={() => setSelectedCode(null)} />
         </div>
       )}
+      </div>
     </div>
   )
 }

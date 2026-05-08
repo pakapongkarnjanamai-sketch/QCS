@@ -78,6 +78,7 @@ namespace QCS.Application.Services
             CurrentStepId = r.CurrentStepId,
             Remark = r.Remark ?? string.Empty,
             RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
+            RequesterNId = r.CreatedBy ?? string.Empty,
             ValidFrom = r.ValidFrom,
             ValidUntil = r.ValidUntil
         };

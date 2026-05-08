@@ -12,6 +12,7 @@ namespace QCS.Domain.DTOs
         public DateTime RequestDate { get; set; } // วันที่ขอ
         public int CurrentStepId { get; set; }    // สถานะ
         public string RequesterName { get; set; } // ชื่อผู้ขอ
+        public string RequesterNId { get; set; }
         public string Remark { get; set; }
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
