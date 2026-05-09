@@ -86,6 +86,17 @@ table td {
   vertical-align: middle;
 }
 
-.dx-datagrid .dx-row > td {
-  vertical-align: middle;
+.dx-datagrid .dx-datagrid-content .dx-datagrid-table .dx-row > td,
+.dx-datagrid .dx-datagrid-content .dx-datagrid-table .dx-row > tr > td,
+.dx-datagrid .dx-datagrid-content .dx-datagrid-table .dx-row > td.dx-datagrid-group-space,
+.dx-datagrid .dx-datagrid-headers .dx-header-row > td,
+.dx-datagrid .dx-datagrid-headers .dx-filter-row > td,
+.dx-datagrid .dx-datagrid-headers .dx-header-row > td > .dx-datagrid-text-content {
+  vertical-align: middle !important;
+}
+
+.dx-datagrid .dx-template-wrapper {
+  display: flex;
+  min-height: 100%;
+  align-items: center;
 }

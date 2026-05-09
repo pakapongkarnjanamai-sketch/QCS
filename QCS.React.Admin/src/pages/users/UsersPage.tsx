@@ -313,7 +313,6 @@ export function UserAccessPage() {
         <DataGrid
           key={refreshKey}
           dataSource={dataSource}
-          keyExpr="id"
           showBorders={false}
           showColumnLines={false}
           showRowLines={true}

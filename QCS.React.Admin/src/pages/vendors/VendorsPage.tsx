@@ -26,7 +26,6 @@ export function VendorsPage() {
       <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
         <DataGrid
           dataSource={dataSource}
-          keyExpr="vendorCode"
           showBorders={false}
           showColumnLines={false}
           showRowLines={true}
@@ -48,8 +47,8 @@ export function VendorsPage() {
             caption="Quotations"
             width={120}
             alignment="right"
-             sortOrder="desc"
-              sortIndex={0}
+            sortOrder="desc"
+            sortIndex={0}
           />
           <Column
             caption="Action"
