@@ -695,10 +695,10 @@ export function OverviewPage() {
                       Requesters
                     </p>
                     <Link
-                      to="/requester"
+                      to="/users"
                       className="focus-ring inline-flex min-h-11 items-center text-[12px] font-medium text-(--ink-muted) underline decoration-(--border-strong) underline-offset-4 hover:text-(--ink-strong)"
                     >
-                      Open requester list
+                      Open user access
                     </Link>
                   </div>
 

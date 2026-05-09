@@ -6,7 +6,7 @@ import { RequestsPage } from './pages/requests/RequestsPage.tsx'
 import { QuotationsPage } from './pages/quotations/QuotationsPage.tsx'
 import { WorkflowPage } from './pages/workflow/WorkflowPage.tsx'
 import { VendorsPage } from './pages/vendors/VendorsPage.tsx'
-import { RequesterPage } from './pages/users/UsersPage.tsx'
+import { UserAccessPage } from './pages/users/UsersPage.tsx'
 import { workspacePages } from './pages/pageData.ts'
 
 function App() {
@@ -25,8 +25,8 @@ function App() {
         <Route path="quotations" element={<QuotationsPage />} />
         <Route path="workflow" element={<WorkflowPage />} />
         <Route path="vendors" element={<VendorsPage />} />
-        <Route path="requester" element={<RequesterPage />} />
-        <Route path="users" element={<Navigate to="/requester" replace />} />
+        <Route path="users" element={<UserAccessPage />} />
+        <Route path="requester" element={<Navigate to="/users" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

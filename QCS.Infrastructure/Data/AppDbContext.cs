@@ -29,6 +29,7 @@ namespace QCS.Infrastructure.Data
         public DbSet<Request> Requests { get; set; }
         public DbSet<Quotation> Quotations { get; set; }
         public DbSet<AttachmentFile> AttachmentFiles { get; set; }
+        public DbSet<AdminUserAccess> AdminUserAccesses { get; set; }
         //public DbSet<Role> Roles { get; set; }
         //public DbSet<UserRole> UserRoles { get; set; }
         //public DbSet<Department> Departments { get; set; }
@@ -47,6 +48,17 @@ namespace QCS.Infrastructure.Data
                 entity.HasIndex(r => r.Code)
                     .IsUnique()
                     .HasDatabaseName("IX_Requests_Code");
+            });
+
+            modelBuilder.Entity<AdminUserAccess>(entity =>
+            {
+                entity.Property(x => x.NId)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.HasIndex(x => x.NId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_AdminUserAccesses_NId");
             });
         }
 

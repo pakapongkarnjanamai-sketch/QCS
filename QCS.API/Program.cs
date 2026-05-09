@@ -30,6 +30,7 @@ app.UseStatusCodePages();
 app.MapHub<NotificationHub>("/notificationHub");
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

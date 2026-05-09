@@ -27,7 +27,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/quotations', label: 'Quotations', icon: 'quotations' },
       { to: '/workflow', label: 'Workflow', icon: 'workflow' },
         { to: '/vendors', label: 'Vendors', icon: 'vendors' },
-      { to: '/requester', label: 'Requester', icon: 'users' },
+      { to: '/users', label: 'Users', icon: 'users' },
       { to: '/departments', label: 'Departments', icon: 'departments' },
     ],
   },

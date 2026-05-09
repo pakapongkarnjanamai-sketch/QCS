@@ -8,6 +8,12 @@
 			"projectPath": "${workspaceFolder}/QCS.API/QCS.API.csproj"
 		},
 		{
+			"name": "Web.User",
+			"type": "dotnet",
+			"request": "launch",
+			"projectPath": "${workspaceFolder}/QCS.Web.User/QCS.Web.User.csproj"
+		},
+		{
 			"name": "React",
 			"type": "node-terminal",
 			"request": "launch",
@@ -17,7 +23,6 @@
 				"action": "openExternally",
 				"pattern": "Local:\\s+(https?://\\S+)"
 			}
-		},
-		
+		}
 	]
 }

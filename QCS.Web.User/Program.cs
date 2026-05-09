@@ -31,7 +31,11 @@ builder.Services.Configure<IISOptions>(options =>
 // Authorization with Role-based policies
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = options.DefaultPolicy;
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireAssertion(context =>
+            context.User.Identity?.Name?.StartsWith("NIKONOA\\", StringComparison.OrdinalIgnoreCase) == true)
+        .Build();
 
     options.AddPolicy("AdminOnly", policy =>
         policy.RequireRole("Admin", "SuperAdmin"));

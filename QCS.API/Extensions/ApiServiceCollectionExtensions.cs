@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authentication;
+using QCS.API.Security;
 using QCS.API.Services;
 
 namespace QCS.API.Extensions
@@ -18,6 +20,7 @@ namespace QCS.API.Extensions
             services.AddMemoryCache();
             services.AddHttpContextAccessor();
             services.AddScoped<IEmployeeLookupService, EmployeeLookupService>();
+            services.AddScoped<IClaimsTransformation, AdminAccessClaimsTransformation>();
 
             services.AddControllers()
                 .AddJsonOptions(options =>
@@ -61,9 +64,16 @@ namespace QCS.API.Extensions
             this IServiceCollection services,
             IConfiguration configuration)
         {
+            var domainPrefix = configuration["DomainSettings:DomainPrefix"]
+                ?? throw new InvalidOperationException("DomainSettings:DomainPrefix configuration is required.");
+
             services.AddAuthorization(options =>
             {
-                options.FallbackPolicy = options.DefaultPolicy;
+                options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .RequireAssertion(context =>
+                        context.User.Identity?.Name?.StartsWith(domainPrefix, StringComparison.OrdinalIgnoreCase) == true)
+                    .Build();
 
                 options.AddPolicy("AdminOnly", policy =>
                     policy.RequireRole("Admin", "SuperAdmin"));
@@ -76,9 +86,6 @@ namespace QCS.API.Extensions
 
                 options.AddPolicy("UserOrAbove", policy =>
                     policy.RequireRole("User", "Manager", "Admin", "SuperAdmin"));
-
-                var domainPrefix = configuration["DomainSettings:DomainPrefix"]
-                    ?? throw new InvalidOperationException("DomainSettings:DomainPrefix configuration is required.");
 
                 options.AddPolicy("DomainUser", policy =>
                     policy.RequireAssertion(context =>

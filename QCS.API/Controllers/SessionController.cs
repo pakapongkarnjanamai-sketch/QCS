@@ -25,7 +25,9 @@ namespace QCS.API.Controllers
             {
                 displayName,
                 windowsIdentity = windowsIdentity ?? string.Empty,
-                isAuthenticated = User.Identity?.IsAuthenticated == true
+                isAuthenticated = User.Identity?.IsAuthenticated == true,
+                nId = User.FindFirst("qcs.nid")?.Value ?? string.Empty,
+                accessLevel = User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct().ToArray()
             });
         }
 
