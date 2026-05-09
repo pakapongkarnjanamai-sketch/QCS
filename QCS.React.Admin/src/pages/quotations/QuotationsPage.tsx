@@ -12,6 +12,7 @@ import type { RowClickEvent } from 'devextreme/ui/data_grid'
 import { createDataSource } from '../../lib/createDataSource.ts'
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
+import { toast } from '../../lib/toast.ts'
 
 const portalBase = appConfig.portalBaseUrl
 
@@ -149,7 +150,10 @@ function DetailPane({ code, onClose }: { code: string; onClose: () => void }) {
   }, [fetchPdf])
 
   function downloadCurrentPdf() {
-    if (!pdfDoc) return
+    if (!pdfDoc) {
+      toast.warning('No PDF is available to download.')
+      return
+    }
     const anchor = document.createElement('a')
     anchor.href = pdfDoc.url
     anchor.download = pdfDoc.fileName
@@ -467,6 +471,8 @@ export function QuotationsPage() {
               format="dd/MM/yyyy"
               width={105}
               alignment="center"
+              sortOrder="desc"
+              sortIndex={0}
             />
             {!selectedCode && (
               <>

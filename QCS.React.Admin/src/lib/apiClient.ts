@@ -1,4 +1,5 @@
 import { appConfig } from '../config/appConfig.ts'
+import { toast } from './toast.ts'
 
 const ACCESS_DENIED_PATH = '/access-denied'
 
@@ -15,6 +16,7 @@ export async function fetchWithAccessControl(input: RequestInfo | URL, init?: Re
   const response = await fetch(input, init)
 
   if (response.status === 403) {
+    toast.warning('You do not have permission to access this resource.')
     redirectToAccessDenied()
     throw new Error('Access denied.')
   }

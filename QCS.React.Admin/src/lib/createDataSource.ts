@@ -2,6 +2,7 @@ import CustomStore from 'devextreme/data/custom_store'
 import type { LoadOptions } from 'devextreme/data'
 import { appConfig } from '../config/appConfig.ts'
 import { fetchWithAccessControl } from './apiClient.ts'
+import { toast } from './toast.ts'
 
 type LoadResult<T> = {
   data: T[]
@@ -43,33 +44,39 @@ export function createDataSource<T extends object>(path: string, key: keyof T = 
   return new CustomStore<T>({
     key: key as string,
     load: async (loadOptions: LoadOptions): Promise<LoadResult<T>> => {
-      const params = new URLSearchParams()
+      try {
+        const params = new URLSearchParams()
 
-      DX_LOAD_OPTION_KEYS.forEach((k) => {
-        const value = loadOptions[k]
-        if (k in loadOptions && isNotEmpty(value)) {
-          params.set(k, JSON.stringify(value))
+        DX_LOAD_OPTION_KEYS.forEach((k) => {
+          const value = loadOptions[k]
+          if (k in loadOptions && isNotEmpty(value)) {
+            params.set(k, JSON.stringify(value))
+          }
+        })
+
+        const url = `${appConfig.apiBaseUrl}${path}?${params.toString()}`
+        const response = await fetchWithAccessControl(url, { credentials: 'include' })
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => response.statusText)
+          throw new Error(`API error ${response.status}: ${text}`)
         }
-      })
 
-      const url = `${appConfig.apiBaseUrl}${path}?${params.toString()}`
-      const response = await fetchWithAccessControl(url, { credentials: 'include' })
+        const contentType = response.headers.get('content-type') ?? ''
+        if (!contentType.includes('application/json')) {
+          const preview = await response.text().catch(() => '')
+          throw new Error(
+            `Expected JSON but got "${contentType}" from ${path}.` +
+            (preview.trimStart().startsWith('<') ? ' Server returned HTML — check CORS, authentication, and apiBaseUrl in .env.' : ''),
+          )
+        }
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => response.statusText)
-        throw new Error(`API error ${response.status}: ${text}`)
+        return response.json() as Promise<LoadResult<T>>
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Cannot load data.'
+        toast.error(`Cannot load grid data: ${message}`)
+        throw error
       }
-
-      const contentType = response.headers.get('content-type') ?? ''
-      if (!contentType.includes('application/json')) {
-        const preview = await response.text().catch(() => '')
-        throw new Error(
-          `Expected JSON but got "${contentType}" from ${path}.` +
-          (preview.trimStart().startsWith('<') ? ' Server returned HTML — check CORS, authentication, and apiBaseUrl in .env.' : ''),
-        )
-      }
-
-      return response.json() as Promise<LoadResult<T>>
     },
   })
 }

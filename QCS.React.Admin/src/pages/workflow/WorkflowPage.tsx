@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 
@@ -82,7 +82,7 @@ export function WorkflowPage() {
     [selectedRouteId, workflowList],
   )
 
-  async function loadRoute(parsedRouteId: number) {
+  const loadRoute = useCallback(async (parsedRouteId: number) => {
     setIsLoading(true)
     setError(null)
 
@@ -106,11 +106,15 @@ export function WorkflowPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    void loadRoute(1)
-  }, [])
+    const timeoutId = window.setTimeout(() => {
+      void loadRoute(1)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadRoute])
 
   return (
     <div className="space-y-4">

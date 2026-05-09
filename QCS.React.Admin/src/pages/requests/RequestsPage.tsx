@@ -142,6 +142,8 @@ export function RequestsPage() {
               format="dd/MM/yyyy"
               width={110}
               alignment="center"
+              sortOrder="desc"
+              sortIndex={0}
             />
             <Column dataField="remark" caption="Remark" minWidth={120} />
             <Column

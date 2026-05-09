@@ -3,6 +3,7 @@ import DataGrid, { Column, FilterRow, HeaderFilter, RemoteOperations, Scrolling 
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 import { createDataSource } from '../../lib/createDataSource.ts'
+import { toast } from '../../lib/toast.ts'
 
 type UserAccessRow = {
   id: number
@@ -44,28 +45,26 @@ export function UserAccessPage() {
   const [preview, setPreview] = useState<UserAccessPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
 
   const normalizedNId = useMemo(() => normalizeNId(nIdInput), [nIdInput])
   const dataSource = useMemo(
     () => createDataSource<UserAccessRow>('/api/UserAccess/Grid', 'id'),
-    [refreshKey],
+    [],
   )
 
   const previewIsCurrent = preview?.nId === normalizedNId
   const canRegister = Boolean(normalizedNId && previewIsCurrent)
 
-  const runMutation = async (executor: () => Promise<void>, successMessage: string) => {
+  const runMutation = async (executor: () => Promise<void>) => {
     setBusy(true)
-    setMessage('')
 
     try {
       await executor()
-      setMessage(successMessage)
       setRefreshKey((prev) => prev + 1)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Request failed.')
+      const message = error instanceof Error ? error.message : 'Request failed.'
+      toast.error(message)
     } finally {
       setBusy(false)
     }
@@ -73,12 +72,11 @@ export function UserAccessPage() {
 
   const previewUser = async () => {
     if (!normalizedNId) {
-      setMessage('Please provide NID.')
+      toast.warning('Please provide NID.')
       return
     }
 
     setPreviewLoading(true)
-    setMessage('')
 
     try {
       const response = await fetchWithAccessControl(
@@ -95,10 +93,10 @@ export function UserAccessPage() {
 
       const payload = (await response.json()) as UserAccessPreview
       setPreview(payload)
-      setMessage(`Preview loaded for ${payload.nId}.`)
     } catch (error) {
       setPreview(null)
-      setMessage(error instanceof Error ? error.message : 'Preview failed.')
+      const message = error instanceof Error ? error.message : 'Preview failed.'
+      toast.error(message)
     } finally {
       setPreviewLoading(false)
     }
@@ -106,12 +104,12 @@ export function UserAccessPage() {
 
   const registerUser = async () => {
     if (!normalizedNId) {
-      setMessage('Please provide NID.')
+      toast.warning('Please provide NID.')
       return
     }
 
     if (!previewIsCurrent) {
-      setMessage('Load a preview before registering.')
+      toast.warning('Load a preview before registering.')
       return
     }
 
@@ -132,7 +130,7 @@ export function UserAccessPage() {
 
       setNIdInput('')
       setPreview(null)
-    }, `Saved ${normalizedNId}.`)
+    })
   }
 
   const updateAccessLevel = async (row: UserAccessRow, level: AccessLevel) => {
@@ -150,7 +148,7 @@ export function UserAccessPage() {
         const text = await response.text().catch(() => response.statusText)
         throw new Error(`Update failed (${response.status}): ${text}`)
       }
-    }, `Updated ${row.nId} to ${level}.`)
+    })
   }
 
   const toggleActive = async (row: UserAccessRow) => {
@@ -168,7 +166,7 @@ export function UserAccessPage() {
         const text = await response.text().catch(() => response.statusText)
         throw new Error(`Update failed (${response.status}): ${text}`)
       }
-    }, `${row.nId} ${row.isActive ? 'disabled' : 'enabled'}.`)
+    })
   }
 
   const refreshProfile = async (row: UserAccessRow) => {
@@ -182,7 +180,7 @@ export function UserAccessPage() {
         const text = await response.text().catch(() => response.statusText)
         throw new Error(`Refresh failed (${response.status}): ${text}`)
       }
-    }, `Refreshed ${row.nId} from employee lookup.`)
+    })
   }
 
   const removeUser = async (row: UserAccessRow) => {
@@ -200,7 +198,7 @@ export function UserAccessPage() {
         const text = await response.text().catch(() => response.statusText)
         throw new Error(`Delete failed (${response.status}): ${text}`)
       }
-    }, `Deleted ${row.nId}.`)
+    })
   }
 
   return (
@@ -309,11 +307,11 @@ export function UserAccessPage() {
           </div>
         </div>
 
-        {message ? <p className="mt-2 text-[12px] text-(--ink-muted)">{message}</p> : null}
       </section>
 
       <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
         <DataGrid
+          key={refreshKey}
           dataSource={dataSource}
           keyExpr="id"
           showBorders={false}

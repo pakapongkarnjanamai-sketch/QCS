@@ -49,11 +49,25 @@ namespace QCS.API.Controllers
         }
 
         [HttpGet("RequestTrend")]
-        public async Task<IActionResult> GetRequestTrend([FromQuery] string granularity = "week")
+        public async Task<IActionResult> GetRequestTrend(
+            [FromQuery] string timeframe = "7d",
+            [FromQuery] string aggregation = "day",
+            [FromQuery] string? granularity = null)
         {
+            // Backward-compat: map legacy granularity param to new params
+            if (granularity != null)
+            {
+                (timeframe, aggregation) = (granularity.Trim().ToLowerInvariant()) switch
+                {
+                    "year" => ("1y", "month"),
+                    "month" => ("30d", "week"),
+                    _ => ("7d", "day"),
+                };
+            }
+
             try
             {
-                var buckets = BuildBuckets(granularity);
+                var buckets = BuildBucketsForTrend(timeframe, aggregation);
                 var startOfRange = buckets[0].Start;
 
                 var rows = await _requestService.GetAllRequestsQuery()
@@ -205,6 +219,58 @@ namespace QCS.API.Controllers
         }
 
         private record Bucket(DateTime Start, DateTime End, string Label);
+
+        private static List<Bucket> BuildBucketsForTrend(string timeframe, string aggregation)
+        {
+            var today = DateTime.Today;
+            var tf = (timeframe ?? "7d").Trim().ToLowerInvariant();
+            var agg = (aggregation ?? "day").Trim().ToLowerInvariant();
+
+            var rangeStart = tf switch
+            {
+                "30d" => today.AddDays(-29),
+                "6m"  => today.AddMonths(-6).AddDays(1),
+                "1y"  => today.AddYears(-1).AddDays(1),
+                _     => today.AddDays(-6), // 7d default
+            };
+
+            var buckets = new List<Bucket>();
+
+            if (agg == "month")
+            {
+                var s = new DateTime(rangeStart.Year, rangeStart.Month, 1);
+                while (s <= today)
+                {
+                    var e = s.AddMonths(1);
+                    buckets.Add(new Bucket(s, e, s.ToString("MMM yy", CultureInfo.InvariantCulture)));
+                    s = e;
+                }
+            }
+            else if (agg == "week")
+            {
+                var dow = (int)rangeStart.DayOfWeek;
+                var daysToMonday = dow == 0 ? 6 : dow - 1;
+                var weekStart = rangeStart.AddDays(-daysToMonday);
+                while (weekStart <= today)
+                {
+                    var weekEnd = weekStart.AddDays(7);
+                    var iso = ISOWeek.GetWeekOfYear(weekStart);
+                    buckets.Add(new Bucket(weekStart, weekEnd, $"W{iso:D2}"));
+                    weekStart = weekEnd;
+                }
+            }
+            else // day
+            {
+                var s = rangeStart;
+                while (s <= today)
+                {
+                    buckets.Add(new Bucket(s, s.AddDays(1), s.ToString("d MMM", CultureInfo.InvariantCulture)));
+                    s = s.AddDays(1);
+                }
+            }
+
+            return buckets;
+        }
 
         private static List<Bucket> BuildDayBuckets(int days)
         {

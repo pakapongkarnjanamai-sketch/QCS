@@ -48,6 +48,8 @@ export function VendorsPage() {
             caption="Quotations"
             width={120}
             alignment="right"
+             sortOrder="desc"
+              sortIndex={0}
           />
           <Column
             caption="Action"

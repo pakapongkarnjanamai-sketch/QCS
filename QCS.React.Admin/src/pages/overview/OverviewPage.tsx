@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
+import { toast } from '../../lib/toast.ts'
 import Chart, {
   Series as ChartSeries,
   CommonSeriesSettings,
@@ -62,7 +63,9 @@ type SeriesTrendPoint = {
   count: number
 }
 
-type Granularity = 'week' | 'month' | 'year'
+type ChartType = 'line' | 'bar'
+type Timeframe = '7d' | '30d' | '6m' | '1y'
+type Aggregation = 'day' | 'week' | 'month'
 
 type ValidityStatus = {
   active: number
@@ -138,11 +141,32 @@ function formatCount(value: number): string {
   return numberFormat.format(value)
 }
 
-const GRANULARITY_OPTIONS: Array<{ key: Granularity; label: string; rangeLabel: string }> = [
-  { key: 'week', label: 'Week', rangeLabel: 'Last 7 days' },
-  { key: 'month', label: 'Month', rangeLabel: 'Last 4 weeks' },
-  { key: 'year', label: 'Year', rangeLabel: 'Last 12 months' },
+const CHART_TYPE_OPTIONS: Array<{ key: ChartType; label: string }> = [
+  { key: 'line', label: 'Line' },
+  { key: 'bar', label: 'Bar' },
 ]
+
+type TimeframeOption = { key: Timeframe; label: string; description: string }
+const TIMEFRAME_OPTIONS: TimeframeOption[] = [
+  { key: '7d', label: '7D', description: 'Last 7 days' },
+  { key: '30d', label: '30D', description: 'Last 30 days' },
+  { key: '6m', label: '6M', description: 'Last 6 months' },
+  { key: '1y', label: '1Y', description: 'Last 1 year' },
+]
+
+type AggregationOption = { key: Aggregation; label: string }
+const AGGREGATION_OPTIONS: AggregationOption[] = [
+  { key: 'day', label: 'Daily' },
+  { key: 'week', label: 'Weekly' },
+  { key: 'month', label: 'Monthly' },
+]
+
+const VALID_AGGREGATIONS: Record<Timeframe, Aggregation[]> = {
+  '7d': ['day'],
+  '30d': ['day', 'week'],
+  '6m': ['week', 'month'],
+  '1y': ['week', 'month'],
+}
 
 function toErrorMessage(reason: unknown): string {
   if (reason instanceof DOMException && reason.name === 'AbortError') {
@@ -150,6 +174,10 @@ function toErrorMessage(reason: unknown): string {
   }
 
   return reason instanceof Error ? reason.message : 'Unknown request error.'
+}
+
+function isAbortReason(reason: unknown): boolean {
+  return reason instanceof DOMException && reason.name === 'AbortError'
 }
 
 async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T> {
@@ -217,7 +245,7 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
         myRequestCount: 0,
       }
 
-  if (summaryResult.status === 'rejected') {
+  if (summaryResult.status === 'rejected' && !isAbortReason(summaryResult.reason)) {
     issues.push({
       section: 'Summary',
       message: toErrorMessage(summaryResult.reason),
@@ -239,7 +267,7 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
     { key: 'Approved queue', value: approvedResult },
     { key: 'Rejected queue', value: rejectedResult },
   ] as const).forEach((item) => {
-    if (item.value.status === 'rejected') {
+    if (item.value.status === 'rejected' && !isAbortReason(item.value.reason)) {
       issues.push({
         section: item.key,
         message: toErrorMessage(item.value.reason),
@@ -250,14 +278,14 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
   const topVendors = vendorsResult.status === 'fulfilled' ? vendorsResult.value.data ?? [] : []
   const topRequesters = requestersResult.status === 'fulfilled' ? requestersResult.value.data ?? [] : []
 
-  if (vendorsResult.status === 'rejected') {
+  if (vendorsResult.status === 'rejected' && !isAbortReason(vendorsResult.reason)) {
     issues.push({
       section: 'Top vendors',
       message: toErrorMessage(vendorsResult.reason),
     })
   }
 
-  if (requestersResult.status === 'rejected') {
+  if (requestersResult.status === 'rejected' && !isAbortReason(requestersResult.reason)) {
     issues.push({
       section: 'Top requesters',
       message: toErrorMessage(requestersResult.reason),
@@ -282,13 +310,13 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
   }
 }
 
-async function fetchTrendData(granularity: Granularity, signal: AbortSignal): Promise<TrendPoint[]> {
-  return fetchJson<TrendPoint[]>(`/api/Dashboard/RequestTrend?granularity=${granularity}`, signal)
+async function fetchTrendData(timeframe: Timeframe, aggregation: Aggregation, signal: AbortSignal): Promise<TrendPoint[]> {
+  return fetchJson<TrendPoint[]>(`/api/Dashboard/RequestTrend?timeframe=${timeframe}&aggregation=${aggregation}`, signal)
 }
 
 async function fetchStaticData(signal: AbortSignal): Promise<StaticData> {
   const [requesterTrendResult, activeVendorsResult, validityResult] = await Promise.allSettled([
-    fetchJson<SeriesTrendPoint[]>('/api/Dashboard/RequesterTrend?days=15&top=5', signal),
+    fetchJson<SeriesTrendPoint[]>('/api/Dashboard/RequesterTrend?days=7&top=5', signal),
     fetchJson<ActiveVendorPoint[]>('/api/Dashboard/ActiveVendors?top=10', signal),
     fetchJson<ValidityStatus>('/api/Dashboard/ValidityStatus', signal),
   ])
@@ -306,22 +334,32 @@ export function OverviewPage() {
   const [data, setData] = useState<OverviewData | null>(null)
   const [trend, setTrend] = useState<TrendPoint[]>([])
   const [trendLoading, setTrendLoading] = useState(false)
+  const [staticLoading, setStaticLoading] = useState(true)
   const [staticData, setStaticData] = useState<StaticData>({
     requesterTrend: [],
     activeVendors: [],
     validityStatus: { active: 0, expiringSoon: 0, expired: 0 },
   })
-  const [issues, setIssues] = useState<LoadIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [granularity, setGranularity] = useState<Granularity>('week')
+  const [chartType, setChartType] = useState<ChartType>('bar')
+  const [timeframe, setTimeframe] = useState<Timeframe>('7d')
+  const [aggregation, setAggregation] = useState<Aggregation>('day')
 
   // Load static data once
   useEffect(() => {
     const controller = new AbortController()
-    void fetchStaticData(controller.signal).then((result) => {
-      setStaticData(result)
-    })
+    const load = async () => {
+      setStaticLoading(true)
+      try {
+        const result = await fetchStaticData(controller.signal)
+        setStaticData(result)
+      } finally {
+        setStaticLoading(false)
+      }
+    }
+
+    void load()
     return () => { controller.abort() }
   }, [])
 
@@ -331,14 +369,16 @@ export function OverviewPage() {
     const load = async () => {
       setLoading(true)
       setError(null)
-      setIssues([])
       try {
         const result = await fetchOverviewData(controller.signal)
         setData(result.data)
-        setIssues(result.issues)
+        if (result.issues.length > 0) {
+          toast.warning('Some overview panels are showing fallback values.')
+        }
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === 'AbortError') return
-        setError(reason instanceof Error ? reason.message : 'Cannot load overview data.')
+        const message = reason instanceof Error ? reason.message : 'Cannot load overview data.'
+        setError(message)
         setData(null)
       } finally {
         setLoading(false)
@@ -348,34 +388,48 @@ export function OverviewPage() {
     return () => { controller.abort() }
   }, [])
 
-  // Reload only the trend chart on granularity change
+  // Reload only the trend chart on timeframe/aggregation change
   useEffect(() => {
     const controller = new AbortController()
     const load = async () => {
       setTrendLoading(true)
       try {
-        const result = await fetchTrendData(granularity, controller.signal)
+        const result = await fetchTrendData(timeframe, aggregation, controller.signal)
         setTrend(result)
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === 'AbortError') return
         setTrend([])
+        toast.warning('Trend chart is temporarily unavailable.')
       } finally {
         setTrendLoading(false)
       }
     }
     void load()
     return () => { controller.abort() }
-  }, [granularity])
+  }, [timeframe, aggregation])
 
-  const activeRangeLabel = useMemo(
-    () => GRANULARITY_OPTIONS.find((g) => g.key === granularity)?.rangeLabel ?? '',
-    [granularity],
+  const activeTimeframeLabel = useMemo(
+    () => TIMEFRAME_OPTIONS.find((t) => t.key === timeframe)?.description ?? '',
+    [timeframe],
   )
+
+  const activeAggregationLabel = useMemo(
+    () => AGGREGATION_OPTIONS.find((a) => a.key === aggregation)?.label ?? '',
+    [aggregation],
+  )
+
+  const validAggregations = useMemo(() => VALID_AGGREGATIONS[timeframe], [timeframe])
+
+  function handleTimeframeChange(newTimeframe: Timeframe) {
+    setTimeframe(newTimeframe)
+    const valid = VALID_AGGREGATIONS[newTimeframe]
+    if (!valid.includes(aggregation)) {
+      setAggregation(valid[0])
+    }
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      
-
       {loading && (
         <section
           role="status"
@@ -399,23 +453,8 @@ export function OverviewPage() {
 
       {!loading && !error && data && (
         <>
-          {issues.length > 0 && (
-            <section
-              role="status"
-              aria-live="polite"
-              className="rounded-sm border border-(--border-subtle) bg-(--surface-muted) px-4 py-3"
-            >
-              <p className="text-[12px] font-medium text-(--ink-strong)">
-                Some panels are showing fallback values.
-              </p>
-              <p className="mt-1 text-[12px] text-(--ink-muted)">
-                Live updates are temporarily unavailable for {issues.map((item) => item.section).join(', ')}.
-              </p>
-            </section>
-          )}
-
           <section className={cardClassName}>
-            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-(--border-subtle) pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-(--border-subtle) pb-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
                   Trend window
@@ -424,32 +463,79 @@ export function OverviewPage() {
                   className="mt-1 text-[18px] font-semibold leading-none text-(--ink-strong)"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  Aggregation: {activeRangeLabel}
+                  {activeAggregationLabel} — {activeTimeframeLabel}
                 </h3>
               </div>
-              <div
-                role="group"
-                aria-label="Trend granularity"
-                className="inline-flex border border-(--border-subtle)"
-              >
-                {GRANULARITY_OPTIONS.map((opt) => {
-                  const active = opt.key === granularity
-                  return (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setGranularity(opt.key)}
-                      aria-pressed={active}
-                      className={`focus-ring min-h-11 px-4 text-[12px] font-medium ${
-                        active
-                          ? 'bg-(--ink-strong) text-(--surface-panel)'
-                          : 'bg-(--surface-panel) text-(--ink-muted) hover:bg-(--surface-muted)'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  )
-                })}
+              <div className="flex flex-wrap items-start gap-2">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Chart</p>
+                  <div role="group" aria-label="Chart type" className="inline-flex border border-(--border-subtle)">
+                    {CHART_TYPE_OPTIONS.map((opt) => {
+                      const active = opt.key === chartType
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setChartType(opt.key)}
+                          aria-pressed={active}
+                          className={`focus-ring min-h-8 px-3 text-[12px] font-medium ${
+                            active
+                              ? 'bg-(--ink-strong) text-(--surface-panel)'
+                              : 'bg-(--surface-panel) text-(--ink-muted) hover:bg-(--surface-muted)'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Timeframe</p>
+                  <div role="group" aria-label="Timeframe" className="inline-flex border border-(--border-subtle)">
+                    {TIMEFRAME_OPTIONS.map((opt) => {
+                      const active = opt.key === timeframe
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => handleTimeframeChange(opt.key)}
+                          aria-pressed={active}
+                          className={`focus-ring min-h-8 px-3 text-[12px] font-medium ${
+                            active
+                              ? 'bg-(--ink-strong) text-(--surface-panel)'
+                              : 'bg-(--surface-panel) text-(--ink-muted) hover:bg-(--surface-muted)'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Aggregation</p>
+                  <div role="group" aria-label="Data aggregation" className="inline-flex border border-(--border-subtle)">
+                    {AGGREGATION_OPTIONS.filter((opt) => validAggregations.includes(opt.key)).map((opt) => {
+                      const active = opt.key === aggregation
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setAggregation(opt.key)}
+                          aria-pressed={active}
+                          className={`focus-ring min-h-8 px-3 text-[12px] font-medium ${
+                            active
+                              ? 'bg-(--ink-strong) text-(--surface-panel)'
+                              : 'bg-(--surface-panel) text-(--ink-muted) hover:bg-(--surface-muted)'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -470,7 +556,7 @@ export function OverviewPage() {
                   <ChartSeries
                     valueField="count"
                     argumentField="label"
-                    type="bar"
+                    type={chartType}
                     color="#3b82f6"
                     name="Requests"
                   />
@@ -498,14 +584,18 @@ export function OverviewPage() {
                   className="mt-1 text-[16px] font-semibold leading-none text-(--ink-strong)"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  Requests created by top 5 requesters
+                  Requests created by top 5 requesters (last 7 days)
                 </h3>
               </div>
-              {staticData.requesterTrend.length === 0 ? (
+              {staticLoading ? (
+                <div className="flex h-65 items-center justify-center text-[12px] text-(--ink-muted)">
+                  Loading requester activity...
+                </div>
+              ) : staticData.requesterTrend.length === 0 ? (
                 <p className="text-[12px] text-(--ink-muted)">No requester activity found.</p>
               ) : (
                 <Chart dataSource={staticData.requesterTrend} height={260}>
-                  <CommonSeriesSettings argumentField="label" valueField="count" type="line" />
+                  <CommonSeriesSettings argumentField="label" valueField="count" type="spline" />
                   <SeriesTemplate nameField="name" />
                   <ArgumentAxis />
                   <ValueAxis allowDecimals={false} />
@@ -513,7 +603,7 @@ export function OverviewPage() {
                   <ChartTooltip
                     enabled
                     customizeTooltip={(arg: { seriesName: string; argument: string; value: number }) => ({
-                      text: `${arg.seriesName}\n${arg.argument}: ${formatCount(arg.value)}`,
+                      text: `${arg.seriesName}\n${arg.argument}: ${formatCount(arg.value)} requests`,
                     })}
                   />
                 </Chart>
@@ -532,7 +622,11 @@ export function OverviewPage() {
                   Active quotations by vendor
                 </h3>
               </div>
-              {staticData.activeVendors.length === 0 ? (
+              {staticLoading ? (
+                <div className="flex h-65 items-center justify-center text-[12px] text-(--ink-muted)">
+                  Loading vendor activity...
+                </div>
+              ) : staticData.activeVendors.length === 0 ? (
                 <p className="text-[12px] text-(--ink-muted)">No active quotations found.</p>
               ) : (
                 <TreeMap
@@ -606,7 +700,11 @@ export function OverviewPage() {
               </div>
 
               <div>
-                {(staticData.validityStatus.active + staticData.validityStatus.expiringSoon + staticData.validityStatus.expired) === 0 ? (
+                {staticLoading ? (
+                  <div className="flex h-55 items-center justify-center text-[12px] text-(--ink-muted)">
+                    Loading validity data...
+                  </div>
+                ) : (staticData.validityStatus.active + staticData.validityStatus.expiringSoon + staticData.validityStatus.expired) === 0 ? (
                   <p className="text-[12px] text-(--ink-muted)">No validity data available.</p>
                 ) : (
                   <PieChart
