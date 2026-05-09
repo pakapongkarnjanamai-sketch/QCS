@@ -1,6 +1,7 @@
 import CustomStore from 'devextreme/data/custom_store'
 import type { LoadOptions } from 'devextreme/data'
 import { appConfig } from '../config/appConfig.ts'
+import { fetchWithAccessControl } from './apiClient.ts'
 
 type LoadResult<T> = {
   data: T[]
@@ -52,7 +53,7 @@ export function createDataSource<T extends object>(path: string, key: keyof T = 
       })
 
       const url = `${appConfig.apiBaseUrl}${path}?${params.toString()}`
-      const response = await fetch(url, { credentials: 'include' })
+      const response = await fetchWithAccessControl(url, { credentials: 'include' })
 
       if (!response.ok) {
         const text = await response.text().catch(() => response.statusText)

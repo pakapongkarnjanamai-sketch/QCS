@@ -95,6 +95,24 @@ namespace QCS.API.Controllers
             return Ok(new { success = true });
         }
 
+        [HttpGet("Preview")]
+        public async Task<IActionResult> Preview([FromQuery] string nId, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(nId))
+            {
+                return Problem("NID is required.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var normalizedNId = NormalizeNId(nId);
+            var employee = await _employeeLookupService.GetEmployeeByNIdAsync(normalizedNId, cancellationToken);
+            if (employee == null)
+            {
+                return Problem($"NID '{normalizedNId}' was not found in EmployeeLookup/GetFull.", statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Ok(CreatePreviewResponse(employee));
+        }
+
         [HttpPut("{id:int}/AccessLevel")]
         public async Task<IActionResult> UpdateAccessLevel(int id, [FromBody] UpdateUserAccessLevelRequest request, CancellationToken cancellationToken)
         {
@@ -210,6 +228,29 @@ namespace QCS.API.Controllers
             target.Email = source.Email?.Trim() ?? string.Empty;
         }
 
+        private static UserAccessPreviewResponse CreatePreviewResponse(EmployeeFullItem source)
+        {
+            var normalizedNId = NormalizeNId(source.NId);
+            var fullName = string.Join(" ", new[]
+            {
+                source.EnglishFirstName?.Trim(),
+                source.EnglishLastName?.Trim(),
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+            return new UserAccessPreviewResponse
+            {
+                NId = normalizedNId,
+                EmployeeId = source.EId?.Trim() ?? string.Empty,
+                FullName = fullName,
+                Division = source.Division?.Trim() ?? string.Empty,
+                Department = source.Department?.Trim() ?? string.Empty,
+                Section = source.Section?.Trim() ?? string.Empty,
+                Position = source.Position?.Trim() ?? string.Empty,
+                CostCenter = source.CostCenter?.Trim() ?? string.Empty,
+                Email = source.Email?.Trim() ?? string.Empty,
+            };
+        }
+
         private static string NormalizeNId(string nId)
         {
             return nId.Trim().ToUpperInvariant();
@@ -236,5 +277,18 @@ namespace QCS.API.Controllers
     {
         public string AccessLevel { get; set; } = nameof(AdminAccessLevel.User);
         public bool IsActive { get; set; } = true;
+    }
+
+    public sealed class UserAccessPreviewResponse
+    {
+        public string NId { get; set; } = string.Empty;
+        public string EmployeeId { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Division { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public string Section { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public string CostCenter { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
     }
 }

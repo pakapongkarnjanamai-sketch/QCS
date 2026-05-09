@@ -80,3 +80,12 @@ a {
 .shell-enter {
   animation: shell-fade 180ms ease-out;
 }
+
+table th,
+table td {
+  vertical-align: middle;
+}
+
+.dx-datagrid .dx-row > td {
+  vertical-align: middle;
+}

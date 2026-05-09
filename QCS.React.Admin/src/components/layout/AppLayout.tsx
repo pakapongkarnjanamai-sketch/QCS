@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { getPageTitle } from '../../config/navigation.ts'
 import { appConfig } from '../../config/appConfig.ts'
+import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 import { Sidebar } from './Sidebar.tsx'
 
 const formatToday = () =>
@@ -40,7 +41,7 @@ export function AppLayout() {
 
     const loadCurrentUser = async () => {
       try {
-        const response = await fetch(`${appConfig.apiBaseUrl}/api/Session/Me`, {
+        const response = await fetchWithAccessControl(`${appConfig.apiBaseUrl}/api/Session/Me`, {
           credentials: 'include',
         })
 
@@ -66,7 +67,7 @@ export function AppLayout() {
   }, [])
 
   return (
-    <div className="h-screen overflow-hidden bg-[var(--surface-app)] text-[var(--ink-strong)]">
+    <div className="h-screen overflow-hidden bg-(--surface-app) text-(--ink-strong)">
       <div className="flex h-full min-h-0">
         <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
@@ -80,11 +81,11 @@ export function AppLayout() {
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] px-4 sm:px-6">
+          <header className="flex h-16 shrink-0 items-center justify-between border-b border-(--border-subtle) bg-(--surface-panel) px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-panel)] text-[var(--ink-strong)] lg:hidden"
+                className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-sm border border-(--border-subtle) bg-(--surface-panel) text-(--ink-strong) lg:hidden"
                 aria-label="Open navigation"
                 onClick={() => setIsSidebarOpen(true)}
               >
@@ -94,7 +95,7 @@ export function AppLayout() {
               <div className="min-w-0">
                
                 <h1
-                  className="truncate text-[20px] font-semibold leading-none text-[var(--ink-strong)]"
+                  className="truncate text-[20px] font-semibold leading-none text-(--ink-strong)"
                 >
                   {pageTitle}
                 </h1>
@@ -103,26 +104,26 @@ export function AppLayout() {
 
             <div className="hidden items-center gap-4 md:flex">
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-(--ink-soft)">
                   User
                 </p>
-                <p className="text-[13px] font-medium text-[var(--ink-strong)]">{userName}</p>
+                <p className="text-[13px] font-medium text-(--ink-strong)">{userName}</p>
               </div>
 
-              <div className="h-8 w-px bg-[var(--border-subtle)]" aria-hidden="true" />
+              <div className="h-8 w-px bg-(--border-subtle)" aria-hidden="true" />
 
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-(--ink-soft)">
                   Today
                 </p>
-                <p className="text-[13px] font-medium text-[var(--ink-strong)]">{today}</p>
+                <p className="text-[13px] font-medium text-(--ink-strong)">{today}</p>
               </div>
             </div>
           </header>
 
           <main className="min-h-0 flex-1 flex flex-col">
             <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 sm:p-6">
-              <div className="shell-enter mx-auto max-w-[1560px] flex flex-1 min-h-0 flex-col w-full">
+              <div className="shell-enter mx-auto flex flex-1 min-h-0 w-full max-w-390 flex-col">
                 <Outlet />
               </div>
             </div>

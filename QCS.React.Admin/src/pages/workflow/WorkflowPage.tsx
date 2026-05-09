@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { appConfig } from '../../config/appConfig.ts'
+import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 
 type AssignmentDto = {
   nId: string
@@ -86,7 +87,7 @@ export function WorkflowPage() {
     setError(null)
 
     try {
-      const response = await fetch(`${appConfig.apiBaseUrl}/api/Workflow/route/${parsedRouteId}`, {
+      const response = await fetchWithAccessControl(`${appConfig.apiBaseUrl}/api/Workflow/route/${parsedRouteId}`, {
         credentials: 'include',
       })
 

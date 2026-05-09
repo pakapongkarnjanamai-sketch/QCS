@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout.tsx'
 import { WorkspacePage } from './pages/WorkspacePage.tsx'
+import { AccessDeniedPage } from './pages/access-denied/AccessDeniedPage.tsx'
 import { OverviewPage } from './pages/overview/OverviewPage.tsx'
 import { RequestsPage } from './pages/requests/RequestsPage.tsx'
 import { QuotationsPage } from './pages/quotations/QuotationsPage.tsx'
@@ -12,6 +13,7 @@ import { workspacePages } from './pages/pageData.ts'
 function App() {
   return (
     <Routes>
+      <Route path="access-denied" element={<AccessDeniedPage />} />
       <Route element={<AppLayout />}>
         <Route index element={<OverviewPage />} />
         {workspacePages.map((page) =>

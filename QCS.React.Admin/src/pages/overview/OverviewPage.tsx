@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { appConfig } from '../../config/appConfig.ts'
+import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 import Chart, {
   Series as ChartSeries,
   CommonSeriesSettings,
@@ -152,7 +153,7 @@ function toErrorMessage(reason: unknown): string {
 }
 
 async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
+  const response = await fetchWithAccessControl(`${appConfig.apiBaseUrl}${path}`, {
     credentials: 'include',
     signal,
   })

@@ -11,6 +11,7 @@ import DataGrid, {
 import type { RowClickEvent } from 'devextreme/ui/data_grid'
 import { createDataSource } from '../../lib/createDataSource.ts'
 import { appConfig } from '../../config/appConfig.ts'
+import { fetchWithAccessControl } from '../../lib/apiClient.ts'
 
 const portalBase = appConfig.portalBaseUrl
 
@@ -113,7 +114,7 @@ function DetailPane({ code, onClose }: { code: string; onClose: () => void }) {
     setPdfError(null)
 
     try {
-      const response = await fetch(`${appConfig.apiBaseUrl}${endpoint}`, {
+      const response = await fetchWithAccessControl(`${appConfig.apiBaseUrl}${endpoint}`, {
         credentials: 'include',
       })
 
@@ -166,7 +167,7 @@ function DetailPane({ code, onClose }: { code: string; onClose: () => void }) {
       currentObjectUrlRef.current = null
     }
 
-    fetch(`${appConfig.apiBaseUrl}/api/Quotation/ByCode/${encodeURIComponent(code)}`, {
+    fetchWithAccessControl(`${appConfig.apiBaseUrl}/api/Quotation/ByCode/${encodeURIComponent(code)}`, {
       credentials: 'include',
     })
       .then((r) => {
