@@ -65,9 +65,20 @@ const normalizePortalUrl = (value?: string) => {
   return trimmed.replace(/\/+$/, '')
 }
 
+function resolvePortalBaseUrl() {
+  const configured = import.meta.env.VITE_QCS_PORTAL_BASE_URL?.trim()
+
+  if (configured) {
+    return normalizePortalUrl(configured)
+  }
+
+  // Legacy MVC base URL fallback for quotation detail links.
+  return 'https://ap-ntc2137-prwb/QCS'
+}
+
 export const appConfig = {
   appBasePath: normalizeBasePath(import.meta.env.VITE_QCS_ADMIN_APP_BASE_PATH),
   apiBaseUrl,
   hubUrl: resolveHubUrl(apiBaseUrl),
-  portalBaseUrl: normalizePortalUrl(import.meta.env.VITE_QCS_PORTAL_BASE_URL),
+  portalBaseUrl: resolvePortalBaseUrl(),
 } as const

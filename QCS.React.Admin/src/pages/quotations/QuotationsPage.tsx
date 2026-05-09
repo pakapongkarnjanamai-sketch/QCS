@@ -241,14 +241,26 @@ function DetailPane({ code, onClose }: { code: string; onClose: () => void }) {
               Merged & Stamped
             </button>
           </div>
-          <button
-            type="button"
-            onClick={downloadCurrentPdf}
-            disabled={!pdfDoc || pdfLoading}
-            className="rounded-sm border border-(--border-subtle) px-3 py-1.5 text-[12px] text-(--ink-strong) disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Download
-          </button>
+          <div className="flex items-center gap-2">
+            {portalBase && (
+              <a
+                href={`${portalBase}/Quotation/View/${encodeURIComponent(code)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-sm border border-(--border-subtle) px-3 py-1.5 text-[12px] text-(--ink-strong) hover:bg-(--surface-muted)"
+              >
+                Open Page
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={downloadCurrentPdf}
+              disabled={!pdfDoc || pdfLoading}
+              className="rounded-sm border border-(--border-subtle) px-3 py-1.5 text-[12px] text-(--ink-strong) disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Download
+            </button>
+          </div>
         </div>
       )}
 
@@ -438,26 +450,7 @@ export function QuotationsPage() {
             <HeaderFilter visible={true} />
             <Scrolling mode="virtual" rowRenderingMode="virtual" />
 
-            <Column
-              dataField="code"
-              caption="Doc No."
-              width={130}
-              cellRender={({ data }: { data: QuotationRow }) =>
-                portalBase ? (
-                  <a
-                    href={`${portalBase}/Quotation/View/${encodeURIComponent(data.code)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[13px] text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
-                  >
-                    {data.code}
-                  </a>
-                ) : (
-                  <span>{data.code}</span>
-                )
-              }
-            />
+            <Column dataField="code" caption="Doc No." width={130} />
             <Column dataField="vendorCode" caption="Vendor" minWidth={130}>
               <Lookup
                 dataSource={vendorLookupDataSource}
