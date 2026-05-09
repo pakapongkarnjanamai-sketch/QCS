@@ -73,7 +73,7 @@ export function RequestsPage() {
   )
 
   return (
-    <div className="flex min-h-0 gap-4">
+    <div className="flex flex-1 min-h-0 gap-4">
       {/* Sub-sidebar */}
       <nav className="w-44 shrink-0">
         <p className="mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-(--ink-soft)">
@@ -102,11 +102,11 @@ export function RequestsPage() {
       </nav>
 
       {/* Main content */}
-      <div className="min-w-0 flex-1">
-        <div className="mb-3">
+      <div className="flex flex-col min-h-0 min-w-0 flex-1">
+        <div className="mb-3 shrink-0">
           <p className="text-[12px] text-(--ink-soft)">{activeCategory.description}</p>
         </div>
-        <section className="overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
+        <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
           <DataGrid
             key={activeKey}
             dataSource={dataSource}
@@ -116,7 +116,7 @@ export function RequestsPage() {
             rowAlternationEnabled={false}
             columnAutoWidth={true}
             wordWrapEnabled={false}
-            height="calc(100vh - 260px)"
+            height="100%"
           >
             <RemoteOperations
               filtering={true}

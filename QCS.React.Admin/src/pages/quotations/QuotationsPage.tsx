@@ -399,13 +399,14 @@ export function QuotationsPage() {
   )
 
   const handleRowClick = useCallback((e: RowClickEvent<QuotationRow>) => {
-    setSelectedCode(e.data?.code ?? null)
+    const code = e.data?.code ?? null
+    setSelectedCode((prev) => (prev === code ? null : code))
   }, [])
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3 flex-1 min-h-0">
       {(vendorCodeFilter || requesterNameFilter) && (
-        <section className="rounded-sm border border-(--border-subtle) bg-(--surface-panel) px-4 py-2 text-[13px] text-(--ink-muted)">
+        <section className="shrink-0 rounded-sm border border-(--border-subtle) bg-(--surface-panel) px-4 py-2 text-[13px] text-(--ink-muted)">
           {vendorCodeFilter ? (
             <>
               Showing quotations for vendor:
@@ -426,7 +427,7 @@ export function QuotationsPage() {
         </section>
       )}
 
-      <div className="flex min-h-0 gap-0" style={{ height: 'calc(100vh - 240px)' }}>
+      <div className="flex flex-1 min-h-0 gap-0">
       {/* Grid — narrows when detail pane is open */}
       <div
         className={`min-w-0 transition-all duration-150 ${selectedCode ? 'w-95 shrink-0' : 'flex-1'}`}

@@ -22,10 +22,8 @@ export function VendorsPage() {
   )
 
   return (
-    <div className="space-y-3">
-     
-
-      <section className="overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
+    <div className="flex flex-col flex-1 min-h-0">
+      <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
         <DataGrid
           dataSource={dataSource}
           keyExpr="vendorCode"
@@ -36,7 +34,7 @@ export function VendorsPage() {
           columnAutoWidth={true}
           wordWrapEnabled={false}
           noDataText="No vendor data"
-          height="calc(100vh - 250px)"
+          height="100%"
         >
           <RemoteOperations filtering paging sorting grouping={false} summary={false} />
           <FilterRow visible={true} />

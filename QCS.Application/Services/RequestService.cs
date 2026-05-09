@@ -746,6 +746,10 @@ namespace QCS.Application.Services
                 Title = request.Title,
                 RequestDate = request.RequestDate,
                 Status = request.Status.ToString(),
+                RequesterName = request.ApprovalSteps
+                    .Where(s => s.Sequence == 1)
+                    .Select(s => s.ApproverName)
+                    .FirstOrDefault() ?? string.Empty,
                 CurrentStepId = request.CurrentStepId,
                 VendorCode = request.VendorCode,
                 VendorName = request.VendorName,

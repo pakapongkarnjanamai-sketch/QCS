@@ -120,9 +120,9 @@ export function AppLayout() {
             </div>
           </header>
 
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            <div className="p-4 sm:p-6">
-              <div className="shell-enter mx-auto max-w-[1560px]">
+          <main className="min-h-0 flex-1 flex flex-col">
+            <div className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 sm:p-6">
+              <div className="shell-enter mx-auto max-w-[1560px] flex flex-1 min-h-0 flex-col w-full">
                 <Outlet />
               </div>
             </div>
