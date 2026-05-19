@@ -57,7 +57,7 @@ namespace QCS.API.Controllers
         private async Task<List<VendorGridDto>> LoadVendorGridRowsAsync()
         {
             var client = _httpClientFactory.CreateClient("VendorApi");
-            var response = await client.GetAsync("Vendors/LookupVendors");
+            var response = await client.GetAsync("Vendors/Lookup");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -111,7 +111,7 @@ namespace QCS.API.Controllers
 
                 // ยิงไปที่ Endpoint ปลายทาง "Suppliers"
                 // คุณสามารถรับ Query String จาก Frontend มาส่งต่อได้ถ้าต้องการ (เช่น ?filter=...)
-                var response = await client.GetAsync("Vendors/LookupVendors" + Request.QueryString);
+                var response = await client.GetAsync("Vendors/Lookup" + Request.QueryString);
 
                 if (response.IsSuccessStatusCode)
                 {

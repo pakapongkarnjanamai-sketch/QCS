@@ -27,7 +27,7 @@ namespace QCS.Application.Services
             _httpClient = httpClient;
             _logger = logger;
             _currentUserService = currentUserService;
-            _workflowApiBaseUrl = configuration["ExternalServices:WorkflowApi"] ?? "http://ap-ntc2138-qawb/WorkflowApi/";
+            _workflowApiBaseUrl = configuration["ExternalServices:WorkflowApi"] ?? "https://ap-ntc2138-qawb/WorkflowApi/";
             _cache = cache;
         }
 
