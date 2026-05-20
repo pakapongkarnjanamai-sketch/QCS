@@ -16,11 +16,13 @@ namespace QCS.API.Controllers
     {
         // ✅ เปลี่ยน Type เป็น Interface
         private readonly IRequestService _requestService;
+        private readonly IPaperSavedService _paperSavedService;
 
         // ✅ เปลี่ยน Parameter ใน Constructor เป็น Interface
-        public DashboardController(IRequestService requestService)
+        public DashboardController(IRequestService requestService, IPaperSavedService paperSavedService)
         {
             _requestService = requestService;
+            _paperSavedService = paperSavedService;
         }
 
         [HttpGet("Summary")]
@@ -211,6 +213,50 @@ namespace QCS.API.Controllers
                     .ToListAsync();
 
                 return Ok(rows);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpGet("PaperSaved")]
+        public async Task<ActionResult<PaperSavedDto>> GetPaperSaved()
+        {
+            try
+            {
+                var dto = await _paperSavedService.GetSummaryAsync();
+                return Ok(dto);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpGet("PaperSavedTrend")]
+        public async Task<ActionResult<List<PaperSavedTrendPointDto>>> GetPaperSavedTrend(
+            [FromQuery] string timeframe = "30d",
+            [FromQuery] string aggregation = "day")
+        {
+            try
+            {
+                var result = await _paperSavedService.GetTrendAsync(timeframe, aggregation);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPost("BackfillPageCount")]
+        public async Task<ActionResult<PaperSavedBackfillResultDto>> BackfillPageCount([FromQuery] int batchSize = 50)
+        {
+            try
+            {
+                var result = await _paperSavedService.BackfillPageCountsAsync(batchSize);
+                return Ok(result);
             }
             catch (Exception ex)
             {

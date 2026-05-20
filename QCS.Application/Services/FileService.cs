@@ -21,6 +21,13 @@ namespace QCS.Application.Services
         // ค่า Default สำหรับ DocumentType กรณีไม่ระบุ
         private const int DefaultDocumentTypeId = 10;
 
+        private readonly IPdfPageCounter _pdfPageCounter;
+
+        public FileService(IPdfPageCounter pdfPageCounter)
+        {
+            _pdfPageCounter = pdfPageCounter;
+        }
+
         public async Task<List<Quotation>> PrepareFilesForUploadAsync(List<IFormFile> files, string quotationsJson)
         {
             var result = new List<Quotation>();
@@ -36,9 +43,12 @@ namespace QCS.Application.Services
             {
                 using var ms = new MemoryStream();
                 await file.CopyToAsync(ms);
+                var bytes = ms.ToArray();
 
                 // หา Metadata ที่ชื่อไฟล์ตรงกัน
                 var meta = metaList?.FirstOrDefault(m => m.FileName == file.FileName);
+
+                var pageCount = _pdfPageCounter.CountPages(bytes, file.ContentType);
 
                 // สร้าง Object Quotation
                 var quotation = new Quotation
@@ -55,7 +65,8 @@ namespace QCS.Application.Services
                         //FileName = file.FileName,
                         ContentType = file.ContentType,
                         FileSize = file.Length,
-                        Data = ms.ToArray()
+                        PageCount = pageCount,
+                        Data = bytes
                     }
                 };
 

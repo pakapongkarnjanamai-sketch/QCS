@@ -6,6 +6,7 @@ export type NavIcon =
   | 'vendors'
   | 'users'
   | 'departments'
+  | 'sustainability'
 
 export type NavItem = {
   to: string
@@ -29,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
         { to: '/vendors', label: 'Vendors', icon: 'vendors' },
       { to: '/users', label: 'Users', icon: 'users' },
       { to: '/departments', label: 'Departments', icon: 'departments' },
+      { to: '/sustainability', label: 'Sustainability', icon: 'sustainability' },
     ],
   },
  

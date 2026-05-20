@@ -76,6 +76,13 @@ const DepartmentsIcon = ({ active }: IconProps) => (
   </svg>
 )
 
+const SustainabilityIcon = ({ active }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={iconClassName(active)} aria-hidden="true">
+    <path d="M20 4c-9 0-14 5-14 12 0 1.3.2 2.5.6 3.6" />
+    <path d="M6 20c0-7 5-12 14-14" />
+  </svg>
+)
+
 const CloseIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
     <path d="M6 6l12 12" />
@@ -99,6 +106,8 @@ const renderIcon = (icon: NavIcon, active: boolean) => {
       return <UsersIcon active={active} />
     case 'departments':
       return <DepartmentsIcon active={active} />
+    case 'sustainability':
+      return <SustainabilityIcon active={active} />
   }
 }
 

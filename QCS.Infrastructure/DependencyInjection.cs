@@ -29,6 +29,7 @@ namespace QCS.Infrastructure
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddSingleton<IPdfPageCounter, PdfPigPageCounter>();
 
             // WorkflowService talks to an external HTTP endpoint, so it lives here.
             services.AddHttpClient<WorkflowService>();

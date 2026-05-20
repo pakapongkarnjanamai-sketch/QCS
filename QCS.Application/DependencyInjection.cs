@@ -15,6 +15,7 @@ namespace QCS.Application
             services.AddScoped<IRequestService, RequestService>();
             services.AddScoped<IQuotationService, QuotationService>();
             services.AddScoped<IFileService, FileService>();
+            services.AddScoped<IPaperSavedService, PaperSavedService>();
 
             return services;
         }

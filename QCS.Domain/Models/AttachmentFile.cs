@@ -17,6 +17,9 @@ namespace QCS.Domain.Models
 
         public long FileSize { get; set; }
 
+        // จำนวนหน้าของไฟล์ PDF (null = ยังไม่ได้นับ หรือไฟล์ไม่ใช่ PDF)
+        public int? PageCount { get; set; }
+
         // เก็บข้อมูลไฟล์ในรูปแบบ Binary
         public byte[] Data { get; set; }
     }

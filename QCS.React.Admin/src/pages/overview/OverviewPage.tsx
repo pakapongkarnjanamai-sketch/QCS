@@ -78,10 +78,20 @@ type ActiveVendorPoint = {
   value: number
 }
 
+type PaperSaved = {
+  totalPages: number
+  quotationFileCount: number
+  approvedRequestCount: number
+  co2GramsSaved: number
+  waterLitersSaved: number
+  treesEquivalent: number
+}
+
 type StaticData = {
   requesterTrend: SeriesTrendPoint[]
   activeVendors: ActiveVendorPoint[]
   validityStatus: ValidityStatus
+  paperSaved: PaperSaved
 }
 
 type OverviewData = {
@@ -314,11 +324,21 @@ async function fetchTrendData(timeframe: Timeframe, aggregation: Aggregation, si
   return fetchJson<TrendPoint[]>(`/api/Dashboard/RequestTrend?timeframe=${timeframe}&aggregation=${aggregation}`, signal)
 }
 
+const EMPTY_PAPER_SAVED: PaperSaved = {
+  totalPages: 0,
+  quotationFileCount: 0,
+  approvedRequestCount: 0,
+  co2GramsSaved: 0,
+  waterLitersSaved: 0,
+  treesEquivalent: 0,
+}
+
 async function fetchStaticData(signal: AbortSignal): Promise<StaticData> {
-  const [requesterTrendResult, activeVendorsResult, validityResult] = await Promise.allSettled([
+  const [requesterTrendResult, activeVendorsResult, validityResult, paperSavedResult] = await Promise.allSettled([
     fetchJson<SeriesTrendPoint[]>('/api/Dashboard/RequesterTrend?days=7&top=5', signal),
     fetchJson<ActiveVendorPoint[]>('/api/Dashboard/ActiveVendors?top=10', signal),
     fetchJson<ValidityStatus>('/api/Dashboard/ValidityStatus', signal),
+    fetchJson<PaperSaved>('/api/Dashboard/PaperSaved', signal),
   ])
   return {
     requesterTrend: requesterTrendResult.status === 'fulfilled' ? requesterTrendResult.value : [],
@@ -327,6 +347,7 @@ async function fetchStaticData(signal: AbortSignal): Promise<StaticData> {
       validityResult.status === 'fulfilled'
         ? validityResult.value
         : { active: 0, expiringSoon: 0, expired: 0 },
+    paperSaved: paperSavedResult.status === 'fulfilled' ? paperSavedResult.value : EMPTY_PAPER_SAVED,
   }
 }
 
@@ -339,6 +360,7 @@ export function OverviewPage() {
     requesterTrend: [],
     activeVendors: [],
     validityStatus: { active: 0, expiringSoon: 0, expired: 0 },
+    paperSaved: EMPTY_PAPER_SAVED,
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -453,6 +475,78 @@ export function OverviewPage() {
 
       {!loading && !error && data && (
         <>
+          <section className={cardClassName}>
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-(--border-subtle) pb-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-(--ink-soft)">
+                  Sustainability
+                </p>
+                <h3
+                  className="mt-1 text-[18px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  Paper saved by going digital
+                </h3>
+                <p className="mt-1 text-[12px] text-(--ink-muted)">
+                  Pages of approved quotation PDFs that did not need to be printed (1 PDF page = 1 sheet).
+                </p>
+              </div>
+              <Link
+                to="/sustainability"
+                className="focus-ring inline-flex min-h-11 items-center text-[12px] font-medium text-(--ink-muted) underline decoration-(--border-strong) underline-offset-4 hover:text-(--ink-strong)"
+              >
+                View sustainability
+              </Link>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="border border-(--border-subtle) bg-(--surface-muted) px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Sheets saved</p>
+                <p
+                  className="mt-1 text-[28px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {formatCount(staticData.paperSaved.totalPages)}
+                </p>
+                <p className="mt-1 text-[12px] text-(--ink-muted)">
+                  from {formatCount(staticData.paperSaved.quotationFileCount)} approved quotation files
+                </p>
+              </div>
+              <div className="border border-(--border-subtle) bg-(--surface-muted) px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">CO₂ avoided</p>
+                <p
+                  className="mt-1 text-[28px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {formatCount(Math.round(staticData.paperSaved.co2GramsSaved))}
+                  <span className="ml-1 text-[14px] font-normal text-(--ink-muted)">g</span>
+                </p>
+                <p className="mt-1 text-[12px] text-(--ink-muted)">≈ 4.6 g CO₂ per A4 sheet</p>
+              </div>
+              <div className="border border-(--border-subtle) bg-(--surface-muted) px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Water saved</p>
+                <p
+                  className="mt-1 text-[28px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {formatCount(Math.round(staticData.paperSaved.waterLitersSaved))}
+                  <span className="ml-1 text-[14px] font-normal text-(--ink-muted)">L</span>
+                </p>
+                <p className="mt-1 text-[12px] text-(--ink-muted)">≈ 10 L per A4 sheet</p>
+              </div>
+              <div className="border border-(--border-subtle) bg-(--surface-muted) px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-(--ink-soft)">Trees equivalent</p>
+                <p
+                  className="mt-1 text-[28px] font-semibold leading-none text-(--ink-strong)"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {staticData.paperSaved.treesEquivalent.toFixed(2)}
+                </p>
+                <p className="mt-1 text-[12px] text-(--ink-muted)">≈ 8,333 sheets per tree</p>
+              </div>
+            </div>
+          </section>
+
           <section className={cardClassName}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-(--border-subtle) pb-3">
               <div>
