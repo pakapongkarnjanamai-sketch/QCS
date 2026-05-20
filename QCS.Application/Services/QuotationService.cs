@@ -100,7 +100,13 @@ namespace QCS.Application.Services
                             ApprovalDate = s.ActionDate ?? fallbackApprovalDate
                         }).ToList()
                 },
-                DrawSetting = new DrawSettingDto { Color = "#000000", FontSize = 8 }
+                DrawSetting = new DrawSettingDto
+                {
+                    Color = "#000000",
+                    FontSize = 8,
+                    Margin = 20,
+                    AlignmentStamp = 2
+                }
             };
 
             var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

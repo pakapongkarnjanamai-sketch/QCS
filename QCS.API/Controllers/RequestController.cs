@@ -428,7 +428,7 @@ namespace QCS.API.Controllers
                     Color = "#000000",
                     FontSize = 8,
                     Margin = 20,
-                    AlignmentStamp = 8
+                    AlignmentStamp = 2
                 }
             };
 

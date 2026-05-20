@@ -48,7 +48,7 @@
         public string Color { get; set; } = "#000000";
         public float FontSize { get; set; } = 12f;
         public float Margin { get; set; } = 20f;
-        public AlignmentStamp AlignmentStamp { get; set; } = AlignmentStamp.BottomRight;
+        public AlignmentStamp AlignmentStamp { get; set; } = AlignmentStamp.TopRight;
     }
 
     public enum AlignmentStamp

@@ -3,18 +3,22 @@ using PDF.Service.Services;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
-const string CorsPolicyName = "AllowAll";
-const string AllowedOrigin = "https://localhost:7209";
+const string CorsPolicyName = "AllowInternal";
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName,
         policy =>
         {
-            policy.WithOrigins(AllowedOrigin)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
+            policy.WithOrigins(
+                "https://localhost:7209",
+                "https://ap-ntc2137-prwb",
+                "http://ap-ntc2137-prwb",
+                "https://ap-ntc2137-prwb:443"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
         });
 });
 
@@ -45,7 +49,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
 app.UseCors(CorsPolicyName);
 
 app.UseAuthorization();

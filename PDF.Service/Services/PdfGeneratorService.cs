@@ -70,7 +70,17 @@ namespace PDF.Service.Services
                     AlignmentStamp = drawSetting.AlignmentStamp
                 };
 
-                DrawWatermarkTable(page, graphics, approvalData, pageDrawSetting, stampProfile.HeaderText, referenceCode, stampProfile.ShowDetails);
+                // Use DrawWatermarkTable for ORIGINAL QUOTATION (showDetails=true, transparent)
+                // Use DrawStampTable for other types (showDetails=false, solid, opaque)
+                if (stampProfile.ShowDetails)
+                {
+                    DrawWatermarkTable(page, graphics, approvalData, pageDrawSetting, stampProfile.HeaderText, referenceCode, true);
+                }
+                else
+                {
+                    DrawStampTable(page, graphics, approvalData, pageDrawSetting, stampProfile.HeaderText, referenceCode, false);
+                }
+
                 graphics.AddToPageForeground(page, 72, 72);
             }
 
@@ -99,7 +109,7 @@ namespace PDF.Service.Services
                 dims.TotalWidth,
                 dims.TotalHeight,
                 drawSetting.Margin,
-                AlignmentStamp.TopRight
+                drawSetting.AlignmentStamp
             );
 
             DrawTableContent(
@@ -199,8 +209,8 @@ namespace PDF.Service.Services
             {
                 10 => new StampProfile("ORIGINAL QUOTATION", "#0000FF", true, 0.15f),
                 // Legacy value support: some existing records were saved as 15.
-                15 => new StampProfile("EXPIRED QUOTATION", "#808080", false, 0.30f),
-                50 => new StampProfile("EXPIRED QUOTATION", "#808080", false, 0.30f),
+                15 => new StampProfile("EXPIRED", "#FF0000", false, 0.30f),
+                50 => new StampProfile("EXPIRED", "#FF0000", false, 0.30f),
                 20 => new StampProfile("COMPARED", "#FF0000", false, 0.30f),
                 30 => new StampProfile("SPECIFICATIONS", "#000000", false, 0.50f),
                 40 => new StampProfile("ATTACHMENT", "#000000", false, 0.50f),

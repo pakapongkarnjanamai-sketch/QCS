@@ -13,7 +13,10 @@ namespace QCS.Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddScoped<IRequestService, RequestService>();
-            services.AddScoped<IQuotationService, QuotationService>();
+            services.AddHttpClient<IQuotationService, QuotationService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(35);
+            });
             services.AddScoped<IFileService, FileService>();
             services.AddScoped<IPaperSavedService, PaperSavedService>();
 
