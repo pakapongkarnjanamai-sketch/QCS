@@ -1,0 +1,529 @@
+﻿@{
+    ViewData["Title"] = "Test - Compere Integration";
+}
+
+@section Styles {
+    <style>
+        .StepGroup {
+            margin-top: 10px;
+        }
+
+        .note {
+            font-size: 10pt;
+            color: #484848;
+            margin-left: 9px;
+        }
+
+            .note > span {
+                font-weight: 700;
+            }
+
+        /* CSS สำหรับส่วนไฟล์ใน Grid */
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+            .file-info i {
+                color: #f05b41;
+                font-size: 1.2em;
+            }
+
+        .upload-instructions {
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .attachments-container {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+}
+
+<div class="container-xxl bd-gutter mt-3 my-md-4 bd-layout">
+    <main class="bd-main order-1">
+        <div class="card mt-4">
+            <h5 class="card-header">Quotation Settings</h5>
+            <div class="card-body">
+                <div id="quotationForm"></div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <h5 class="card-header">Route Approval</h5>
+            <div class="card-body" id="routeSection">
+                <div id="approvalForm"></div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <h5 class="card-header">Result</h5>
+            <div class="card-body" id="resultSection">
+                <div id="resultForm"></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loadingIndicator"></div>
+    <iframe id="printFrame" style="display:none;"></iframe>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // ==========================================
+            // CONFIGURATION
+            // ==========================================
+            // *** ตรวจสอบ Port ให้ตรงกับ Backend ของคุณ ***
+            const API_BASE_URL = "https://localhost:7019/api/Pdf";
+
+            // ==========================================
+            // MOCK MASTER DATA
+            // ==========================================
+            const mockVendors = [
+                { id: 1, name: 'Vendor A Supply Co., Ltd.' },
+                { id: 2, name: 'Global Tech Solutions' },
+                { id: 3, name: 'Office Mate' }
+            ];
+
+            const mockDocumentTypes = [
+                { id: 10, name: 'Main Quotation' },
+                { id: 20, name: 'Specifications' },
+                { id: 30, name: 'Terms & Conditions' }
+            ];
+
+            // ==========================================
+            // DATA MODELS
+            // ==========================================
+            const profileData = {
+                documentName: 'Quotation Document',
+                vendorId: 1,
+                validFrom: new Date(),
+                validUntil: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+                attachments: []
+            };
+
+            const approvalData = {
+                Name: "ORIGINAL QUOTATION",
+                Step: [
+                    { StepName: "Prepare", Approver: "Michael Brown", ApprovalDate: new Date(2024, 7, 14, 9, 30) },
+                    { StepName: "Verify", Approver: "John Smith", ApprovalDate: new Date(2024, 7, 15, 14, 15) },
+                    { StepName: "Approved", Approver: "Sarah Davis", ApprovalDate: new Date(2024, 7, 18, 10, 45) }
+                ]
+            };
+
+            const drawSetting = {
+                Color: '#f05b41',
+                AlignmentStamp: 'BottomRight',
+                FontSize: 10,
+                Margin: 20
+            };
+
+            // ==========================================
+            // UI COMPONENTS
+            // ==========================================
+
+            // Loading Panel
+            const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
+                shadingColor: "rgba(0,0,0,0.4)",
+                visible: false,
+                showIndicator: true,
+                showPane: true,
+                shading: true,
+            }).dxLoadPanel("instance");
+
+            // 1. Quotation Form
+            let attachmentGridInstance = null;
+            const quotationFormInstance = $('#quotationForm').dxForm({
+                formData: profileData,
+                colCount: 2,
+                items: [
+                    {
+                        itemType: "group",
+                        caption: "Quotation Details",
+                        colCount: 2,
+                        colSpan: 2,
+                        items: [
+                             {
+                                dataField: 'documentName',
+                                label: { text: 'Document Name' },
+                                editorType: 'dxTextBox',
+                                colSpan: 2,
+                                validationRules: [{ type: "required" }]
+                            },
+                            {
+                                dataField: "vendorId",
+                                label: { text: "Vendor" },
+                                editorType: "dxSelectBox",
+                                editorOptions: {
+                                    dataSource: mockVendors,
+                                    valueExpr: "id",
+                                    displayExpr: "name",
+                                    searchEnabled: true,
+                                    placeholder: "Select Vendor"
+                                },
+                                validationRules: [{ type: "required" }]
+                            },
+                            { itemType: "empty" },
+                            {
+                                dataField: "validFrom",
+                                label: { text: "Valid From" },
+                                editorType: "dxDateBox",
+                                editorOptions: { displayFormat: "dd/MM/yyyy" },
+                                validationRules: [{ type: "required" }]
+                            },
+                            {
+                                dataField: "validUntil",
+                                label: { text: "Valid Until" },
+                                editorType: "dxDateBox",
+                                editorOptions: { displayFormat: "dd/MM/yyyy" },
+                                validationRules: [{ type: "required" }]
+                            }
+                        ]
+                    },
+                    {
+                        itemType: "group",
+                        caption: "Attachments",
+                        colSpan: 2,
+                        items: [{ template: renderAttachmentsSection }]
+                    }
+                ]
+            }).dxForm('instance');
+
+            // 2. Attachment Section Template
+            function renderAttachmentsSection(data, itemElement) {
+                const $container = $("<div>").addClass("attachments-container");
+
+                // Uploader
+                $("<div>").dxFileUploader({
+                    multiple: true,
+                    accept: ".pdf",
+                    uploadMode: "useForm",
+                    showFileList: false,
+                    allowedFileExtensions: ['.pdf'],
+                    labelText: "Drag & drop PDF here",
+                    onValueChanged: function (e) {
+                        if(e.value && e.value.length > 0) {
+                            e.value.forEach(file => handleFileUpload(file));
+                            e.component.reset();
+                        }
+                    }
+                }).appendTo($container);
+
+                // Grid
+                attachmentGridInstance = $("<div>").dxDataGrid({
+                    dataSource: profileData.attachments,
+                    showBorders: true,
+                    paging: { enabled: false },
+                    noDataText: "No attachments",
+                    editing: {
+                        allowDeleting: true,
+                        allowUpdating: true,
+                        mode: "row",
+                        useIcons: true,
+                        texts: { saveRowChanges: "Save", cancelRowChanges: "Cancel" }
+                    },
+                    // *** แก้ไข: ไม่เรียก updateData เพื่อป้องกัน Loop ***
+                    onRowUpdated: function(e) { /* Log or No-op */ },
+                    onRowRemoved: function(e) { /* Log or No-op */ },
+                    columns: [
+                        {
+                            dataField: "fileName",
+                            caption: "File Name",
+                            allowEditing: false,
+                            cellTemplate: (container, options) => {
+                                $("<div>").addClass("file-info")
+                                    .append($("<i>").addClass("fas fa-file-pdf"), $("<span>").text(options.value))
+                                    .appendTo(container);
+                            }
+                        },
+                        {
+                            dataField: "fileSize",
+                            caption: "Size",
+                            width: 100,
+                            allowEditing: false,
+                            customizeText: (cellInfo) => formatFileSize(cellInfo.value)
+                        },
+                        {
+                            dataField: "documentType",
+                            caption: "Document Type",
+                            width: 250,
+                            lookup: {
+                                dataSource: mockDocumentTypes,
+                                valueExpr: "id",
+                                displayExpr: "name"
+                            },
+                            validationRules: [{ type: "required" }]
+                        },
+                        {
+                            type: "buttons",
+                            width: 100,
+                            buttons: ["edit", "delete", {
+                                hint: "Preview",
+                                icon: "eyeopen",
+                                onClick: (e) => previewPdf(e.row.data)
+                            }]
+                        }
+                    ]
+                }).dxDataGrid("instance");
+
+                attachmentGridInstance.element().appendTo($container);
+                $container.appendTo(itemElement);
+            }
+
+            // 3. Approval Form
+            const approvalFormInstance = $('#approvalForm').dxForm({
+                formData: approvalData,
+                colCount: 1,
+                items: [
+                    { dataField: 'Name', label: { text: 'Stamp Title' } },
+                    {
+                        itemType: 'group',
+                        name: 'stepsContainer',
+                        items: getStepsOptions(approvalData.Step)
+                    },
+                    {
+                        itemType: 'button',
+                        buttonOptions: {
+                            icon: 'add',
+                            text: 'Add Step',
+                            onClick: () => {
+                                approvalData.Step.push({ StepName: '', Approver: '', ApprovalDate: new Date() });
+                                approvalFormInstance.itemOption('stepsContainer', 'items', getStepsOptions(approvalData.Step));
+                            }
+                        }
+                    }
+                ]
+            }).dxForm('instance');
+
+            // 4. Result/Settings Form
+            $('#resultForm').dxForm({
+                formData: drawSetting,
+                colCount: 4,
+                items: [
+                    { dataField: 'Color', label: { text: 'Color' }, editorType: 'dxColorBox', editorOptions: { editAlphaChannel: true } },
+                    { dataField: 'AlignmentStamp', label: { text: 'Alignment' }, editorType: 'dxSelectBox', editorOptions: { dataSource: ['TopCenter', 'TopRight', 'CenterLeft', 'Center', 'CenterRight', 'BottomLeft', 'BottomCenter', 'BottomRight'] } },
+                    { dataField: 'FontSize', label: { text: 'Font Size' }, editorType: 'dxNumberBox', editorOptions: { min: 6, max: 24, showSpinButtons: true } },
+                    {
+                        itemType: 'simple',
+                        colSpan: 1,
+                        template: () => $("<div>").dxButtonGroup({
+                            items: [
+                                { icon: 'print', hint: 'Print', onClick: () => handleFormAction('print') },
+                                { icon: 'download', hint: 'Download', onClick: () => handleFormAction('download') },
+                                { icon: 'pdffile', hint: 'View', onClick: () => handleFormAction('view') }
+                            ],
+                            selectionMode: 'none'
+                        })
+                    }
+                ]
+            });
+
+            // ==========================================
+            // MAIN LOGIC: HANDLE ACTION
+            // ==========================================
+
+            async function handleFormAction(action) {
+                // 1. Validation
+                if (!quotationFormInstance.validate().isValid) {
+                    DevExpress.ui.notify("Please fill in required fields.", "error", 2000);
+                    return;
+                }
+
+                // กรองไฟล์ที่มีขนาด 0 Byte ออก
+                const validFiles = profileData.attachments.filter(f => f.fileSize > 0);
+
+                if (validFiles.length === 0) {
+                    DevExpress.ui.notify("Please upload at least one valid PDF file (Size > 0).", "error", 3000);
+                    return;
+                }
+
+                // 2. Prepare UI (Popup Blocker Fix)
+                let newWindow = null;
+               if (action === 'view') {
+                    // สร้างหน้าเว็บ Loading จำลองขึ้นมาเป็นไฟล์ชั่วคราว (Blob)
+                    const loadingHtml = `
+                                <div style="text-align:center;">
+                                    <h3>Processing PDF...</h3>
+                                    <p>Please wait while we generate your document.</p>
+                                </div>
+                        `;
+
+                    const loadingBlob = new Blob([loadingHtml], { type: 'text/html' });
+                    loadingUrl = URL.createObjectURL(loadingBlob);
+
+                    // เปิดหน้าต่างใหม่โดยชี้ไปที่ Blob URL ทันที
+                    newWindow = window.open(loadingUrl, '_blank');
+
+                    if (!newWindow) {
+                        DevExpress.ui.notify("Pop-up blocked! Please allow pop-ups.", "warning", 5000);
+                        return;
+                    }
+                }
+
+                loadingIndicator.show();
+
+                try {
+                    // 3. Prepare Payload
+                    const selectedVendor = mockVendors.find(v => v.id === profileData.vendorId);
+                    const vendorName = selectedVendor ? selectedVendor.name : "";
+
+                    const filesPayload = await Promise.all(validFiles.map(async f => {
+                        const docTypeObj = mockDocumentTypes.find(t => t.id === f.documentType);
+                        const docTypeName = docTypeObj ? docTypeObj.name : "General";
+                        return await toPdfFile(f.fileObject, docTypeName);
+                    }));
+
+                    const payload = {
+                        PdfFiles: filesPayload,
+                        DocumentName: profileData.documentName,
+                        VendorName: vendorName,
+                        ApprovalData: approvalData,
+                        DrawSetting: drawSetting
+                    };
+
+                    // 4. Call API
+                    const response = await fetch(`${API_BASE_URL}/merge-stamp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (newWindow) newWindow.close();
+                        const errorText = await response.text();
+                        throw new Error(errorText || "Server returned an error");
+                    }
+
+                    // 5. Handle Response
+                    const blob = await response.blob();
+                    if (blob.type !== 'application/pdf') {
+                        if (newWindow) newWindow.close();
+                        throw new Error("Response is not a PDF.");
+                    }
+
+                    const url = URL.createObjectURL(blob);
+
+                    // 6. Execute Action
+                    if (action === 'view') {
+                        if (newWindow) newWindow.location.href = url;
+                    }
+                    else if (action === 'download') {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${profileData.documentName || "Document"}.pdf`;
+                        a.style.display = 'none';
+                        document.body.appendChild(a); // Important!
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }, 100);
+                    }
+                    else if (action === 'print') {
+                        const printFrame = document.getElementById('printFrame');
+                        printFrame.src = url;
+                        printFrame.onload = () => {
+                            setTimeout(() => {
+                                printFrame.contentWindow.focus();
+                                printFrame.contentWindow.print();
+                            }, 500);
+                        };
+                    }
+
+                } catch (err) {
+                    console.error("Error:", err);
+                    if (newWindow) newWindow.close();
+                    DevExpress.ui.notify(`Failed: ${err.message}`, "error", 4000);
+                } finally {
+                    loadingIndicator.hide();
+                }
+            }
+
+            // ==========================================
+            // HELPERS
+            // ==========================================
+
+            function handleFileUpload(file) {
+                if (file.type !== "application/pdf") {
+                    DevExpress.ui.notify("Only PDF files are allowed", "error", 2000);
+                    return;
+                }
+                const newFile = {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    fileType: file.type,
+                    uploadedAt: new Date(),
+                    fileObject: file,
+                    documentType: mockDocumentTypes[0].id
+                };
+                profileData.attachments.push(newFile);
+                if (attachmentGridInstance) attachmentGridInstance.refresh();
+            }
+
+            function toPdfFile(file, docTypeName) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        resolve({
+                            Name: file.name,
+                            ContentType: file.type,
+                            Data: reader.result.split(',')[1],
+                            Length: file.size,
+                            DocumentType: docTypeName
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            function previewPdf(data) {
+                const url = URL.createObjectURL(data.fileObject);
+                window.open(url, '_blank');
+            }
+
+            function formatFileSize(bytes) {
+                if (!bytes) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            function getStepsOptions(steps) {
+                return steps.map((step, i) => ({
+                    itemType: 'group',
+                    name: `Step[${i}]`,
+                    cssClass: "StepGroup",
+                    colCount: 4,
+                    items: [
+                        { dataField: `Step[${i}].StepName`, label: { text: `Step ${i + 1}` } },
+                        { dataField: `Step[${i}].Approver`, label: { text: 'Approver' } },
+                        {
+                            dataField: `Step[${i}].ApprovalDate`,
+                            editorType: 'dxDateBox',
+                            label: { text: 'Approval Date' },
+                            editorOptions: { type: 'datetime', displayFormat: "yyyy-MM-dd hh:mm a" }
+                        },
+                        {
+                            itemType: 'button',
+                            horizontalAlignment: 'right',
+                            buttonOptions: {
+                                icon: 'trash',
+                                onClick: () => {
+                                    approvalData.Step.splice(i, 1);
+                                    approvalFormInstance.itemOption('stepsContainer', 'items', getStepsOptions(approvalData.Step));
+                                }
+                            }
+                        }
+                    ]
+                }));
+            }
+        });
+    </script>
+}

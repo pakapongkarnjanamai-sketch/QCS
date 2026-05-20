@@ -1,0 +1,327 @@
+﻿@{
+    ViewData["Title"] = "Test - Compere";
+}
+
+<style>
+    .StepGroup {
+        margin-top: 10px;
+    }
+
+    .note {
+        font-size: 10pt;
+        color: #484848;
+        margin-left: 9px;
+    }
+
+        .note > span {
+            font-weight: 700;
+        }
+</style>
+
+<div class="container-xxl bd-gutter mt-3 my-md-4 bd-layout">
+    <main class="bd-main order-1">
+        <!-- Quotation Settings -->
+        <div class="card mt-4">
+            <h5 class="card-header">Quotation Settings</h5>
+            <div class="card-body" id="quotationSection">
+                <div id="docNameForm"></div>
+                <div id="fileUploader" style="margin-top:10px;"></div>
+                <div id="filesGrid" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <!-- Route Approval -->
+        <div class="card mt-4">
+            <h5 class="card-header">Route Approval</h5>
+            <div class="card-body" id="routeSection">
+                <div id="approvalForm"></div>
+
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div class="card mt-4">
+            <h5 class="card-header">Result</h5>
+            <div class="card-body" id="resultSection">
+                <div id="resultForm"></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loadingIndicator"></div>
+    <iframe id="printFrame" style="display:none;"></iframe>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // ------------------- MOCK DATA -------------------
+            const profileData = {
+                documentName: 'Quotation Document',
+                uploadedFiles: [] // Store selected File objects
+            };
+
+            const approvalData = {
+                Name: "ORIGINAL QUOTATION",
+                Step: [
+                    {
+                        StepName: "Prepare",
+                        Approver: "Michael Brown",
+                        ApprovalDate: new Date(2024, 7, 14, 9, 30)
+                    },
+                    {
+                        StepName: "Verify",
+                        Approver: "John Smith",
+                        ApprovalDate: new Date(2024, 7, 15, 14, 15)
+                    },
+                    {
+                        StepName: "Approved",
+                        Approver: "Sarah Davis",
+                        ApprovalDate: new Date(2024, 7, 18, 10, 45)
+                    }
+                ]
+            };
+
+            const drawSetting = {
+                Color: '#f05b41',
+                AlignmentStamp: 'Center',
+                FontSize: 8,
+                Margin: 20
+            };
+
+            // ------------------- LOAD PANEL -------------------
+            const loadingIndicator = $("#loadingIndicator").dxLoadPanel({
+                shadingColor: "rgba(0,0,0,0.4)",
+                visible: false,
+                showIndicator: true,
+                showPane: true,
+                shading: true,
+            }).dxLoadPanel("instance");
+
+            // ------------------- DOCUMENT NAME FORM -------------------
+            $('#docNameForm').dxForm({
+                formData: profileData,
+                colCount: 1,
+                items: [
+                    {
+                        dataField: 'documentName',
+                        label: { text: 'Document Name' },
+                        editorType: 'dxTextBox',
+                        editorOptions: { placeholder: 'Enter document name' }
+                    }
+                ]
+            });
+
+            // ------------------- FILE UPLOADER -------------------
+            $("#fileUploader").dxFileUploader({
+                name: 'file',
+                multiple: true,
+                accept: '.pdf',
+                uploadMode: 'useForm',
+                allowedFileExtensions: ['.pdf'],
+                maxFileSize: 50 * 1024 * 1024,
+                selectButtonText: "Select PDF files",
+                labelText: "or drop files here",
+                onValueChanged: function (e) {
+                    profileData.uploadedFiles = profileData.uploadedFiles.concat(e.value);
+                    refreshFilesGrid();
+                }
+            });
+
+            // ------------------- FILES GRID -------------------
+            $("#filesGrid").dxDataGrid({
+                dataSource: profileData.uploadedFiles,
+                columns: [
+                    {
+                        caption: "File Name",
+                        cellTemplate: function (container, opts) {
+                            container.text(opts.data.name);
+                        }
+                    },
+                    {
+                        caption: "Size (KB)",
+                        width: 120,
+                        cellTemplate: function (container, opts) {
+                            container.text((opts.data.size / 1024).toFixed(2));
+                        }
+                    },
+                    {
+                        type: "buttons",
+                        buttons: [{
+                            hint: "Remove",
+                            icon: "trash",
+                            onClick: function (e) {
+                                const idx = profileData.uploadedFiles.indexOf(e.row.data);
+                                if (idx >= 0) {
+                                    profileData.uploadedFiles.splice(idx, 1);
+                                    refreshFilesGrid();
+                                }
+                            }
+                        }]
+                    }
+                ],
+                showBorders: true,
+                rowAlternationEnabled: true,
+                height: "auto",
+                noDataText: "No files selected"
+            });
+
+            function refreshFilesGrid() {
+                $("#filesGrid").dxDataGrid("instance").option("dataSource", [...profileData.uploadedFiles]);
+            }
+
+            // ------------------- APPROVAL FORM -------------------
+            const approvalFormInstance = $('#approvalForm').dxForm({
+                formData: approvalData,
+                colCount: 1,
+                items: [
+                    { dataField: 'Name', label: { text: 'Document Title' } },
+                    {
+                        itemType: 'group',
+                        name: 'stepsContainer',
+                        items: getStepsOptions(approvalData.Step)
+                    },
+                    {
+                        itemType: 'button',
+                        buttonOptions: {
+                            icon: 'add',
+                            text: 'Add Step',
+                            onClick: () => {
+                                approvalData.Step.push({ StepName: '', Approver: '', ApprovalDate: new Date() });
+                                approvalFormInstance.itemOption('stepsContainer', 'items', getStepsOptions(approvalData.Step));
+                            }
+                        }
+                    }
+                ]
+            }).dxForm('instance');
+
+            function getStepsOptions(steps) {
+                return steps.map((step, i) => ({
+                    itemType: 'group',
+                    name: `Step[${i}]`,
+                    cssClass: "StepGroup",
+                    colCount: 4,
+                    items: [
+                        { dataField: `Step[${i}].StepName`, label: { text: `Step ${i + 1}` } },
+                        { dataField: `Step[${i}].Approver`, label: { text: 'Approver' } },
+                        {
+                            dataField: `Step[${i}].ApprovalDate`,
+                            editorType: 'dxDateBox',
+                            label: { text: 'Approval Date' },
+                            editorOptions: {
+                                type: 'datetime',
+                                displayFormat: "yyyy-MM-dd hh:mm a"
+                            }
+                        },
+                        {
+                            itemType: 'button',
+                            horizontalAlignment: 'right',
+                            buttonOptions: {
+                                icon: 'trash',
+                                onClick: () => {
+                                    approvalData.Step.splice(i, 1);
+                                    approvalFormInstance.itemOption('stepsContainer', 'items', getStepsOptions(approvalData.Step));
+                                }
+                            }
+                        }
+                    ]
+                }));
+            }
+
+            // ------------------- RESULT FORM -------------------
+            $('#resultForm').dxForm({
+                formData: drawSetting,
+                colCount: 5,
+                items: [
+                    { dataField: 'Color', label: { text: 'Color' }, editorType: 'dxColorBox', editorOptions: { editAlphaChannel: true } },
+                    { dataField: 'AlignmentStamp', label: { text: 'Alignment' }, editorType: 'dxSelectBox', editorOptions: { dataSource: ['TopCenter','TopRight','CenterLeft','Center','CenterRight','BottomLeft','BottomCenter','BottomRight'] } },
+                    { dataField: 'FontSize', label: { text: 'Font Size' }, editorType: 'dxNumberBox', editorOptions: { min: 6, max: 24, showSpinButtons: true } },
+                    { dataField: 'Margin', label: { text: 'Margin' }, editorType: 'dxNumberBox', editorOptions: { min: 10, max: 100, showSpinButtons: true } },
+                    {
+                        itemType: 'simple',
+                        horizontalAlignment: 'right',
+                        template: () => $("<div>").dxButtonGroup({
+                            items: [
+                                { icon: 'print', hint: 'Print', onClick: () => handleFormAction('print') },
+                                { icon: 'download', hint: 'Download', onClick: () => handleFormAction('download') },
+                                { icon: 'pdffile', hint: 'View', onClick: () => handleFormAction('view') }
+                            ],
+                            selectionMode: 'none'
+                        })
+                    }
+                ]
+            });
+
+            // ------------------- ACTION -------------------
+            async function handleFormAction(action) {
+                if (!isFormValid()) {
+                    DevExpress.ui.notify("Please fill in all required fields and upload at least one file.", "error", 3000);
+                    return;
+                }
+
+                loadingIndicator.show();
+                try {
+                    const filesBase64 = await Promise.all(profileData.uploadedFiles.map(f => toPdfFile(f)));
+                    const body = {
+                        PdfFiles: filesBase64,
+                        DocumentName: profileData.documentName,
+                        ApprovalData: approvalData,
+                        DrawSetting: drawSetting
+                    };
+
+                    const res = await fetch(`/api/pdf/merge-stamp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+
+                    if (action === 'view') {
+                        window.open(url, '_blank');
+                    } else if (action === 'download') {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = profileData.documentName + ".pdf";
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    } else if (action === 'print') {
+                        const printFrame = document.getElementById('printFrame');
+                        printFrame.src = url;
+                        printFrame.onload = () => {
+                            printFrame.contentWindow.focus();
+                            printFrame.contentWindow.print();
+                        };
+                    }
+                } catch (err) {
+                    DevExpress.ui.notify("Failed to process files.", "error", 3000);
+                } finally {
+                    loadingIndicator.hide();
+                }
+            }
+
+            function isFormValid() {
+                return profileData.documentName &&
+                       profileData.uploadedFiles.length > 0 &&
+                       approvalData.Step.every(s => s.StepName && s.Approver && s.ApprovalDate);
+            }
+
+            function toPdfFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        resolve({
+                            Name: file.name,
+                            ContentType: file.type,
+                            Data: reader.result.split(',')[1],
+                            Length: file.size
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+        });
+    </script>
+}

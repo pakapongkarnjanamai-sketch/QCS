@@ -1,0 +1,2 @@
+const license_key = 'ewogICJmb3JtYXQiOiAxLAogICJjdXN0b21lcklkIjogIjQzMzdjY2M1LTA4ZjYtNDE2NS05NmJiLWU3MmY1NmY2MjA4MCIsCiAgIm1heFZlcnNpb25BbGxvd2VkIjogMjUxCn0=.b+Vvu7gHrg5FUGFn+0Uf1LZYYke7Ucot75MmeKo5KI6kBdXxJJfJwqy/Vf9e/nKpukRLQsogvVfL6CG16/8Kp3JpQ0EYhG+EmLR0BgsBKBQ2pGAuRRYQpwj/hag5FE0FNCzoCQ=='
+DevExpress.config({ licenseKey: license_key });
