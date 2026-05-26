@@ -366,3 +366,39 @@ FodyWeavers.xsd
 QCS.Web.User/wwwroot/
 QCS.API/wwwroot/
 QCS.Web.Admin/wwwroot/
+
+# -------------------------------------------------------
+# Secrets & credentials — NEVER commit these
+# -------------------------------------------------------
+
+# .NET environment-specific appsettings that may hold passwords / connection strings
+appsettings.Development.json
+appsettings.Staging.json
+appsettings.Production.json
+appsettings.Local.json
+appsettings.*.json
+!appsettings.json
+
+# Environment variable files (React / Node)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.staging
+.env.production
+!.env.example
+
+# Secret / key files
+*.pfx
+*.p12
+*.pem
+*.key
+secrets.json
+*secrets*.json
+*password*.json
+*credentials*.json
+
+# User secrets (dotnet user-secrets)
+# Located at %APPDATA%\Microsoft\UserSecrets\ — listed here for clarity
+secrets/
+UserSecrets/
