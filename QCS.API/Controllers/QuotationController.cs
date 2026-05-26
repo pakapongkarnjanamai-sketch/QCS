@@ -84,6 +84,10 @@ namespace QCS.API.Controllers
                         detail: "File content missing");
                 }
 
+                Response.Headers.CacheControl = "no-store, no-cache, must-revalidate, max-age=0";
+                Response.Headers.Pragma = "no-cache";
+                Response.Headers.Expires = "0";
+
                 return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
             }
             catch (KeyNotFoundException)

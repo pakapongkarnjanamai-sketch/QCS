@@ -70,8 +70,6 @@ namespace PDF.Service.Services
                     AlignmentStamp = drawSetting.AlignmentStamp
                 };
 
-                // Use DrawWatermarkTable for ORIGINAL QUOTATION (showDetails=true, transparent)
-                // Use DrawStampTable for other types (showDetails=false, solid, opaque)
                 if (stampProfile.ShowDetails)
                 {
                     DrawWatermarkTable(page, graphics, approvalData, pageDrawSetting, stampProfile.HeaderText, referenceCode, true);
@@ -208,8 +206,6 @@ namespace PDF.Service.Services
             return documentTypeId switch
             {
                 10 => new StampProfile("ORIGINAL QUOTATION", "#0000FF", true, 0.15f),
-                // Legacy value support: some existing records were saved as 15.
-                15 => new StampProfile("EXPIRED", "#FF0000", false, 0.30f),
                 50 => new StampProfile("EXPIRED", "#FF0000", false, 0.30f),
                 20 => new StampProfile("COMPARED", "#FF0000", false, 0.30f),
                 30 => new StampProfile("SPECIFICATIONS", "#000000", false, 0.50f),
