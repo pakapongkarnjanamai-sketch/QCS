@@ -89,7 +89,9 @@ namespace PDF.Service.Services
         {
             var dims = CalculateTableDimensions(approvalData, drawSetting.FontSize, referenceCode, showDetails, headerText);
             var (startX, startY) = CalculateStartPosition(pdfPage, dims.TotalWidth, dims.TotalHeight, drawSetting.Margin, drawSetting.AlignmentStamp);
-            DrawTableContent(graphics, startX, startY, dims, approvalData, drawSetting.FontSize, headerText, referenceCode, ParseColor(drawSetting.Color), isWatermark: false, showDetails: showDetails);
+            Color baseColor = ParseColor(drawSetting.Color);
+            Color fadedColor = Color.FromArgb(WatermarkAlpha, baseColor.R, baseColor.G, baseColor.B);
+            DrawTableContent(graphics, startX, startY, dims, approvalData, drawSetting.FontSize, headerText, referenceCode, fadedColor, isWatermark: false, showDetails: showDetails);
         }
 
         private void DrawWatermarkTable(PdfPage pdfPage, PdfGraphics graphics, ApprovalData approvalData, DrawSetting drawSetting, string headerText, string referenceCode, bool showDetails)
@@ -208,8 +210,8 @@ namespace PDF.Service.Services
                 10 => new StampProfile("ORIGINAL QUOTATION", "#0000FF", true, 0.15f),
                 50 => new StampProfile("EXPIRED", "#FF0000", false, 0.30f),
                 20 => new StampProfile("COMPARED", "#FF0000", false, 0.30f),
-                30 => new StampProfile("SPECIFICATIONS", "#000000", false, 0.50f),
-                40 => new StampProfile("ATTACHMENT", "#000000", false, 0.50f),
+                30 => new StampProfile("SPECIFICATIONS", "#000000", false, 0.30f),
+                40 => new StampProfile("ATTACHMENT", "#000000", false, 0.30f),
                 _ => new StampProfile("APPROVAL STAMP", fallbackColor, true, DefaultTargetWidthRatio)
             };
         }
