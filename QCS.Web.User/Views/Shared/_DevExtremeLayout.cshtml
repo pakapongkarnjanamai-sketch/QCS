@@ -57,7 +57,7 @@
                     <ul class="navbar-nav">
                         <li class="nav-item">
                             <a class="nav-link" href="#">
-                                <i class="fas fa-user-circle me-1"></i> @(User.Identity?.Name ?? "Unknown User")
+                                <i class="fas fa-user-circle me-1"></i> @(User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown User")
                             </a>
                         </li>
                     </ul>

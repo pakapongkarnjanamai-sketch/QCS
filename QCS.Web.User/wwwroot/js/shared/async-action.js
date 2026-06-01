@@ -28,7 +28,8 @@
         }
 
         if (type === "error") {
-            alert(message);
+            // DevExtreme not loaded yet — queue for next tick
+            setTimeout(function () { notify(message, type, duration); }, 500);
         }
     }
 

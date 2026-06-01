@@ -68,7 +68,8 @@ const CATEGORIES: Category[] = [
 
 export function RequestsPage() {
   const [activeKey, setActiveKey] = useState<string>('all')
-  const gridRef = useRef<DataGrid>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gridRef = useRef<any>(null)
 
   const activeCategory = CATEGORIES.find((c) => c.key === activeKey)!
   const isDraft = activeKey === 'draft'

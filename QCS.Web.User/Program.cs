@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authentication;
 using QCS.Web.Shared.Middleware;
 using QCS.Web.Shared.Services;
+using QCS.Web.User.Security;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,7 +58,7 @@ builder.Services.AddAuthorization(options =>
 
 // Services
 builder.Services.AddHttpContextAccessor();
-//builder.Services.AddScoped<IApiUserService, ApiUserService>();
+builder.Services.AddScoped<IClaimsTransformation, UserClaimsTransformation>();
 
 // HTTP Client for API calls
 builder.Services.AddHttpClient("DocTrackerAPI", client =>

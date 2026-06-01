@@ -39,5 +39,16 @@ namespace QCS.API.Controllers
 
             return DataSourceLoader.Load(query, loadOptions);
         }
+
+        [HttpGet("FullName/{nId}")]
+        public async Task<IActionResult> GetFullName(string nId)
+        {
+            var employee = await _employeeLookupService.GetEmployeeByNIdAsync(nId);
+            if (employee == null)
+                return Ok(new { fullName = "" });
+
+            var fullName = $"{employee.EnglishFirstName} {employee.EnglishLastName}".Trim();
+            return Ok(new { fullName });
+        }
     }
 }

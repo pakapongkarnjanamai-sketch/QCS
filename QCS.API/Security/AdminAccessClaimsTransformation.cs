@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using QCS.API.Services;
 using QCS.Domain.Models;
 using QCS.Infrastructure.Data;
 
@@ -10,10 +12,17 @@ namespace QCS.API.Security
     {
         private const string RootNId = "N4734";
         private readonly AppDbContext _context;
+        private readonly IEmployeeLookupService _employeeLookupService;
+        private readonly IMemoryCache _cache;
 
-        public AdminAccessClaimsTransformation(AppDbContext context)
+        public AdminAccessClaimsTransformation(
+            AppDbContext context,
+            IEmployeeLookupService employeeLookupService,
+            IMemoryCache cache)
         {
             _context = context;
+            _employeeLookupService = employeeLookupService;
+            _cache = cache;
         }
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -74,8 +83,36 @@ namespace QCS.API.Security
                 }
             }
 
+            var fullName = await ResolveFullNameAsync(normalizedNId);
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                identity.AddClaim(new Claim("FullName", fullName));
+            }
+
             principal.AddIdentity(identity);
             return principal;
+        }
+
+        private async Task<string?> ResolveFullNameAsync(string nId)
+        {
+            var cacheKey = $"emp:fullname:{nId}";
+            if (_cache.TryGetValue(cacheKey, out string? cached))
+                return cached;
+
+            string? fullName = null;
+            try
+            {
+                var employee = await _employeeLookupService.GetEmployeeByNIdAsync(nId);
+                if (employee != null)
+                    fullName = $"{employee.EnglishFirstName} {employee.EnglishLastName}".Trim();
+            }
+            catch
+            {
+                // Employee directory unavailable — fall back to NID
+            }
+
+            _cache.Set(cacheKey, fullName, TimeSpan.FromMinutes(30));
+            return fullName;
         }
 
         private static string ExtractNId(string? identityName)

@@ -557,13 +557,8 @@
                 applyPreset(activePresetKey);
             }
 
-            if (typeof DevExpress !== "undefined" && DevExpress.ui && DevExpress.ui.notify) {
-                DevExpress.ui.notify({
-                    message: "รีเซ็ตสถานะตารางเรียบร้อยแล้ว (Grid state reset)",
-                    type: "success",
-                    displayTime: 3000,
-                    position: { at: "top center", my: "top center", offset: "0 20" }
-                });
+            if (typeof QcsAsync !== "undefined" && QcsAsync.notify) {
+                QcsAsync.notify("รีเซ็ตสถานะตารางเรียบร้อยแล้ว (Grid state reset)", "success", 3000);
             }
         });
     });

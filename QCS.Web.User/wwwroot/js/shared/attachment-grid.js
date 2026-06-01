@@ -34,27 +34,30 @@
         }
 
         function removeRow(row) {
-            if (!global.confirm(settings.deleteConfirmText || "ยืนยันการลบไฟล์? (Confirm file deletion?)")) {
-                return;
-            }
+            var confirmText = settings.deleteConfirmText || "ต้องการลบไฟล์นี้หรือไม่? (Delete this file?)";
+            var confirmTitle = settings.deleteConfirmTitle || "ยืนยันการลบไฟล์ (Confirm File Deletion)";
 
-            if (row.id && row.id > 0) {
-                if (state.deletedFileIds.indexOf(row.id) === -1) {
-                    state.deletedFileIds.push(row.id);
+            DevExpress.ui.dialog.confirm(confirmText, confirmTitle).done(function (result) {
+                if (!result) return;
+
+                if (row.id && row.id > 0) {
+                    if (state.deletedFileIds.indexOf(row.id) === -1) {
+                        state.deletedFileIds.push(row.id);
+                    }
+                } else {
+                    removePendingFile(getDisplayFileName(row));
                 }
-            } else {
-                removePendingFile(getDisplayFileName(row));
-            }
 
-            const dataSource = getFiles();
-            const rowIndex = dataSource.findIndex(function (record) {
-                return record.id === row.id;
+                var dataSource = getFiles();
+                var rowIndex = dataSource.findIndex(function (record) {
+                    return record.id === row.id;
+                });
+
+                if (rowIndex > -1) {
+                    dataSource.splice(rowIndex, 1);
+                    state.gridInstance.refresh();
+                }
             });
-
-            if (rowIndex > -1) {
-                dataSource.splice(rowIndex, 1);
-                state.gridInstance.refresh();
-            }
         }
 
         function createButtons() {

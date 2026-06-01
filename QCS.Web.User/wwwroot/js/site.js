@@ -25,9 +25,10 @@
         },
         errorHandler: function (error) {
             if (error && error.xhr && error.xhr.status === 401) {
-                showAuthenticationError();
+                QcsAsync.notify("กรุณาเข้าสู่ระบบใหม่ (Authentication required)", "error", 5000);
             } else {
-                showGenericError(error);
+                var message = (error && error.message) || "เกิดข้อผิดพลาด (An error occurred)";
+                QcsAsync.notify(message, "error", 4000);
             }
         }
     });
