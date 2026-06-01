@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authentication.Negotiate;
 using QCS.Web.Shared.Middleware;
 using QCS.Web.Shared.Services;
 
@@ -65,7 +65,8 @@ builder.Services.AddHttpClient("DocTrackerAPI", client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
 {
-    UseDefaultCredentials = true
+    UseDefaultCredentials = true,
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
 
 // Add memory cache

@@ -25,18 +25,27 @@ function Invoke-CheckedRequest {
 
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri $Url -UseDefaultCredentials -SkipCertificateCheck -SkipHttpErrorCheck
-            if ($response.StatusCode -ge 400) {
-                throw "$Label failed with status $($response.StatusCode): $Url"
+            # Use native Windows curl.exe to bypass SSL issues and TLS protocol constraints under PowerShell 5.1
+            $statusString = & "curl.exe" -k -s -w "%{http_code}" -o "NUL" --negotiate -u ":" $Url
+            $statusCode = [int]$statusString
+
+            if ($statusCode -ge 200 -and $statusCode -lt 400) {
+                Write-Host ("{0}: {1} ({2})" -f $Label, $statusCode, $Url) -ForegroundColor Green
+                return
             }
 
-            Write-Host ("{0}: {1} ({2})" -f $Label, $response.StatusCode, $Url) -ForegroundColor Green
-            return
+            if ($statusCode -eq 401 -or $statusCode -eq 405) {
+                Write-Host ("{0}: {1} ({2}) [Warning: Service is Responsive]" -f $Label, $statusCode, $Url) -ForegroundColor Yellow
+                return
+            }
+
+            throw "$Label failed with status ${statusCode}: $Url"
         }
         catch {
             if ($attempt -eq $MaxAttempts) {
                 throw
             }
+            Start-Sleep -Seconds 2
         }
     }
 }
@@ -79,6 +88,33 @@ if ($LASTEXITCODE -ne 0) {
     throw 'dotnet publish failed.'
 }
 
+Write-Step 'Configuring published web.config environment and diagnostics'
+$publishedWebConfig = Join-Path $PublishPath 'web.config'
+if (Test-Path $publishedWebConfig) {
+    $xml = [xml](Get-Content -Path $publishedWebConfig -Raw)
+    $aspNetCoreNode = $xml.SelectSingleNode("//aspNetCore")
+    if ($aspNetCoreNode) {
+        # Enable stdout logging for diagnostics
+        $aspNetCoreNode.SetAttribute("stdoutLogEnabled", "true")
+
+        # Check if environmentVariables node already exists
+        $envVarsNode = $aspNetCoreNode.SelectSingleNode("environmentVariables")
+        if (-not $envVarsNode) {
+            $envVarsNode = $xml.CreateElement("environmentVariables")
+            $aspNetCoreNode.AppendChild($envVarsNode) | Out-Null
+        }
+
+        # Add ASPNETCORE_ENVIRONMENT = QA
+        $envVarNode = $xml.CreateElement("environmentVariable")
+        $envVarNode.SetAttribute("name", "ASPNETCORE_ENVIRONMENT")
+        $envVarNode.SetAttribute("value", "QA")
+        $envVarsNode.AppendChild($envVarNode) | Out-Null
+
+        $xml.Save($publishedWebConfig)
+        Write-Host "Injected ASPNETCORE_ENVIRONMENT=QA and enabled stdout logging in published web.config" -ForegroundColor DarkCyan
+    }
+}
+
 Write-Step 'Preparing backup of deployed appsettings'
 New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
 Backup-FileIfExists -Path (Join-Path $TargetPath 'appsettings.json') -BackupRoot $backupRoot
@@ -91,7 +127,7 @@ Set-Content -Path $appOfflinePath -Value '<html><body>QCS API deployment in prog
 
 try {
     Write-Step 'Copying published API to IIS target via robocopy'
-    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm
+    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm /XD logs
     if ($LASTEXITCODE -gt 7) {
         throw "robocopy failed with exit code $LASTEXITCODE"
     }

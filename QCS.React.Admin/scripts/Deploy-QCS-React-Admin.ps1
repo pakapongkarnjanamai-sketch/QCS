@@ -79,22 +79,42 @@ function Invoke-CheckedRequest {
 
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri $Url -UseDefaultCredentials -SkipCertificateCheck -SkipHttpErrorCheck
-            if ($response.StatusCode -ge 500 -or $response.StatusCode -eq 404) {
-                throw "$Label failed with status $($response.StatusCode): $Url"
+            if ($ExpectHtml) {
+                # Fetch output to verify HTML content
+                $tempFile = [System.IO.Path]::GetTempFileName()
+                $statusString = & "curl.exe" -k -s -w "%{http_code}" -o $tempFile --negotiate -u ":" $Url
+                $statusCode = [int]$statusString
+                $content = Get-Content -Path $tempFile -Raw
+                Remove-Item $tempFile -Force
+
+                if ($statusCode -ge 200 -and $statusCode -lt 400) {
+                    if ($content -notmatch '<!doctype html|<html') {
+                        throw "$Label did not return HTML: $Url"
+                    }
+                    Write-Host ("{0}: {1} ({2})" -f $Label, $statusCode, $Url) -ForegroundColor Green
+                    return
+                }
+            } else {
+                $statusString = & "curl.exe" -k -s -w "%{http_code}" -o "NUL" --negotiate -u ":" $Url
+                $statusCode = [int]$statusString
+                if ($statusCode -ge 200 -and $statusCode -lt 400) {
+                    Write-Host ("{0}: {1} ({2})" -f $Label, $statusCode, $Url) -ForegroundColor Green
+                    return
+                }
             }
 
-            if ($ExpectHtml -and $response.Content -notmatch '<!doctype html|<html') {
-                throw "$Label did not return HTML: $Url"
+            if ($statusCode -eq 401 -or $statusCode -eq 405) {
+                Write-Host ("{0}: {1} ({2}) [Warning: Service is Responsive]" -f $Label, $statusCode, $Url) -ForegroundColor Yellow
+                return
             }
 
-            Write-Host ("{0}: {1} ({2})" -f $Label, $response.StatusCode, $Url) -ForegroundColor Green
-            return
+            throw "$Label failed with status ${statusCode}: $Url"
         }
         catch {
             if ($attempt -eq $MaxAttempts) {
                 throw
             }
+            Start-Sleep -Seconds 2
         }
     }
 }

@@ -15,6 +15,9 @@ namespace PDF.Service.Controllers
             _pdfGeneratorService = pdfGeneratorService;
         }
 
+        [HttpGet("health")]
+        public IActionResult Health() => Ok(new { status = "healthy", service = "PDF.Service", timestamp = DateTime.UtcNow });
+
         [HttpPost("merge-stamp")]
         public IActionResult MergeAndStamp([FromBody] MergeAndStampRequest request)
         {
