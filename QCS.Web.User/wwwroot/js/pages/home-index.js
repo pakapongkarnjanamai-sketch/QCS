@@ -165,6 +165,13 @@
 
         function buildPresetColumns(preset) {
             const resolvedPreset = resolvePresetText(preset);
+            // ตรวจสอบว่าพนักงานไม่มีเอกสารของตัวเองในระบบเลย (เช่น กลุ่มผู้บริหาร/ผู้อนุมัติ)
+            const hasNoOwnDocuments = (myRequestsCount === 0 && myApprovedCount === 0 && myRejectedCount === 0);
+            
+            const defaultFilter = (resolvedPreset.key === "all-approved" && window.CurrentUser && !hasNoOwnDocuments)
+                ? window.CurrentUser.fullName
+                : null;
+
             const columns = QcsRequestGrid.createRequestColumns({
                 workflowStepsSource: workflowStepsSource,
                 targetUrl: resolvedPreset.targetUrl,
@@ -177,7 +184,8 @@
                 statusWidth: resolvedPreset.statusWidth,
                 buttonHint: resolvedPreset.buttonHint,
                 codeSortOrder: resolvedPreset.codeSortOrder,
-                statusBadgeOptions: baseStatusBadgeOptions
+                statusBadgeOptions: baseStatusBadgeOptions,
+                defaultRequesterFilter: defaultFilter
             });
 
             if (resolvedPreset.key === "all-approved") {
@@ -400,6 +408,11 @@
                 openInNewWindow: resolvedPreset.openInNewWindow,
                 paramField: resolvedPreset.paramField,
                 noDataText: resolvedPreset.emptyStateTitle,
+                stateStoring: {
+                    enabled: true,
+                    type: "localStorage",
+                    storageKey: "qcs_workspace_grid_" + resolvedPreset.key
+                },
                 onContentReady: function (e) {
                     gridInstance = e.component;
                     toggleEmptyState();

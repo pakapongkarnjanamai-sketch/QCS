@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -64,11 +64,14 @@ namespace QCS.Web.Shared.Middleware
                                 };
 
                                 // เพิ่ม Role Claims
-                                foreach (var role in user.Roles)
+                                if (user.Roles != null)
                                 {
-                                    claims.Add(new Claim(ClaimTypes.Role, role.Name));
-                                    _logger.LogInformation("Added role claim: {RoleName} for user: {WindowsIdentity}",
-                                        role.Name, windowsIdentity);
+                                    foreach (var role in user.Roles)
+                                    {
+                                        claims.Add(new Claim(ClaimTypes.Role, role.Name));
+                                        _logger.LogInformation("Added role claim: {RoleName} for user: {WindowsIdentity}",
+                                            role.Name, windowsIdentity);
+                                    }
                                 }
 
                                 // สร้าง ClaimsIdentity และ ClaimsPrincipal ใหม่
@@ -82,7 +85,7 @@ namespace QCS.Web.Shared.Middleware
                                 _cache.Set(cacheKey, user, TimeSpan.FromMinutes(10));
 
                                 _logger.LogInformation("User {WindowsIdentity} synced successfully with {RoleCount} roles: {Roles}",
-                                    windowsIdentity, user.Roles.Count, string.Join(", ", user.Roles.Select(r => r.Name)));
+                                    windowsIdentity, user.Roles?.Count ?? 0, string.Join(", ", user.Roles?.Select(r => r.Name) ?? Array.Empty<string>()));
                             }
                             else
                             {

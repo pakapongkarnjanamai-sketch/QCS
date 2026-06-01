@@ -52,6 +52,7 @@
             headerFilter: settings.headerFilter || { visible: true },
             scrolling: settings.scrolling || { mode: "virtual" },
             paging: settings.paging || { pageSize: 20 },
+            stateStoring: settings.stateStoring || { enabled: false },
             searchPanel: settings.searchPanel || {
                 visible: true,
                 width: settings.searchWidth || 300,
@@ -108,7 +109,9 @@
             columns.push({
                 dataField: "requesterName",
                 caption: settings.requesterCaption || "ผู้ขอ (Requester)",
-                width: settings.requesterWidth || 180
+                width: settings.requesterWidth || 180,
+                filterValue: settings.defaultRequesterFilter || null,
+                selectedFilterOperation: settings.defaultRequesterFilter ? "contains" : null
             });
         }
 
