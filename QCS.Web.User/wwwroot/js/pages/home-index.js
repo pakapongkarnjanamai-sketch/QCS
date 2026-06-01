@@ -543,5 +543,30 @@
 
             window.location.href = formUrl;
         });
+
+        $("#btnResetGridState").on("click", function () {
+            // Remove state from localStorage for all presets
+            Object.keys(presetMap).forEach(function (key) {
+                localStorage.removeItem("qcs_workspace_grid_" + key);
+            });
+
+            if (gridInstance) {
+                gridInstance.state(null);
+            }
+
+            // Re-apply current preset to force recreation of the grid with its default columns and filters
+            if (activePresetKey) {
+                applyPreset(activePresetKey);
+            }
+
+            if (typeof DevExpress !== "undefined" && DevExpress.ui && DevExpress.ui.notify) {
+                DevExpress.ui.notify({
+                    message: "รีเซ็ตสถานะตารางเรียบร้อยแล้ว (Grid state reset)",
+                    type: "success",
+                    displayTime: 3000,
+                    position: { at: "top center", my: "top center", offset: "0 20" }
+                });
+            }
+        });
     });
 })(window);
