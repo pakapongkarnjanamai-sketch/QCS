@@ -3,51 +3,27 @@
 	"configurations": [
 		{
 			"name": "QCS.API",
-			"type": "coreclr",
+			"type": "dotnet",
 			"request": "launch",
-			"preLaunchTask": "build",
-			"program": "${workspaceFolder}/QCS.API/bin/Debug/net9.0/QCS.API.dll",
-			"args": [],
-			"cwd": "${workspaceFolder}/QCS.API",
-			"stopAtEntry": false,
-			"env": {
-				"ASPNETCORE_ENVIRONMENT": "Development",
-				"ASPNETCORE_URLS": "https://localhost:7127;http://localhost:5157"
-			}
+			"projectPath": "${workspaceFolder}/QCS.API/QCS.API.csproj"
 		},
 		{
 			"name": "QCS.Web.User",
-			"type": "coreclr",
+			"type": "dotnet",
 			"request": "launch",
-			"preLaunchTask": "build",
-			"program": "${workspaceFolder}/QCS.Web.User/bin/Debug/net9.0/QCS.Web.User.dll",
-			"args": [],
-			"cwd": "${workspaceFolder}/QCS.Web.User",
-			"stopAtEntry": false,
-			"env": {
-				"ASPNETCORE_ENVIRONMENT": "Development",
-				"ASPNETCORE_URLS": "https://localhost:7105;http://localhost:5274"
-			}
+			"projectPath": "${workspaceFolder}/QCS.Web.User/QCS.Web.User.csproj"
 		},
 		{
 			"name": "PDF.Service",
-			"type": "coreclr",
+			"type": "dotnet",
 			"request": "launch",
-			"preLaunchTask": "build",
-			"program": "${workspaceFolder}/PDF.Service/bin/Debug/net9.0/PDF.Service.dll",
-			"args": [],
-			"cwd": "${workspaceFolder}/PDF.Service",
-			"stopAtEntry": false,
-			"env": {
-				"ASPNETCORE_ENVIRONMENT": "Development",
-				"ASPNETCORE_URLS": "https://localhost:7019;http://localhost:5226"
-			}
+			"projectPath": "${workspaceFolder}/PDF.Service/PDF.Service.csproj"
 		},
 		{
 			"name": "QCS.React.Admin",
 			"type": "node-terminal",
 			"request": "launch",
-			"command": "npm run dev -- --host 127.0.0.1 --port 5173 --strictPort",
+			"command": "npm run dev -- --host localhost --port 5173 --strictPort",
 			"cwd": "${workspaceFolder}/QCS.React.Admin",
 			"serverReadyAction": {
 				"action": "openExternally",
@@ -57,20 +33,22 @@
 	],
 	"compounds": [
 		{
-			"name": "QCS - Full System (API + Web.User + PDF + React)",
+			"name": "Full System (API + Web.User + PDF + React)",
 			"configurations": [
 				"QCS.API",
 				"QCS.Web.User",
 				"PDF.Service",
 				"QCS.React.Admin"
-			]
+			],
+			"stopAll": true
 		},
 		{
-			"name": "QCS - Core Backend (API + PDF.Service)",
+			"name": "Core Backend (API + PDF.Service)",
 			"configurations": [
 				"QCS.API",
 				"PDF.Service"
-			]
+			],
+			"stopAll": true
 		}
 	]
 }

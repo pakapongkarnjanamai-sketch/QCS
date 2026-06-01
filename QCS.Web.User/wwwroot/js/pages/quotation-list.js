@@ -33,7 +33,6 @@
         QcsRealtime.initNotificationHub({
             logLevel: signalR.LogLevel.Warning,
             onReceiveUpdate: function (message) {
-                console.log("SignalR Update (List):", message);
                 if (grid) {
                     grid.refresh();
                 }

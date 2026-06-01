@@ -293,19 +293,25 @@ namespace QCS.Application.Services
                     .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
                     .FirstOrDefaultAsync(r => r.Id == id);
 
-                if (request != null)
-                {
-                    var code = request.Code;
-                    var attachmentFilesToDelete = request.Quotations.Where(q => q.AttachmentFile != null).Select(q => q.AttachmentFile).ToList();
-                    if (attachmentFilesToDelete.Any()) await _unitOfWork.Repository<AttachmentFile>().DeleteRangeAsync(attachmentFilesToDelete);
-                    if (request.Quotations.Any()) await _unitOfWork.Repository<Quotation>().DeleteRangeAsync(request.Quotations);
-                    if (request.ApprovalSteps.Any()) await _unitOfWork.Repository<ApprovalStep>().DeleteRangeAsync(request.ApprovalSteps);
-                    await _unitOfWork.Repository<Request>().DeleteAsync(request);
+                if (request == null)
+                    throw new KeyNotFoundException($"Request {id} not found.");
 
-                    await _unitOfWork.CommitAsync();
-                    await transaction.CommitAsync();
-                    await NotifyUpdatesAsync($"ลบเอกสาร {code}");
-                }
+                if (request.Status != (int)RequestStatus.Draft)
+                    throw new InvalidOperationException("Only draft requests can be deleted.");
+
+                if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException("You can only delete your own draft requests.");
+
+                var code = request.Code;
+                var attachmentFilesToDelete = request.Quotations.Where(q => q.AttachmentFile != null).Select(q => q.AttachmentFile).ToList();
+                if (attachmentFilesToDelete.Any()) await _unitOfWork.Repository<AttachmentFile>().DeleteRangeAsync(attachmentFilesToDelete);
+                if (request.Quotations.Any()) await _unitOfWork.Repository<Quotation>().DeleteRangeAsync(request.Quotations);
+                if (request.ApprovalSteps.Any()) await _unitOfWork.Repository<ApprovalStep>().DeleteRangeAsync(request.ApprovalSteps);
+                await _unitOfWork.Repository<Request>().DeleteAsync(request);
+
+                await _unitOfWork.CommitAsync();
+                await transaction.CommitAsync();
+                await NotifyUpdatesAsync($"ลบเอกสาร {code}");
             }
             catch (Exception)
             {

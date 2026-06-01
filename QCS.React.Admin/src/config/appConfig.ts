@@ -64,8 +64,10 @@ function resolveApiBaseUrl(siteBasePath: string) {
 
   if (isLocalhost()) {
     // On localhost with no absolute URL configured, fall back to the dev API port.
+    // Use the same hostname as the browser to avoid cross-origin CORS issues
+    // (e.g. 127.0.0.1 vs localhost are treated as different origins).
     // Override by setting VITE_QCS_API_BASE_URL=http://localhost:5157 in .env.local
-    return 'http://localhost:5157'
+    return `http://${window.location.hostname}:5157`
   }
 
   // Production default for the IIS layout: <site>/QCS/Admin -> API at <site>/QCS/Service

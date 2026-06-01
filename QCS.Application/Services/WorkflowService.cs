@@ -37,6 +37,7 @@ namespace QCS.Application.Services
             bool canApprove = false;
             bool canReject = false;
             bool canEdit = request.Status == (int)QCS.Domain.Enum.RequestStatus.Draft;
+            bool canDelete = canEdit && string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase);
 
             if (request.Status == (int)QCS.Domain.Enum.RequestStatus.Pending && workflowRoute?.Steps != null)
             {
@@ -53,7 +54,8 @@ namespace QCS.Application.Services
             {
                 CanApprove = canApprove,
                 CanReject = canReject,
-                CanEdit = canEdit
+                CanEdit = canEdit,
+                CanDelete = canDelete
             };
         }
 

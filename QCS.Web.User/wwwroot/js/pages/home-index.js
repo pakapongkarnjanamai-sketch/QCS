@@ -518,11 +518,9 @@
         QcsRealtime.initNotificationHub({
             logLevel: signalR.LogLevel.Information,
             onReceiveUpdate: function (message) {
-                console.log("SignalR Update Received:", message);
                 refreshActiveData();
             },
-            onConnected: function (hubUrl) {
-                console.log("SignalR Connected to " + hubUrl);
+            onConnected: function () {
             }
         });
 

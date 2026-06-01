@@ -22,6 +22,7 @@
             API_UPDATE_SUBMIT: "/Request/SubmitUpdate",
             API_APPROVE: "/Approval/Approve",
             API_REJECT: "/Approval/Reject",
+            API_DELETE: `/Request/${prId}`,
             VENDOR_API_URL: "/Vendor"
         };
 
@@ -63,7 +64,8 @@
 
         function initToolbar() {
             const items = [
-                { location: "after", widget: "dxButton", visible: mode === "EDIT", options: Object.assign({ text: "ประวัติ (History)", icon: "clock", onClick: showHistoryPopup }, QcsButtonDefaults.getCommonButtonOptions("ghost")) },
+                { location: "after", widget: "dxButton", visible: mode === "EDIT", options: Object.assign({ text: "ประวัติ (History)", icon: "clock", onClick: showHistoryPopup }, QcsButtonDefaults.getCommonButtonOptions("secondary")) },
+                { location: "after", widget: "dxButton", visible: false, options: Object.assign({ elementAttr: { id: "btnDelete" }, text: "ลบฉบับร่าง (Delete Draft)", icon: "trash", onClick: handleDelete }, QcsButtonDefaults.getCommonButtonOptions("secondary")) },
                 { location: "after", widget: "dxButton", visible: false, options: Object.assign({ elementAttr: { id: "btnPreview" }, text: "Preview PDF", icon: "exportpdf", onClick: handlePreviewPdf }, QcsButtonDefaults.getCommonButtonOptions("secondary")) },
                 { location: "after", widget: "dxButton", visible: false, options: Object.assign({ elementAttr: { id: "btnSave" }, text: "บันทึกฉบับร่าง (Save Draft)", icon: "save", onClick: function () { handleSaveOrSubmit(false); } }, QcsButtonDefaults.getCommonButtonOptions("secondary")) },
                 QcsActionDialog.createToolbarButtonItem("Submit", {
@@ -193,6 +195,7 @@
                     btnPreview: canEdit,
                     btnSave: canEdit,
                     btnSubmit: canEdit,
+                    btnDelete: data.permissions.canDelete,
                     btnApprove: data.permissions.canApprove,
                     btnReject: data.permissions.canReject
                 });
@@ -232,6 +235,38 @@
             } else {
                 executeSaveOrSubmit(false, null);
             }
+        }
+
+        async function handleDelete() {
+            const result = await DevExpress.ui.dialog.confirm(
+                "ต้องการลบฉบับร่างนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้ (Delete this draft? This cannot be undone.)",
+                "ยืนยันการลบ (Confirm Delete)"
+            );
+            if (!result) return;
+
+            await QcsAsync.run(async function () {
+                const response = await fetch(pageConfig.API_BASE_URL + pageConfig.API_DELETE, {
+                    method: "DELETE",
+                    credentials: "include"
+                });
+                if (!response.ok) {
+                    const body = await response.json().catch(function () { return null; });
+                    throw new Error((body && (body.detail || body.message)) || "Delete failed (" + response.status + ")");
+                }
+                setTimeout(function () {
+                    window.location.href = homeUrl;
+                }, 1000);
+            }, {
+                loader: loadingIndicator,
+                successMessage: "ลบสำเร็จ (Deleted successfully)",
+                successDuration: 1500,
+                onError: function (err) {
+                    QcsErrorPresenter.logAndNotify("Delete error", err, {
+                        message: "ลบไม่สำเร็จ (Delete failed)",
+                        duration: 5000
+                    });
+                }
+            });
         }
 
         function openActionPopup(action) {

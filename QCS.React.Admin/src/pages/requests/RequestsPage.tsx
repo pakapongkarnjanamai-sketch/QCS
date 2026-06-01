@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import DataGrid, {
   Column,
   FilterRow,
@@ -6,7 +6,11 @@ import DataGrid, {
   RemoteOperations,
   Scrolling,
 } from 'devextreme-react/data-grid'
+import { confirm } from 'devextreme/ui/dialog'
 import { createDataSource } from '../../lib/createDataSource.ts'
+import { appConfig } from '../../config/appConfig.ts'
+import { fetchWithAccessControl } from '../../lib/apiClient.ts'
+import { toast } from '../../lib/toast.ts'
 
 type RequestRow = {
   id: number
@@ -64,13 +68,38 @@ const CATEGORIES: Category[] = [
 
 export function RequestsPage() {
   const [activeKey, setActiveKey] = useState<string>('all')
+  const gridRef = useRef<DataGrid>(null)
 
   const activeCategory = CATEGORIES.find((c) => c.key === activeKey)!
+  const isDraft = activeKey === 'draft'
 
   const dataSource = useMemo(
     () => createDataSource<RequestRow>(activeCategory.path, 'id'),
     [activeCategory.path],
   )
+
+  const handleDelete = useCallback(async (row: RequestRow) => {
+    const confirmed = await confirm(
+      `Delete draft "${row.code}"? This cannot be undone.`,
+      'Delete Draft',
+    )
+    if (!confirmed) return
+
+    try {
+      const res = await fetchWithAccessControl(
+        `${appConfig.apiBaseUrl}/api/Request/${row.id}`,
+        { method: 'DELETE', credentials: 'include' },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.detail ?? body?.message ?? `Delete failed (${res.status})`)
+      }
+      toast.success(`Deleted ${row.code}`)
+      gridRef.current?.instance().refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed')
+    }
+  }, [])
 
   return (
     <div className="flex flex-1 min-h-0 gap-4">
@@ -108,6 +137,7 @@ export function RequestsPage() {
         </div>
         <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
           <DataGrid
+            ref={gridRef}
             key={activeKey}
             dataSource={dataSource}
             showBorders={false}
@@ -162,6 +192,24 @@ export function RequestsPage() {
               width={110}
               alignment="center"
             />
+            {isDraft && (
+              <Column
+                caption=""
+                width={70}
+                allowFiltering={false}
+                allowSorting={false}
+                allowHeaderFiltering={false}
+                cellRender={({ data }: { data: RequestRow }) => (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(data)}
+                    className="text-[12px] text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              />
+            )}
           </DataGrid>
         </section>
       </div>

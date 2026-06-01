@@ -6,6 +6,19 @@
     margin-bottom: 12px;
 }
 
+/* Allow action toolbar to wrap when space is tight */
+#actionButtons .dx-toolbar-items-container {
+    flex-wrap: wrap;
+    height: auto !important;
+}
+
+#actionButtons .dx-toolbar-after {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    position: static;
+}
+
 
 /* Main page sections */
 .section-header {

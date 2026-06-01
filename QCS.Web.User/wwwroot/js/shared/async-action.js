@@ -29,8 +29,6 @@
 
         if (type === "error") {
             alert(message);
-        } else {
-            console.log(message);
         }
     }
 

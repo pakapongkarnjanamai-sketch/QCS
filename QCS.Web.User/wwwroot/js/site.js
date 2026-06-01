@@ -25,10 +25,8 @@
         },
         errorHandler: function (error) {
             if (error && error.xhr && error.xhr.status === 401) {
-                console.log('401 Unauthorized. Authentication required.');
                 showAuthenticationError();
             } else {
-                console.error('Error:', error);
                 showGenericError(error);
             }
         }
@@ -116,10 +114,8 @@ function initSystemEnums() {
             SystemEnums.workflowStep = data.workflowStep;
             SystemEnums.documentType = data.documentType;
             SystemEnums.approvalStatus = data.approvalStatus;
-            console.log("System Enums Loaded:", SystemEnums);
         },
         error: function (err) {
-            console.error("Failed to load Enums", err);
         }
     });
 }

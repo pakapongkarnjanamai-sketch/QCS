@@ -267,8 +267,23 @@ namespace QCS.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            await _service.DeleteAsync(id);
-            return Ok(new { message = "Deleted successfully" });
+            try
+            {
+                await _service.DeleteAsync(id);
+                return Ok(new { message = "Deleted successfully" });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Problem(detail: ex.Message, statusCode: 400);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Problem(detail: ex.Message, statusCode: 403);
+            }
         }
 
         [HttpGet("ViewFile/{id}")]

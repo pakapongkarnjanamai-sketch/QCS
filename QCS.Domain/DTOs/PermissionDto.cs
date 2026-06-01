@@ -11,5 +11,6 @@ namespace QCS.Domain.DTOs
         public bool CanApprove { get; set; }
         public bool CanReject { get; set; }
         public bool CanEdit { get; set; }
+        public bool CanDelete { get; set; }
     }
 }
