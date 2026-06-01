@@ -1,0 +1,136 @@
+- generic [ref=e1]:
+  - link "ข้ามไปยังเนื้อหาหลัก (Skip to main content)" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - navigation "เมนูหลัก (Main navigation)" [ref=e3]:
+    - generic [ref=e4]:
+      - link "QCS" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img [ref=e6]
+        - text: QCS
+      - button "เปิด/ปิดเมนู (Toggle navigation)" [ref=e8] [cursor=pointer]
+  - main "พื้นที่งาน (Workspace)" [ref=e10]:
+    - generic [ref=e11]:
+      - heading "พื้นที่งาน (Workspace)" [level=1] [ref=e12]
+      - generic [ref=e13]:
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - button [ref=e18] [cursor=pointer]:
+              - img [ref=e19]
+            - generic [ref=e22]:
+              - button [ref=e23] [cursor=pointer]:
+                - img [ref=e24]
+              - button "2" [pressed] [ref=e59] [cursor=pointer]:
+                - img [ref=e27]
+                - generic [ref=e60]: "2"
+              - button [ref=e29] [cursor=pointer]:
+                - img [ref=e30]
+              - button [ref=e32] [cursor=pointer]:
+                - img [ref=e33]
+          - generic [ref=e36]:
+            - button "รีเซ็ตตาราง (Reset Grid)" [ref=e37] [cursor=pointer]:
+              - img [ref=e38]
+            - button "สร้างใหม่ (New)" [ref=e40] [cursor=pointer]:
+              - img [ref=e41]
+              - generic [ref=e43]: สร้างใหม่ (New)
+        - group "Data grid with 2 rows and 7 columns" [ref=e61]:
+          - status [ref=e192]: Data grid with 2 rows and 7 columns
+          - row "Column เลขที่เอกสาร (Document No.) Column หัวข้อ/รายการ (Title/Item) Column หมายเหตุ (Remark) Column ผู้ขาย (Vendor) Column วันที่ขอ (Request Date) Column สถานะ (Status)" [ref=e201]:
+            - columnheader "Column เลขที่เอกสาร (Document No.)" [ref=e202] [cursor=pointer]:
+              - text: เลขที่เอกสาร (Document No.)
+              - generic [ref=e203]: 
+              - button "Show filter options for column 'เลขที่เอกสาร (Document No.)'" [ref=e204]: 
+            - columnheader "Column หัวข้อ/รายการ (Title/Item)" [ref=e205] [cursor=pointer]:
+              - text: หัวข้อ/รายการ (Title/Item)
+              - button "Show filter options for column 'หัวข้อ/รายการ (Title/Item)'" [ref=e206]: 
+            - columnheader "Column หมายเหตุ (Remark)" [ref=e207] [cursor=pointer]:
+              - text: หมายเหตุ (Remark)
+              - button "Show filter options for column 'หมายเหตุ (Remark)'" [ref=e208]: 
+            - columnheader "Column ผู้ขาย (Vendor)" [ref=e209] [cursor=pointer]:
+              - text: ผู้ขาย (Vendor)
+              - button "Show filter options for column 'ผู้ขาย (Vendor)'" [ref=e210]: 
+            - columnheader "Column วันที่ขอ (Request Date)" [ref=e211] [cursor=pointer]:
+              - text: วันที่ขอ (Request Date)
+              - button "Show filter options for column 'วันที่ขอ (Request Date)'" [ref=e212]: 
+            - columnheader "Column สถานะ (Status)" [ref=e213] [cursor=pointer]:
+              - text: สถานะ (Status)
+              - button "Show filter options for column 'สถานะ (Status)'" [ref=e214]: 
+            - gridcell [ref=e215]
+          - row "Filter cell Filter cell Filter cell Filter cell Filter cell Filter cell" [ref=e216]:
+            - gridcell "Filter cell" [ref=e217]:
+              - generic [ref=e218]:
+                - menubar:
+                  - menuitem "Search box" [ref=e219] [cursor=pointer]:
+                    - generic [ref=e220]:
+                      - generic [ref=e221]: 
+                      - text: 
+                - textbox "Filter cell" [ref=e226]
+            - gridcell "Filter cell" [ref=e227]:
+              - generic [ref=e228]:
+                - menubar:
+                  - menuitem "Search box" [ref=e229] [cursor=pointer]:
+                    - generic [ref=e230]:
+                      - generic [ref=e231]: 
+                      - text: 
+                - textbox "Filter cell" [ref=e236]
+            - gridcell "Filter cell" [ref=e237]:
+              - generic [ref=e238]:
+                - menubar:
+                  - menuitem "Search box" [ref=e239] [cursor=pointer]:
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: 
+                      - text: 
+                - textbox "Filter cell" [ref=e246]
+            - gridcell "Filter cell" [ref=e247]:
+              - generic [ref=e248]:
+                - menubar:
+                  - menuitem "Search box" [ref=e249] [cursor=pointer]:
+                    - generic [ref=e250]:
+                      - generic [ref=e251]: 
+                      - text: 
+                - textbox "Filter cell" [active] [ref=e256]
+            - gridcell "Filter cell" [ref=e257]:
+              - generic [ref=e258]:
+                - menubar:
+                  - menuitem "Search box" [ref=e259] [cursor=pointer]:
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: 
+                      - text: 
+                - generic [ref=e265]:
+                  - combobox "Filter cell" [ref=e267]
+                  - button "Select" [ref=e269] [cursor=pointer]:
+                    - generic [ref=e271]: 
+            - gridcell "Filter cell" [ref=e272]:
+              - generic [ref=e277] [cursor=pointer]:
+                - generic [ref=e278]:
+                  - combobox "Filter cell" [ref=e279]: (All)
+                  - text: Select...
+                - button "Select" [ref=e281]:
+                  - generic [ref=e283]: 
+            - gridcell [ref=e284]
+          - grid [ref=e158]:
+            - 'row "QC-20260601-002 Delete Test 1004167 : TAKASAGO CO., LTD. 2026-06-01 บันทึก " [ref=e293]':
+              - gridcell "QC-20260601-002" [ref=e294]:
+                - link "QC-20260601-002" [ref=e295] [cursor=pointer]:
+                  - /url: /Request/Form/3
+              - gridcell "Delete" [ref=e296]
+              - gridcell "Test" [ref=e297]
+              - 'gridcell "1004167 : TAKASAGO CO., LTD." [ref=e298]'
+              - gridcell "2026-06-01" [ref=e299]
+              - gridcell "บันทึก" [ref=e300]:
+                - generic [ref=e301]: บันทึก
+              - gridcell "" [ref=e302]:
+                - link "" [ref=e303] [cursor=pointer]:
+                  - /url: "#"
+            - 'row "QC-20260601-001 ABC ACS 1004088 : NAGATA CO., LTD. 2026-06-01 รออนุมัติ " [ref=e304]':
+              - gridcell "QC-20260601-001" [ref=e305]:
+                - link "QC-20260601-001" [ref=e306] [cursor=pointer]:
+                  - /url: /Request/Form/1
+              - gridcell "ABC" [ref=e307]
+              - gridcell "ACS" [ref=e308]
+              - 'gridcell "1004088 : NAGATA CO., LTD." [ref=e309]'
+              - gridcell "2026-06-01" [ref=e310]
+              - gridcell "รออนุมัติ" [ref=e311]:
+                - generic [ref=e312]: รออนุมัติ
+              - gridcell "" [ref=e313]:
+                - link "" [ref=e314] [cursor=pointer]:
+                  - /url: "#"

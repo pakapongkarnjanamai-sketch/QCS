@@ -105,6 +105,42 @@
     color: var(--surface-card);
 }
 
+/* Icon-only utility button (e.g. Reset Grid) */
+.workspace-icon-btn {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0 10px;
+    color: var(--text-secondary);
+    position: relative;
+}
+
+.workspace-icon-btn:hover {
+    color: var(--text-primary);
+}
+
+.workspace-icon-btn.state-modified {
+    color: var(--dx-primary-color);
+    border-color: var(--dx-primary-color);
+}
+
+.workspace-icon-btn.state-modified::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--dx-primary-color);
+    box-shadow: 0 0 0 2px var(--surface-card);
+}
+
+/* Column header highlight when filter is active */
+.dx-datagrid-headers .dx-header-row td.column-filtered {
+    color: var(--dx-primary-color) !important;
+    font-weight: 700 !important;
+}
+
 .workspace-action-btn {
     background: var(--text-primary);
     border-color: var(--text-primary);

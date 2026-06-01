@@ -396,6 +396,62 @@
             descriptionElement.text(preset.description);
         }
 
+        function checkGridStateModified() {
+            if (!gridInstance) {
+                $("#btnResetGridState").removeClass("state-modified");
+                return;
+            }
+
+            var state = gridInstance.state();
+            var modified = false;
+            var filteredFields = {};
+
+            if (state && state.columns) {
+                for (var i = 0; i < state.columns.length; i++) {
+                    var col = state.columns[i];
+                    var hasFilter = false;
+
+                    if (col.filterValue !== undefined && col.filterValue !== null && col.filterValue !== "") {
+                        hasFilter = true;
+                    }
+                    if (col.filterValues && col.filterValues.length > 0) {
+                        hasFilter = true;
+                    }
+
+                    if (hasFilter) {
+                        modified = true;
+                        filteredFields[col.dataField] = true;
+                    }
+
+                    if (col.sortOrder && col.dataField !== "code") {
+                        modified = true;
+                    }
+                    if (col.dataField === "code" && col.sortOrder === "asc") {
+                        modified = true;
+                    }
+                }
+            }
+
+            if (state && state.searchText) {
+                modified = true;
+            }
+            if (state && state.filterValue) {
+                modified = true;
+            }
+
+            $("#btnResetGridState").toggleClass("state-modified", modified);
+
+            // Highlight column headers that have active filters
+            var $headers = gridElement.find(".dx-datagrid-headers .dx-header-row td");
+            $headers.removeClass("column-filtered");
+            var columns = gridInstance.getVisibleColumns();
+            for (var j = 0; j < columns.length; j++) {
+                if (columns[j].dataField && filteredFields[columns[j].dataField]) {
+                    $headers.eq(j).addClass("column-filtered");
+                }
+            }
+        }
+
         function buildGridOptions(preset) {
             const resolvedPreset = resolvePresetText(preset);
             return QcsRequestGrid.createGridOptions({
@@ -416,6 +472,12 @@
                 onContentReady: function (e) {
                     gridInstance = e.component;
                     toggleEmptyState();
+                    checkGridStateModified();
+                },
+                onOptionChanged: function (e) {
+                    if (e.name === "columns" || e.name === "filterValue" || e.name === "searchText") {
+                        checkGridStateModified();
+                    }
                 },
                 onDataErrorOccurred: function (e) {
                     QcsErrorPresenter.logAndNotify("Grid error", e.error, {
@@ -560,6 +622,8 @@
             if (typeof QcsAsync !== "undefined" && QcsAsync.notify) {
                 QcsAsync.notify("รีเซ็ตสถานะตารางเรียบร้อยแล้ว (Grid state reset)", "success", 3000);
             }
+
+            $("#btnResetGridState").removeClass("state-modified");
         });
     });
 })(window);
