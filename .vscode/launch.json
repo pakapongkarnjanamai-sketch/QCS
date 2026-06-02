@@ -5,25 +5,40 @@
 			"name": "QCS.API",
 			"type": "dotnet",
 			"request": "launch",
-			"projectPath": "${workspaceFolder}/QCS.API/QCS.API.csproj"
+			"projectPath": "${workspaceFolder}/QCS.API/QCS.API.csproj",
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+				"uriFormat": "%s/swagger"
+			}
 		},
 		{
 			"name": "QCS.Web.User",
 			"type": "dotnet",
 			"request": "launch",
-			"projectPath": "${workspaceFolder}/QCS.Web.User/QCS.Web.User.csproj"
+			"projectPath": "${workspaceFolder}/QCS.Web.User/QCS.Web.User.csproj",
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+				"uriFormat": "%s"
+			}
 		},
 		{
 			"name": "PDF.Service",
 			"type": "dotnet",
 			"request": "launch",
-			"projectPath": "${workspaceFolder}/PDF.Service/PDF.Service.csproj"
+			"projectPath": "${workspaceFolder}/PDF.Service/PDF.Service.csproj",
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+				"uriFormat": "%s/swagger"
+			}
 		},
 		{
 			"name": "QCS.React.Admin",
 			"type": "node-terminal",
 			"request": "launch",
-			"command": "npm run dev -- --host localhost --port 5173 --strictPort",
+			"command": "npm run dev -- --host localhost --port 5846 --strictPort",
 			"cwd": "${workspaceFolder}/QCS.React.Admin",
 			"serverReadyAction": {
 				"action": "openExternally",

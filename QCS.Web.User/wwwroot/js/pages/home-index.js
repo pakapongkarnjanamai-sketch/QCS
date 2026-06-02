@@ -41,7 +41,8 @@
             buttonHint: "ดูรายละเอียด (View Details)",
             emptyStateTitle: "ยังไม่มีข้อมูล (No data)",
             emptyActionLabel: "สร้างใบเสนอราคาใหม่ (Create new quotation)",
-            emptyActionIconClass: "fas fa-plus"
+            emptyActionIconClass: "fas fa-plus",
+            codeSortOrder: "desc"
         };
 
         function resolvePresetText(preset) {
@@ -495,6 +496,16 @@
 
         function applyPreset(presetKey) {
             const preset = resolvePresetText(presetMap[presetKey] || presetMap[resolveRequestedPreset()]);
+
+            // Save current grid state before switching so it persists per-view
+            if (gridInstance && activePresetKey) {
+                var oldKey = "qcs_workspace_grid_" + activePresetKey;
+                var currentState = gridInstance.state();
+                if (currentState) {
+                    localStorage.setItem(oldKey, JSON.stringify(currentState));
+                }
+            }
+
             activePresetKey = preset.key;
 
             updateWorkspaceHeader(preset);
@@ -508,7 +519,10 @@
                 return;
             }
 
+            var newStorageKey = "qcs_workspace_grid_" + preset.key;
+
             gridInstance.beginUpdate();
+            gridInstance.option("stateStoring.storageKey", newStorageKey);
             gridInstance.option("columns", buildPresetColumns(preset));
             gridInstance.option("dataSource", {
                 store: createPresetStore(preset),
@@ -518,6 +532,15 @@
             gridInstance.option("noDataText", preset.emptyStateTitle);
             gridInstance.option("onRowDblClick", createRowDblClickHandler(preset));
             gridInstance.endUpdate();
+
+            // Restore saved state for this view (column filters, sort, search)
+            var savedRaw = localStorage.getItem(newStorageKey);
+            if (savedRaw) {
+                try {
+                    gridInstance.state(JSON.parse(savedRaw));
+                } catch (_) { /* ignore corrupt state */ }
+            }
+
             gridInstance.refresh().done(toggleEmptyState);
         }
 
@@ -611,12 +634,10 @@
             });
 
             if (gridInstance) {
+                // Clear saved state then re-apply preset columns (which include default sort)
                 gridInstance.state(null);
-            }
-
-            // Re-apply current preset to force recreation of the grid with its default columns and filters
-            if (activePresetKey) {
-                applyPreset(activePresetKey);
+                var preset = resolvePresetText(presetMap[activePresetKey]);
+                gridInstance.option("columns", buildPresetColumns(preset));
             }
 
             if (typeof QcsAsync !== "undefined" && QcsAsync.notify) {
