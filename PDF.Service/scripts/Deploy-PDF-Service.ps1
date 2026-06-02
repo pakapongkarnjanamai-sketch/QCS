@@ -35,8 +35,9 @@ function Test-ServiceHealth {
         }
         catch {
             $statusCode = $null
-            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-                $statusCode = [int]$_.Exception.Response.StatusCode
+            $resp = $_.Exception | Select-Object -ExpandProperty Response -ErrorAction SilentlyContinue
+            if ($resp) {
+                $statusCode = [int]($resp | Select-Object -ExpandProperty StatusCode -ErrorAction SilentlyContinue)
             }
 
             if ($statusCode -and ($AcceptedStatusCodes -contains $statusCode)) {

@@ -4,6 +4,7 @@ param(
     [string]$TargetPath = '\\10.10.154.21\wwwroot\QCS\Service',
     [string]$PublishPath = 'c:\Users\n4734\source\repos\QCS\artifacts\publish\QCS.API',
     [string]$PublicApiBaseUrl = 'https://ap-ntc2137-prwb/QCS/Service',
+    [string]$Environment = 'Production',
     [switch]$SkipSmokeTest
 )
 
@@ -104,14 +105,14 @@ if (Test-Path $publishedWebConfig) {
             $aspNetCoreNode.AppendChild($envVarsNode) | Out-Null
         }
 
-        # Add ASPNETCORE_ENVIRONMENT = QA
+        # Add ASPNETCORE_ENVIRONMENT
         $envVarNode = $xml.CreateElement("environmentVariable")
         $envVarNode.SetAttribute("name", "ASPNETCORE_ENVIRONMENT")
-        $envVarNode.SetAttribute("value", "QA")
+        $envVarNode.SetAttribute("value", $Environment)
         $envVarsNode.AppendChild($envVarNode) | Out-Null
 
         $xml.Save($publishedWebConfig)
-        Write-Host "Injected ASPNETCORE_ENVIRONMENT=QA and enabled stdout logging in published web.config" -ForegroundColor DarkCyan
+        Write-Host "Injected ASPNETCORE_ENVIRONMENT=$Environment and enabled stdout logging in published web.config" -ForegroundColor DarkCyan
     }
 }
 
