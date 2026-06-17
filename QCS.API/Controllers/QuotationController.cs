@@ -2,6 +2,7 @@
 using QCS.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using QCS.Application.Services;
+using QCS.Domain.DTOs;
 
 namespace QCS.API.Controllers
 {
@@ -19,6 +20,42 @@ namespace QCS.API.Controllers
         {
             _requestService = requestService;
             _quotationService = quotationService;
+        }
+
+        // GET api/Quotation/GetEffectiveByVendorCodeAsync?code=V001
+        [HttpGet("GetEffectiveByVendorCodeAsync")]
+        [ProducesResponseType(typeof(List<QuotationDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetEffectiveByVendorCode([FromQuery] string code, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Query parameter 'code' is required.");
+            }
+
+            var result = await _quotationService.GetEffectiveByVendorCodeAsync(code, cancellationToken);
+            return Ok(result);
+        }
+
+        // GET api/Quotation/GetEffective?vendorCode=&keyword=&page=1&pageSize=20&sortBy=RequestDate&sortDescending=true
+        [HttpGet("GetEffective")]
+        [ProducesResponseType(typeof(ApiResponse<PagedResult<QuotationDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResult<QuotationDto>>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetEffective([FromQuery] EffectiveQuotationQuery query, CancellationToken cancellationToken)
+        {
+            if (query.RequestDateFrom.HasValue && query.RequestDateTo.HasValue
+                && query.RequestDateFrom.Value.Date > query.RequestDateTo.Value.Date)
+            {
+                return BadRequest(ApiResponse<PagedResult<QuotationDto>>.Fail(
+                    StatusCodes.Status400BadRequest,
+                    "RequestDateFrom must not be after RequestDateTo."));
+            }
+
+            var paged = await _quotationService.GetEffectiveAsync(query, cancellationToken);
+            return Ok(ApiResponse<PagedResult<QuotationDto>>.Ok(paged));
         }
 
         [HttpGet("ByCode")]
