@@ -101,12 +101,13 @@ namespace QCS.API.Extensions
         {
             var allowedOrigins = configuration.GetSection("CorsOrigins").Get<string[]>()
                 ?? throw new InvalidOperationException("CorsOrigins configuration is required.");
+            var normalizedOrigins = BuildAllowedOrigins(allowedOrigins);
 
             services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
-                    policy.WithOrigins(allowedOrigins)
+                    policy.WithOrigins(normalizedOrigins)
                           .AllowAnyMethod()
                           .AllowAnyHeader()
                           .AllowCredentials();
@@ -114,6 +115,41 @@ namespace QCS.API.Extensions
             });
 
             return services;
+        }
+
+        private static string[] BuildAllowedOrigins(IEnumerable<string> origins)
+        {
+            var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var rawOrigin in origins)
+            {
+                if (string.IsNullOrWhiteSpace(rawOrigin))
+                {
+                    continue;
+                }
+
+                var candidate = rawOrigin.Trim().TrimEnd('/');
+                if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+                    || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                {
+                    normalized.Add(candidate);
+                    continue;
+                }
+
+                var portPart = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+                normalized.Add($"{uri.Scheme}://{uri.Host}{portPart}");
+
+                if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalized.Add($"{uri.Scheme}://127.0.0.1{portPart}");
+                }
+                else if (uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalized.Add($"{uri.Scheme}://localhost{portPart}");
+                }
+            }
+
+            return normalized.ToArray();
         }
     }
 }

@@ -2,16 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DataGrid, {
   Column,
+  Export,
   FilterRow,
   HeaderFilter,
+  Item,
   Lookup,
   RemoteOperations,
   Scrolling,
+  Toolbar,
 } from 'devextreme-react/data-grid'
-import type { RowClickEvent } from 'devextreme/ui/data_grid'
+import type { ExportingEvent, RowClickEvent } from 'devextreme/ui/data_grid'
 import { createDataSource } from '../../lib/createDataSource.ts'
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
+import { exportDataGridToExcel } from '../../lib/exportDataGridToExcel.ts'
 import { toast } from '../../lib/toast.ts'
 
 const portalBase = appConfig.portalBaseUrl
@@ -408,6 +412,18 @@ export function QuotationsPage() {
     setSelectedCode((prev) => (prev === code ? null : code))
   }, [])
 
+  const handleExporting = useCallback((e: ExportingEvent) => {
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    void exportDataGridToExcel({
+      component: e.component,
+      fileName: `Quotations_${stamp}`,
+      worksheetName: 'Quotations',
+    }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    })
+    e.cancel = true
+  }, [])
+
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
       {(vendorCodeFilter || requesterNameFilter) && (
@@ -440,6 +456,7 @@ export function QuotationsPage() {
         <section className="h-full overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
           <DataGrid
             dataSource={dataSource}
+            onExporting={handleExporting}
             showBorders={false}
             showColumnLines={false}
             showRowLines={true}
@@ -455,6 +472,10 @@ export function QuotationsPage() {
             <FilterRow visible={true} />
             <HeaderFilter visible={true} />
             <Scrolling mode="virtual" rowRenderingMode="virtual" />
+            <Export enabled={true} allowExportSelectedData={false} />
+            <Toolbar>
+              <Item name="exportButton" location="after" />
+            </Toolbar>
 
             <Column dataField="code" caption="Doc No." width={130} />
             <Column dataField="vendorCode" caption="Vendor" minWidth={130}>

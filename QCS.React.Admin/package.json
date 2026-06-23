@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "devextreme": "24.2",
+    "devextreme-exceljs-fork": "^4.4.11",
     "devextreme-react": "24.2",
+    "file-saver": "^2.0.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0"
@@ -19,6 +21,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

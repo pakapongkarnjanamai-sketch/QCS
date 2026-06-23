@@ -1,15 +1,20 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import DataGrid, {
   Column,
+  Export,
   FilterRow,
   HeaderFilter,
+  Item,
   RemoteOperations,
   Scrolling,
+  Toolbar,
 } from 'devextreme-react/data-grid'
+import type { ExportingEvent } from 'devextreme/ui/data_grid'
 import { confirm } from 'devextreme/ui/dialog'
 import { createDataSource } from '../../lib/createDataSource.ts'
 import { appConfig } from '../../config/appConfig.ts'
 import { fetchWithAccessControl } from '../../lib/apiClient.ts'
+import { exportDataGridToExcel } from '../../lib/exportDataGridToExcel.ts'
 import { toast } from '../../lib/toast.ts'
 
 type RequestRow = {
@@ -102,22 +107,37 @@ export function RequestsPage() {
     }
   }, [])
 
+  const handleExporting = useCallback((e: ExportingEvent) => {
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    void exportDataGridToExcel({
+      component: e.component,
+      fileName: `Requests_${activeKey}_${stamp}`,
+      worksheetName: 'Requests',
+    }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    })
+    e.cancel = true
+  }, [activeKey])
+
   return (
-    <div className="flex flex-1 min-h-0 gap-4">
-      {/* Sub-sidebar */}
-      <nav className="w-44 shrink-0">
-        <p className="mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-(--ink-soft)">
-          Status
-        </p>
-        <ul className="space-y-0.5">
-          {CATEGORIES.map((cat) => {
-            const isActive = cat.key === activeKey
-            return (
-              <li key={cat.key}>
+    <div className="flex flex-1 min-h-0 min-w-0 flex-col">
+      <div className="mb-3 shrink-0">
+        <div className="overflow-x-auto">
+          <div
+            className="inline-flex min-w-max gap-1 rounded-sm border border-(--border-subtle) bg-(--surface-panel) p-1"
+            role="tablist"
+            aria-label="Request status"
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = cat.key === activeKey
+              return (
                 <button
+                  key={cat.key}
                   type="button"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setActiveKey(cat.key)}
-                  className={`w-full rounded-sm px-3 py-2 text-left text-[13px] transition-colors ${
+                  className={`rounded-sm px-3 py-1.5 text-left text-[12px] transition-colors ${
                     isActive
                       ? 'bg-(--surface-muted) font-medium text-(--ink-strong)'
                       : 'text-(--ink-muted) hover:bg-(--surface-muted) hover:text-(--ink-strong)'
@@ -125,95 +145,95 @@ export function RequestsPage() {
                 >
                   {cat.label}
                 </button>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-
-      {/* Main content */}
-      <div className="flex flex-col min-h-0 min-w-0 flex-1">
-        <div className="mb-3 shrink-0">
-          <p className="text-[12px] text-(--ink-soft)">{activeCategory.description}</p>
+              )
+            })}
+          </div>
         </div>
-        <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
-          <DataGrid
-            ref={gridRef}
-            key={activeKey}
-            dataSource={dataSource}
-            showBorders={false}
-            showColumnLines={false}
-            showRowLines={true}
-            rowAlternationEnabled={false}
-            columnAutoWidth={true}
-            wordWrapEnabled={false}
-            height="100%"
-          >
-            <RemoteOperations
-              filtering={true}
-              paging={true}
-              sorting={true}
-              grouping={false}
-              summary={false}
-            />
-
-            <FilterRow visible={true} />
-            <HeaderFilter visible={true} />
-
-            <Scrolling mode="virtual" rowRenderingMode="virtual" />
-
-            <Column dataField="code" caption="Doc No." width={140} />
-            <Column dataField="title" caption="Title" minWidth={200} />
-            <Column dataField="requesterName" caption="Requester" width={160} />
-            <Column dataField="vendorName" caption="Vendor" width={180} />
-            <Column
-              dataField="requestDate"
-              caption="Date"
-              dataType="date"
-              format="dd/MM/yyyy"
-              width={110}
-              alignment="center"
-              sortOrder="desc"
-              sortIndex={0}
-            />
-            <Column dataField="remark" caption="Remark" minWidth={120} />
-            <Column
-              dataField="validFrom"
-              caption="Valid From"
-              dataType="date"
-              format="dd/MM/yyyy"
-              width={110}
-              alignment="center"
-            />
-            <Column
-              dataField="validUntil"
-              caption="Valid Until"
-              dataType="date"
-              format="dd/MM/yyyy"
-              width={110}
-              alignment="center"
-            />
-            {isDraft && (
-              <Column
-                caption=""
-                width={70}
-                allowFiltering={false}
-                allowSorting={false}
-                allowHeaderFiltering={false}
-                cellRender={({ data }: { data: RequestRow }) => (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(data)}
-                    className="text-[12px] text-red-600 hover:text-red-800 transition-colors"
-                  >
-                    Delete
-                  </button>
-                )}
-              />
-            )}
-          </DataGrid>
-        </section>
+        <p className="mt-2 px-1 text-[12px] text-(--ink-soft)">{activeCategory.description}</p>
       </div>
+
+      <section className="flex-1 min-h-0 overflow-hidden rounded-sm border border-(--border-subtle) bg-(--surface-panel)">
+        <DataGrid
+          ref={gridRef}
+          key={activeKey}
+          dataSource={dataSource}
+          onExporting={handleExporting}
+          showBorders={false}
+          showColumnLines={false}
+          showRowLines={true}
+          rowAlternationEnabled={false}
+          columnAutoWidth={true}
+          wordWrapEnabled={false}
+          height="100%"
+        >
+          <RemoteOperations
+            filtering={true}
+            paging={true}
+            sorting={true}
+            grouping={false}
+            summary={false}
+          />
+
+          <FilterRow visible={true} />
+          <HeaderFilter visible={true} />
+
+          <Scrolling mode="virtual" rowRenderingMode="virtual" />
+          <Export enabled={true} allowExportSelectedData={false} />
+          <Toolbar>
+            <Item name="exportButton" location="after" />
+          </Toolbar>
+
+          <Column dataField="code" caption="Doc No." width={140} />
+          <Column dataField="title" caption="Title" minWidth={200} />
+          <Column dataField="requesterName" caption="Requester" width={160} />
+          <Column dataField="vendorName" caption="Vendor" width={180} />
+          <Column
+            dataField="requestDate"
+            caption="Date"
+            dataType="date"
+            format="dd/MM/yyyy"
+            width={110}
+            alignment="center"
+            sortOrder="desc"
+            sortIndex={0}
+          />
+          <Column dataField="remark" caption="Remark" minWidth={120} />
+          <Column
+            dataField="validFrom"
+            caption="Valid From"
+            dataType="date"
+            format="dd/MM/yyyy"
+            width={110}
+            alignment="center"
+          />
+          <Column
+            dataField="validUntil"
+            caption="Valid Until"
+            dataType="date"
+            format="dd/MM/yyyy"
+            width={110}
+            alignment="center"
+          />
+          {isDraft && (
+            <Column
+              caption=""
+              width={70}
+              allowFiltering={false}
+              allowSorting={false}
+              allowHeaderFiltering={false}
+              cellRender={({ data }: { data: RequestRow }) => (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(data)}
+                  className="text-[12px] text-red-600 hover:text-red-800 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            />
+          )}
+        </DataGrid>
+      </section>
     </div>
   )
 }

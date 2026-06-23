@@ -9,6 +9,7 @@ import { WorkflowPage } from './pages/workflow/WorkflowPage.tsx'
 import { VendorsPage } from './pages/vendors/VendorsPage.tsx'
 import { UserAccessPage } from './pages/users/UsersPage.tsx'
 import { SustainabilityPage } from './pages/sustainability/SustainabilityPage.tsx'
+import { DepartmentsPage } from './pages/departments/DepartmentsPage.tsx'
 import { workspacePages } from './pages/pageData.ts'
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
         <Route path="workflow" element={<WorkflowPage />} />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="users" element={<UserAccessPage />} />
+        <Route path="departments" element={<DepartmentsPage />} />
         <Route path="sustainability" element={<SustainabilityPage />} />
         <Route path="requester" element={<Navigate to="/users" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
