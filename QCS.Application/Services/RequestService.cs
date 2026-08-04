@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using QCS.Application.Abstractions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using QCS.Application.Hubs;
 using QCS.Domain.DTOs;
+using QCS.Domain.DTOs.Portal;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
 using System.Linq.Expressions;
@@ -37,6 +38,7 @@ namespace QCS.Application.Services
         Task ApproveAsync(ApprovalActionDto input);
         Task RejectAsync(ApprovalActionDto input);
         Task<int> GetMyPendingTaskCountAsync();
+        Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(PortalRequestQuery query, CancellationToken cancellationToken = default);
     }
 
     public class RequestService : IRequestService
@@ -867,6 +869,128 @@ namespace QCS.Application.Services
             var currentUserId = _currentUserService.UserId;
             var taskResult = await GetMyPendingTaskResultAsync(currentUserId);
             return taskResult.TotalCount;
+        }
+
+        public async Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(
+            PortalRequestQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            if (query == null)
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+
+            if (string.IsNullOrWhiteSpace(query.View) ||
+                !Enum.TryParse<PortalRequestView>(query.View, ignoreCase: true, out var view))
+            {
+                throw new ArgumentException($"Invalid view '{query.View}'. Valid values are: {nameof(PortalRequestView.MyTasks)}, {nameof(PortalRequestView.MyRequests)}, {nameof(PortalRequestView.MyApproved)}, {nameof(PortalRequestView.Rejected)}, {nameof(PortalRequestView.AllApproved)}.");
+            }
+
+            var currentUserId = _currentUserService.UserId;
+
+            IQueryable<Request> requestsQuery;
+
+            switch (view)
+            {
+                case PortalRequestView.MyTasks:
+                    var taskResult = await GetMyPendingTaskResultAsync(currentUserId);
+                    if (taskResult.TaskIds.Count == 0)
+                    {
+                        requestsQuery = GetActiveRequestsQuery().AsNoTracking().Where(r => false);
+                    }
+                    else
+                    {
+                        requestsQuery = GetActiveRequestsQuery().AsNoTracking().Where(r => taskResult.TaskIds.Contains(r.Id));
+                    }
+                    break;
+
+                case PortalRequestView.MyRequests:
+                    requestsQuery = GetActiveRequestsQuery()
+                        .AsNoTracking()
+                        .Where(r => r.CreatedBy == currentUserId
+                                 && r.Status != (int)RequestStatus.Approved
+                                 && r.Status != (int)RequestStatus.Rejected);
+                    break;
+
+                case PortalRequestView.MyApproved:
+                    requestsQuery = _unitOfWork.Repository<Request>().GetAll()
+                        .AsNoTracking()
+                        .Where(r => r.CreatedBy == currentUserId && r.Status == (int)RequestStatus.Approved);
+                    break;
+
+                case PortalRequestView.Rejected:
+                    requestsQuery = _unitOfWork.Repository<Request>().GetAll()
+                        .AsNoTracking()
+                        .Where(r => r.CreatedBy == currentUserId && r.Status == (int)RequestStatus.Rejected);
+                    break;
+
+                case PortalRequestView.AllApproved:
+                    requestsQuery = _unitOfWork.Repository<Request>().GetAll()
+                        .AsNoTracking()
+                        .Where(r => r.Status == (int)RequestStatus.Approved);
+                    break;
+
+                default:
+                    throw new ArgumentException($"Unsupported view '{query.View}'.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Search))
+            {
+                var s = query.Search.Trim();
+                requestsQuery = requestsQuery.Where(r =>
+                    r.Code.Contains(s) ||
+                    r.Title.Contains(s) ||
+                    r.VendorCode.Contains(s) ||
+                    r.VendorName.Contains(s) ||
+                    (r.Remark != null && r.Remark.Contains(s)));
+            }
+
+            bool isDescending = query.SortDescending;
+            string sortBy = (query.SortBy ?? string.Empty).Trim().ToLowerInvariant();
+
+            requestsQuery = sortBy switch
+            {
+                "code" => isDescending ? requestsQuery.OrderByDescending(r => r.Code) : requestsQuery.OrderBy(r => r.Code),
+                "title" => isDescending ? requestsQuery.OrderByDescending(r => r.Title) : requestsQuery.OrderBy(r => r.Title),
+                "vendorcode" => isDescending ? requestsQuery.OrderByDescending(r => r.VendorCode) : requestsQuery.OrderBy(r => r.VendorCode),
+                "vendorname" => isDescending ? requestsQuery.OrderByDescending(r => r.VendorName) : requestsQuery.OrderBy(r => r.VendorName),
+                "status" => isDescending ? requestsQuery.OrderByDescending(r => r.Status) : requestsQuery.OrderBy(r => r.Status),
+                "requestdate" or "date" => isDescending ? requestsQuery.OrderByDescending(r => r.RequestDate) : requestsQuery.OrderBy(r => r.RequestDate),
+                _ => isDescending ? requestsQuery.OrderByDescending(r => r.Id) : requestsQuery.OrderByDescending(r => r.RequestDate).ThenByDescending(r => r.Id)
+            };
+
+            int page = query.Page;
+            int pageSize = query.PageSize;
+
+            int totalCount = await requestsQuery.CountAsync(cancellationToken);
+
+            var items = await requestsQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new PortalRequestListItemDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    CurrentStepId = r.CurrentStepId,
+                    Status = r.Status,
+                    StatusName = r.Status == (int)RequestStatus.Draft ? nameof(RequestStatus.Draft)
+                        : r.Status == (int)RequestStatus.Pending ? nameof(RequestStatus.Pending)
+                        : r.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
+                        : r.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
+                        : "Unknown",
+                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
+                    RequesterNId = r.CreatedBy ?? string.Empty,
+                    Remark = r.Remark ?? string.Empty,
+                    ValidFrom = r.ValidFrom,
+                    ValidUntil = r.ValidUntil
+                })
+                .ToListAsync(cancellationToken);
+
+            return new PortalPage<PortalRequestListItemDto>(items, totalCount, page, pageSize);
         }
     }
 }

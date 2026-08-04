@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Noto Sans Thai Variable', 'Noto Sans Thai', system-ui, sans-serif;
+  --color-surface-app: oklch(0.977 0.003 250);
+  --color-surface-panel: oklch(1 0 0);
+  --color-surface-muted: oklch(0.955 0.005 250);
+  --color-border-subtle: oklch(0.905 0.008 250);
+  --color-ink-strong: oklch(0.28 0.03 256);
+  --color-ink-muted: oklch(0.48 0.02 256);
+  --color-ink-soft: oklch(0.62 0.015 256);
+  --color-accent: oklch(0.48 0.15 255);
+  --color-accent-hover: oklch(0.4 0.15 255);
+  --color-accent-soft: oklch(0.96 0.02 255);
+  --color-danger: oklch(0.51 0.19 27);
+  --text-caption: 0.75rem;
+  --text-body: 0.875rem;
+  --text-heading: 1rem;
+  --text-title: 1.5rem;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root { min-height: 100%; margin: 0; }
+  body { font-family: var(--font-sans); }
+  button, input { font: inherit; }
+}

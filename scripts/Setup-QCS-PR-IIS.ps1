@@ -62,6 +62,13 @@ $Apps = @(
         PoolName     = 'QCS-Admin-Pool'
         WindowsAuth  = $false
         AnonAuth     = $true
+    },
+    @{
+        Name         = 'QCS/User'
+        PhysicalPath = "$PhysicalRoot\QCS\User"
+        PoolName     = 'QCS-User-Pool'
+        WindowsAuth  = $false
+        AnonAuth     = $true
     }
 )
 

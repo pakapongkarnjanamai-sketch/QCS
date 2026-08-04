@@ -405,3 +405,10 @@ secrets.json
 # Located at %APPDATA%\Microsoft\UserSecrets\ — listed here for clarity
 secrets/
 UserSecrets/
+
+# `*.user` above is a legacy Visual Studio rule; keep the new React user portal tracked.
+!QCS.React.User/
+!QCS.React.User/**
+QCS.React.User/node_modules/
+QCS.React.User/dist/
+QCS.React.User/.tmp/

@@ -150,6 +150,7 @@ if (-not $SkipSmokeTest) {
     Invoke-CheckedRequest -Url "$base/api/Request/Admin/Requesters?skip=0&take=5&sort=%5B%7B%22selector%22%3A%22quotationCount%22%2C%22desc%22%3Atrue%7D%5D" -Label 'Admin requesters'
     Invoke-CheckedRequest -Url "$base/api/Dashboard/RequestTrend?timeframe=7d&aggregation=day" -Label 'Trend window'
     Invoke-CheckedRequest -Url "$base/api/Session/Me" -Label 'Session me'
+    Invoke-CheckedRequest -Url "$base/api/Portal/Requests?view=MyRequests&page=1&pageSize=1" -Label 'Portal requests'
 }
 
 Write-Step 'API deploy completed successfully'

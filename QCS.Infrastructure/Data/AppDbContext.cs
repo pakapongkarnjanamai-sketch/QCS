@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using QCS.Application.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
@@ -92,7 +92,10 @@ namespace QCS.Infrastructure.Data
                 if (entry.State == EntityState.Added)
                 {
                     entry.Entity.CreatedAt = _dateTime.Now;
-                    entry.Entity.CreatedBy = _currentUserService.UserId;
+                    if (string.IsNullOrEmpty(entry.Entity.CreatedBy))
+                    {
+                        entry.Entity.CreatedBy = _currentUserService.UserId;
+                    }
                 }
                 else if (entry.State == EntityState.Modified)
                 {

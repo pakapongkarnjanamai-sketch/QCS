@@ -1,0 +1,8 @@
+{
+  "env": { "browser": true },
+  "plugins": ["react", "typescript", "unicorn"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "rules": {
+    "react/react-in-jsx-scope": "off"
+  }
+}

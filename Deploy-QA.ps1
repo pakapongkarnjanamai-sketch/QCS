@@ -39,13 +39,24 @@ Write-Header "3/4 Deploying PDF.Service to QA"
     -SkipHealthCheck:$SkipSmokeTest
 
 # 4. Deploy QCS.React.Admin (Static SPA Sub-Application)
-Write-Header "4/4 Deploying QCS.React.Admin (Vite/React SPA) to QA"
+Write-Header "4/5 Deploying QCS.React.Admin (Vite/React SPA) to QA"
 & "$Root\QCS.React.Admin\scripts\Deploy-QCS-React-Admin.ps1" `
     -TargetPath "\\10.10.143.39\wwwroot\QCS\Admin" `
     -PublicBasePath "/QCS/admin" `
     -ApiBaseUrl "/QCS/Service" `
     -HubUrl "/QCS/Service/hubs/qcs" `
     -PortalBaseUrl "/QCS" `
+    -PublicSiteOrigin "https://ap-ntc2138-qawb" `
+    -SkipSmokeTest:$SkipSmokeTest
+
+# 5. Deploy QCS.React.User (Static SPA Sub-Application)
+Write-Header "5/5 Deploying QCS.React.User (Vite/React SPA) to QA"
+& "$Root\QCS.React.User\scripts\Deploy-QCS-React-User.ps1" `
+    -TargetPath "\\10.10.143.39\wwwroot\QCS\User" `
+    -PublicBasePath "/QCS/User" `
+    -ApiBaseUrl "/QCS/Service" `
+    -HubUrl "/QCS/Service/notificationHub" `
+    -LegacyPortalBaseUrl "/QCS" `
     -PublicSiteOrigin "https://ap-ntc2138-qawb" `
     -SkipSmokeTest:$SkipSmokeTest
 
