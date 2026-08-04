@@ -14,7 +14,6 @@ namespace QCS.API.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Policy = "DomainUser")]
     public class IntegrationController : ControllerBase
     {
         private readonly IRequestService _requestService;
@@ -30,6 +29,7 @@ namespace QCS.API.Controllers
         /// </summary>
         /// <returns>List of Approved Requests</returns>
         [HttpGet("GetRequestAll")]
+        [Authorize(Policy = "DomainUser")]
         public async Task<ActionResult<List<RequestGridDto>>> GetRequestAll()
         {
             try
@@ -53,6 +53,7 @@ namespace QCS.API.Controllers
         /// <param name="vendorCode">รหัส Vendor ที่ต้องการค้นหา</param>
         /// <returns>List of Approved Requests filtered by VendorCode</returns>
         [HttpGet("GetRequestByVendorCode")]
+        [Authorize(Policy = "DomainUser")]
         public async Task<ActionResult<List<RequestGridDto>>> GetRequestByVendorCode(string vendorCode)
         {
             if (string.IsNullOrWhiteSpace(vendorCode))
@@ -78,7 +79,7 @@ namespace QCS.API.Controllers
         }
 
         [HttpGet("GetRequestsBySource")]
-    [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
+        [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
         public async Task<ActionResult<List<SourcedRequestDto>>> GetRequestsBySource(
             [FromQuery] string system,
             [FromQuery] string number)
