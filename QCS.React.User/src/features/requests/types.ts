@@ -23,8 +23,34 @@ export interface PortalRequestDetail {
   histories: PortalHistory[]
 }
 
-// Mirrors QCS.Domain.DTOs.Portal.PermissionDto.
-export interface PortalRequestPermissions { [key: string]: boolean }
+// Mirrors QCS.Domain.DTOs.Portal.SavePortalRequestDto.
+export interface SavePortalRequest {
+  title: string
+  vendorCode: string
+  vendorName: string
+  sourceSystem: string
+  sourceCode: string
+  validFrom: string
+  validUntil: string
+  remark: string
+}
+
+// Mirrors QCS.Domain.DTOs.Portal.PortalSaveResultDto.
+export interface PortalSaveResult { id: number; code: string }
+
+// Mirrors QCS.Domain.DTOs.Portal.PortalAttachmentDto.
+export interface PortalAttachment { id: number; fileName: string; documentTypeId: number; documentTypeName: string; viewUrl: string }
+
+// Mirrors QCS.Domain.DTOs.Portal.PortalApprovalActionDto.
+export interface PortalApprovalAction { comment: string }
+
+// Mirrors QCS.Domain.DTOs.PermissionDto.
+export interface PortalRequestPermissions {
+  canApprove: boolean
+  canReject: boolean
+  canEdit: boolean
+  canDelete: boolean
+}
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalDocumentDto.
 export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; viewUrl: string }

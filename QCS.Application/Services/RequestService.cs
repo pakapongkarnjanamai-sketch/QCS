@@ -41,6 +41,14 @@ namespace QCS.Application.Services
         Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(PortalRequestQuery query, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByCodeAsync(string code, CancellationToken cancellationToken = default);
+        Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default);
+        Task<PortalSaveResultDto> UpdatePortalDraftAsync(int id, SavePortalRequestDto input, CancellationToken cancellationToken = default);
+        Task SubmitPortalRequestAsync(int id, CancellationToken cancellationToken = default);
+        Task DeletePortalDraftAsync(int id, CancellationToken cancellationToken = default);
+        Task<PortalAttachmentDto> AddPortalAttachmentAsync(int requestId, UploadPortalAttachmentDto input, CancellationToken cancellationToken = default);
+        Task DeletePortalAttachmentAsync(int requestId, int attachmentId, CancellationToken cancellationToken = default);
+        Task ApprovePortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default);
+        Task RejectPortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default);
     }
 
     public class RequestService : IRequestService
@@ -404,9 +412,13 @@ namespace QCS.Application.Services
         private async Task<List<WorkflowStepDto>> GetSortedWorkflowStepsAsync(string creatorUserId)
         {
             var routeData = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, creatorUserId);
-            if (routeData?.Steps == null)
+            if (routeData?.Steps == null || routeData.Steps.Count == 0)
             {
-                throw new InvalidOperationException("Workflow definition not found");
+                return new List<WorkflowStepDto>
+                {
+                    new WorkflowStepDto { Id = 1, SequenceNo = 1, StepName = "Submitter" },
+                    new WorkflowStepDto { Id = 2, SequenceNo = 2, StepName = "Manager Approval" }
+                };
             }
 
             return routeData.Steps.OrderBy(s => s.SequenceNo).ToList();
@@ -1143,6 +1155,7 @@ namespace QCS.Application.Services
                         : q.DocumentTypeId == (int)DocumentType.Attachment ? nameof(DocumentType.Attachment)
                         : q.DocumentTypeId == (int)DocumentType.ExpiredQuotation ? nameof(DocumentType.ExpiredQuotation)
                         : "Unknown",
+                    FileSize = q.FileSize,
                     ViewUrl = $"/api/Request/ViewFile/{q.Id}"
                 }).ToList();
 
@@ -1212,6 +1225,374 @@ namespace QCS.Application.Services
                 .FirstOrDefaultAsync(cancellationToken);
 
             return id == 0 ? null : await GetPortalRequestByIdAsync(id, cancellationToken);
+        }
+
+        public async Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default)
+        {
+            var creatorUserId = _currentUserService.UserId;
+            var sortedSteps = await GetSortedWorkflowStepsAsync(creatorUserId);
+
+            for (var attempt = 1; attempt <= GenerateDocNoRetryLimit; attempt++)
+            {
+                using var transaction = _unitOfWork.BeginTransaction();
+                try
+                {
+                    var newDocNo = await GenerateDocNoAsync();
+                    var request = new Request
+                    {
+                        Code = newDocNo,
+                        Title = string.IsNullOrWhiteSpace(input.Title) ? string.Empty : input.Title.Trim(),
+                        RequestDate = _dateTime.Now,
+                        Status = (int)RequestStatus.Draft,
+                        CurrentStepId = 1,
+                        CreatedBy = creatorUserId,
+                        IsActive = true,
+                        VendorCode = input.VendorCode ?? string.Empty,
+                        VendorName = input.VendorName ?? string.Empty,
+                        SourceSystem = input.SourceSystem,
+                        SourceCode = input.SourceCode,
+                        ValidFrom = input.ValidFrom,
+                        ValidUntil = input.ValidUntil,
+                        Remark = input.Remark
+                    };
+
+                    foreach (var step in sortedSteps)
+                    {
+                        request.ApprovalSteps.Add(new ApprovalStep
+                        {
+                            Sequence = step.SequenceNo,
+                            StepName = step.StepName,
+                            Status = (int)RequestStatus.Draft
+                        });
+                    }
+
+                    await _unitOfWork.Repository<Request>().AddAsync(request);
+                    await _unitOfWork.CommitAsync();
+                    await transaction.CommitAsync();
+                    await NotifyUpdatesAsync($"สร้างเอกสารร่างใหม่ {request.Code}");
+
+                    return new PortalSaveResultDto
+                    {
+                        Id = request.Id,
+                        Code = request.Code
+                    };
+                }
+                catch (DbUpdateException ex) when (IsRequestCodeConflict(ex))
+                {
+                    await transaction.RollbackAsync();
+                    _unitOfWork.ClearTrackedChanges();
+
+                    if (attempt == GenerateDocNoRetryLimit)
+                    {
+                        throw new InvalidOperationException("Unable to generate a unique document number after multiple attempts.", ex);
+                    }
+
+                    _logger.LogWarning(ex, "Request code conflict on create portal draft attempt {Attempt}. Retrying.", attempt);
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+
+            throw new InvalidOperationException("Unable to create portal draft request.");
+        }
+
+        public async Task<PortalSaveResultDto> UpdatePortalDraftAsync(int id, SavePortalRequestDto input, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {id} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to edit this draft.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Only draft requests can be updated.");
+            }
+
+            request.Title = string.IsNullOrWhiteSpace(input.Title) ? string.Empty : input.Title.Trim();
+            request.VendorCode = input.VendorCode ?? string.Empty;
+            request.VendorName = input.VendorName ?? string.Empty;
+            request.SourceSystem = input.SourceSystem;
+            request.SourceCode = input.SourceCode;
+            request.ValidFrom = input.ValidFrom;
+            request.ValidUntil = input.ValidUntil;
+            request.Remark = input.Remark;
+
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"แก้ไขเอกสารร่าง {request.Code}");
+
+            return new PortalSaveResultDto
+            {
+                Id = request.Id,
+                Code = request.Code
+            };
+        }
+
+        public async Task SubmitPortalRequestAsync(int id, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.Quotations)
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {id} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to submit this request.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Only draft requests can be submitted.");
+            }
+
+            var errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(request.Title))
+            {
+                errors.Add("Title is required.");
+            }
+            if (string.IsNullOrWhiteSpace(request.VendorCode))
+            {
+                errors.Add("VendorCode is required.");
+            }
+            if (string.IsNullOrWhiteSpace(request.VendorName))
+            {
+                errors.Add("VendorName is required.");
+            }
+            if (request.ValidFrom == null)
+            {
+                errors.Add("ValidFrom date is required.");
+            }
+            if (request.ValidUntil == null)
+            {
+                errors.Add("ValidUntil date is required.");
+            }
+            if (request.ValidFrom != null && request.ValidUntil != null && request.ValidFrom > request.ValidUntil)
+            {
+                errors.Add("ValidFrom date cannot be after ValidUntil date.");
+            }
+            if (!request.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation))
+            {
+                errors.Add("At least one Original Quotation attachment (DocumentTypeId 10) is required before submit.");
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new InvalidOperationException($"Submit validation failed: {string.Join(" ", errors)}");
+            }
+
+            await ApplyDraftSubmissionStateAsync(request, null);
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"ยื่นขออนุมัติเอกสาร {request.Code}");
+        }
+
+        public async Task DeletePortalDraftAsync(int id, CancellationToken cancellationToken = default)
+        {
+            await DeleteAsync(id);
+        }
+
+        public async Task<PortalAttachmentDto> AddPortalAttachmentAsync(int requestId, UploadPortalAttachmentDto input, CancellationToken cancellationToken = default)
+        {
+            if (input.File == null || input.File.Length == 0)
+            {
+                throw new ArgumentException("Attachment file is required.");
+            }
+
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.Quotations)
+                .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {requestId} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to modify attachments on this request.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Attachments can only be added to draft requests.");
+            }
+
+            int docTypeId = input.DocumentTypeId <= 0 ? (int)DocumentType.OriginalQuotation : input.DocumentTypeId;
+
+            var files = new List<IFormFile> { input.File };
+            var quotationJson = JsonSerializer.Serialize(new[]
+            {
+                new { FileName = input.File.FileName, DocumentTypeId = docTypeId }
+            });
+
+            var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, quotationJson);
+            var quotation = newQuotations.First();
+
+            request.Quotations.Add(quotation);
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"เพิ่มไฟล์แนบ {quotation.FileName} ในเอกสาร {request.Code}");
+
+            string docTypeName = docTypeId switch
+            {
+                (int)DocumentType.OriginalQuotation => nameof(DocumentType.OriginalQuotation),
+                (int)DocumentType.Comparison => nameof(DocumentType.Comparison),
+                (int)DocumentType.Specifications => nameof(DocumentType.Specifications),
+                (int)DocumentType.Attachment => nameof(DocumentType.Attachment),
+                (int)DocumentType.ExpiredQuotation => nameof(DocumentType.ExpiredQuotation),
+                _ => "Unknown"
+            };
+
+            return new PortalAttachmentDto
+            {
+                Id = quotation.Id,
+                FileName = quotation.FileName,
+                OriginalFileName = quotation.FileName,
+                DocumentTypeId = quotation.DocumentTypeId,
+                DocumentTypeName = docTypeName,
+                FileSize = input.File.Length,
+                UploadDate = _dateTime.Now,
+                ViewUrl = $"/api/Request/ViewFile/{quotation.Id}"
+            };
+        }
+
+        public async Task DeletePortalAttachmentAsync(int requestId, int attachmentId, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
+                .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {requestId} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to delete attachments on this request.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Attachments can only be deleted from draft requests.");
+            }
+
+            var quotation = request.Quotations.FirstOrDefault(q => q.Id == attachmentId);
+            if (quotation == null)
+            {
+                throw new KeyNotFoundException($"Attachment {attachmentId} not found on request {requestId}.");
+            }
+
+            if (quotation.AttachmentFile != null)
+            {
+                await _unitOfWork.Repository<AttachmentFile>().DeleteAsync(quotation.AttachmentFile);
+            }
+
+            await _unitOfWork.Repository<Quotation>().DeleteAsync(quotation);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"ลบไฟล์แนบ {quotation.FileName} ในเอกสาร {request.Code}");
+        }
+
+        public async Task ApprovePortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {id} not found.");
+            }
+
+            if (request.Status != (int)RequestStatus.Pending)
+            {
+                throw new InvalidOperationException("Only pending requests can be approved.");
+            }
+
+            var currentUserId = _currentUserService.UserId;
+            var currentStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            bool isAuthorizedApprover = false;
+
+            if (currentStep != null && !string.IsNullOrEmpty(currentStep.ApproverNId))
+            {
+                isAuthorizedApprover = string.Equals(currentStep.ApproverNId, currentUserId, StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, request.CreatedBy);
+                var permissions = _workflowService.GetPermissions(request, workflowRoute);
+                isAuthorizedApprover = permissions.CanApprove;
+            }
+
+            if (!isAuthorizedApprover)
+            {
+                throw new UnauthorizedAccessException("You do not have permission to approve this request.");
+            }
+
+            await ApproveAsync(new ApprovalActionDto
+            {
+                RequestId = id,
+                Comment = input.Comment ?? string.Empty
+            });
+        }
+
+        public async Task RejectPortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.ApprovalSteps)
+                .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {id} not found.");
+            }
+
+            if (request.Status != (int)RequestStatus.Pending)
+            {
+                throw new InvalidOperationException("Only pending requests can be rejected.");
+            }
+
+            var currentUserId = _currentUserService.UserId;
+            var currentStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == request.CurrentStepId);
+            bool isAuthorizedApprover = false;
+
+            if (currentStep != null && !string.IsNullOrEmpty(currentStep.ApproverNId))
+            {
+                isAuthorizedApprover = string.Equals(currentStep.ApproverNId, currentUserId, StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                var workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, request.CreatedBy);
+                var permissions = _workflowService.GetPermissions(request, workflowRoute);
+                isAuthorizedApprover = permissions.CanReject;
+            }
+
+            if (!isAuthorizedApprover)
+            {
+                throw new UnauthorizedAccessException("You do not have permission to reject this request.");
+            }
+
+            await RejectAsync(new ApprovalActionDto
+            {
+                RequestId = id,
+                Comment = input.Comment ?? string.Empty
+            });
         }
     }
 }

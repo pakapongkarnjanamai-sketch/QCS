@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { PortalRequestDetail } from './types'
+import type { PortalApprovalAction, PortalAttachment, PortalRequestDetail, PortalSaveResult, SavePortalRequest } from './types'
 
 function resolveDocumentUrls(request: PortalRequestDetail): PortalRequestDetail {
   return {
@@ -21,3 +21,40 @@ export async function getPortalRequestByCode(code: string, signal?: AbortSignal)
   const { data } = await apiClient.get<PortalRequestDetail>(`/Portal/Requests/by-code/${encodeURIComponent(code)}`, { signal })
   return resolveDocumentUrls(data)
 }
+
+export async function createPortalDraft(input: SavePortalRequest): Promise<PortalSaveResult> {
+  const { data } = await apiClient.post<PortalSaveResult>('/Portal/Requests', input)
+  return data
+}
+
+export async function updatePortalDraft(id: number, input: SavePortalRequest): Promise<PortalSaveResult> {
+  const { data } = await apiClient.put<PortalSaveResult>(`/Portal/Requests/${id}`, input)
+  return data
+}
+
+export async function submitPortalRequest(id: number): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/submit`) }
+
+export async function deletePortalDraft(id: number): Promise<void> { await apiClient.delete(`/Portal/Requests/${id}`) }
+
+export async function uploadPortalAttachment(id: number, file: File, documentTypeId: number): Promise<PortalAttachment> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('documentTypeId', String(documentTypeId))
+  const { data } = await apiClient.post<PortalAttachment>(`/Portal/Requests/${id}/attachments`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function deletePortalAttachment(id: number, attachmentId: number): Promise<void> {
+  await apiClient.delete(`/Portal/Requests/${id}/attachments/${attachmentId}`)
+}
+
+export async function previewPortalRequest(id: number): Promise<Blob> {
+  const { data } = await apiClient.post(`/Portal/Requests/${id}/preview`, undefined, { responseType: 'blob' })
+  return data
+}
+
+export async function approvePortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/approve`, input) }
+
+export async function rejectPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/reject`, input) }
