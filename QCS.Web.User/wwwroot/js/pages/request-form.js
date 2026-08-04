@@ -60,6 +60,9 @@
                         return response.json();
                     })
                     .then(function (data) { return data.items || []; });
+            },
+            byKey: function (code) {
+                return Promise.resolve({ code: code, title: code });
             }
         });
 
