@@ -35,6 +35,23 @@ namespace QCS.API.Controllers
             try
             {
                 using var response = await sendAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "QRS sourcing lookup returned upstream status code {StatusCode}.",
+                        (int)response.StatusCode);
+
+                    var statusCode = response.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable
+                        or System.Net.HttpStatusCode.GatewayTimeout
+                        ? StatusCodes.Status503ServiceUnavailable
+                        : StatusCodes.Status502BadGateway;
+
+                    return Problem(
+                        statusCode: statusCode,
+                        title: "QRS sourcing lookup is unavailable.");
+                }
+
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 return new ContentResult
                 {

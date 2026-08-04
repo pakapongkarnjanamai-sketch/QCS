@@ -40,7 +40,7 @@ $Apps = @(
         PhysicalPath = "$PhysicalRoot\QCS\Service"
         PoolName     = 'QCS-Api-Pool'
         WindowsAuth  = $true
-        AnonAuth     = $false
+        AnonAuth     = $true
     },
     @{
         Name         = 'QCS/PDF'

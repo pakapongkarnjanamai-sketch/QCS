@@ -14,7 +14,7 @@ namespace QCS.API.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
+    [Authorize(Policy = "DomainUser")]
     public class IntegrationController : ControllerBase
     {
         private readonly IRequestService _requestService;
@@ -78,6 +78,7 @@ namespace QCS.API.Controllers
         }
 
         [HttpGet("GetRequestsBySource")]
+    [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
         public async Task<ActionResult<List<SourcedRequestDto>>> GetRequestsBySource(
             [FromQuery] string system,
             [FromQuery] string number)
