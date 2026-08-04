@@ -19,6 +19,8 @@ namespace QCS.Domain.DTOs
 
         public string VendorCode { get; set; }
         public string VendorName { get; set; }
+        public string? SourceSystem { get; set; }
+        public string? SourceCode { get; set; }
 
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }

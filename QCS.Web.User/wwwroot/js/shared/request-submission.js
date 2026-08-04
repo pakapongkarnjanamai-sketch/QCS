@@ -59,6 +59,8 @@
         formData.append("Title", formValues.title || "");
         formData.append("VendorCode", formValues.vendorCode || "");
         formData.append("VendorName", settings.vendorName || formValues.vendorName || "");
+        formData.append("SourceSystem", formValues.sourceSystem || "");
+        formData.append("SourceCode", formValues.sourceCode || "");
         appendIsoDate(formData, "ValidFrom", formValues.validFrom);
         appendIsoDate(formData, "ValidUntil", formValues.validUntil);
         formData.append("Remark", formValues.remark || "");

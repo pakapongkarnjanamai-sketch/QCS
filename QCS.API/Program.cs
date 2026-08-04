@@ -3,6 +3,9 @@ using QCS.API.Middleware;
 using QCS.Application;
 using QCS.Application.Hubs;
 using QCS.Infrastructure;
+using Microsoft.Extensions.Options;
+using QCS.API.Authentication;
+using QCS.API.Integration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +18,20 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
+
+var integrationKeys = app.Services.GetRequiredService<IOptions<ApiKeyOptions>>().Value;
+if (integrationKeys.ApiKeys.Count == 0)
+{
+    app.Logger.LogWarning(
+        "No integration API keys are configured (Integration:ApiKeys is empty). Every request to /api/Integration will be rejected with 401.");
+}
+
+var qrsIntegration = app.Services.GetRequiredService<IOptions<QrsIntegrationOptions>>().Value;
+if (string.IsNullOrWhiteSpace(qrsIntegration.BaseUrl) || string.IsNullOrWhiteSpace(qrsIntegration.ApiKey))
+{
+    app.Logger.LogWarning(
+        "QRS integration is not configured (ExternalServices:Qrs:BaseUrl or ApiKey is empty). QRS sourcing lookup will be unavailable.");
+}
 
 if (app.Environment.IsDevelopment())
 {

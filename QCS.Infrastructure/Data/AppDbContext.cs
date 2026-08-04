@@ -45,9 +45,18 @@ namespace QCS.Infrastructure.Data
                 entity.Property(r => r.Code)
                     .HasMaxLength(50);
 
+                entity.Property(r => r.SourceSystem)
+                    .HasMaxLength(20);
+
+                entity.Property(r => r.SourceCode)
+                    .HasMaxLength(50);
+
                 entity.HasIndex(r => r.Code)
                     .IsUnique()
                     .HasDatabaseName("IX_Requests_Code");
+
+                entity.HasIndex(r => new { r.SourceSystem, r.SourceCode })
+                    .HasDatabaseName("IX_Requests_Source");
             });
 
             modelBuilder.Entity<AdminUserAccess>(entity =>

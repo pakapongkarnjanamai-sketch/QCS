@@ -19,6 +19,7 @@ namespace QCS.Application.Services
         IQueryable<RequestGridDto> GetMyApprovedListQuery();
         IQueryable<RequestGridDto> GetApprovedListQuery();
         IQueryable<RequestGridDto> GetRejectedRequestsQuery();
+        IQueryable<SourcedRequestDto> GetBySourceQuery(string system, string number);
 
         // Admin views — no current-user filter
         IQueryable<RequestGridDto> GetAllRequestsQuery();
@@ -163,6 +164,8 @@ namespace QCS.Application.Services
                 pr.Title = input.Title;
                 pr.VendorCode = input.VendorCode;
                 pr.VendorName = input.VendorName;
+                pr.SourceSystem = input.SourceSystem;
+                pr.SourceCode = input.SourceCode;
                 pr.ValidFrom = input.ValidFrom;
                 pr.ValidUntil = input.ValidUntil;
                 pr.Remark = input.Remark;
@@ -369,6 +372,8 @@ namespace QCS.Application.Services
                 CurrentStepId = currentStepId,
                 VendorCode = input.VendorCode,
                 VendorName = input.VendorName,
+                SourceSystem = input.SourceSystem,
+                SourceCode = input.SourceCode,
                 ValidFrom = input.ValidFrom,
                 ValidUntil = input.ValidUntil,
                 Remark = input.Remark
@@ -609,6 +614,56 @@ namespace QCS.Application.Services
                 .Select(RequestGridWithRequesterProjection);
         }
 
+        public IQueryable<SourcedRequestDto> GetBySourceQuery(string system, string number)
+        {
+            return _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.SourceSystem == system && r.SourceCode == number)
+                .Select(r => new SourcedRequestDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    RequestDate = r.RequestDate,
+                    Status = r.Status,
+                    StatusName = r.Status == (int)RequestStatus.Draft ? nameof(RequestStatus.Draft)
+                        : r.Status == (int)RequestStatus.Pending ? nameof(RequestStatus.Pending)
+                        : r.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
+                        : r.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
+                        : "Unknown",
+                    CurrentStepId = r.CurrentStepId,
+                    CurrentStepName = r.ApprovalSteps
+                        .Where(s => s.Sequence == r.CurrentStepId)
+                        .Select(s => s.StepName)
+                        .FirstOrDefault(),
+                    RequesterNId = r.CreatedBy ?? string.Empty,
+                    RequesterName = r.ApprovalSteps
+                        .Where(s => s.Sequence == 1)
+                        .Select(s => s.ApproverName)
+                        .FirstOrDefault() ?? "Unknown",
+                    ValidFrom = r.ValidFrom,
+                    ValidUntil = r.ValidUntil,
+                    Remark = r.Remark,
+                    Documents = r.Quotations
+                        .OrderBy(q => q.DocumentTypeId)
+                        .Select(q => new SourcedDocumentDto
+                        {
+                            Id = q.Id,
+                            FileName = q.FileName,
+                            DocumentTypeId = q.DocumentTypeId,
+                            DocumentTypeName = q.DocumentTypeId == (int)DocumentType.OriginalQuotation ? nameof(DocumentType.OriginalQuotation)
+                                : q.DocumentTypeId == (int)DocumentType.Comparison ? nameof(DocumentType.Comparison)
+                                : q.DocumentTypeId == (int)DocumentType.Specifications ? nameof(DocumentType.Specifications)
+                                : q.DocumentTypeId == (int)DocumentType.Attachment ? nameof(DocumentType.Attachment)
+                                : q.DocumentTypeId == (int)DocumentType.ExpiredQuotation ? nameof(DocumentType.ExpiredQuotation)
+                                : "Unknown"
+                        })
+                        .ToList()
+                });
+        }
+
         public async Task<IQueryable<RequestGridDto>> GetMyTasksQueryAsync()
         {
             var currentUserId = _currentUserService.UserId;
@@ -759,6 +814,8 @@ namespace QCS.Application.Services
                 CurrentStepId = request.CurrentStepId,
                 VendorCode = request.VendorCode,
                 VendorName = request.VendorName,
+                SourceSystem = request.SourceSystem,
+                SourceCode = request.SourceCode,
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
                 Remark = request.Remark,

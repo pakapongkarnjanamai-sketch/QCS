@@ -23,7 +23,8 @@
             API_APPROVE: "/Approval/Approve",
             API_REJECT: "/Approval/Reject",
             API_DELETE: `/Request/${prId}`,
-            VENDOR_API_URL: "/Vendor"
+            VENDOR_API_URL: "/Vendor",
+            QRS_SOURCING_API_URL: "/QrsSourcing/Requests"
         };
 
         let prData = {};
@@ -41,6 +42,24 @@
             loadUrl: pageConfig.API_BASE_URL + pageConfig.VENDOR_API_URL,
             onBeforeSend: function (method, ajaxOptions) {
                 ajaxOptions.xhrFields = { withCredentials: true };
+            }
+        });
+
+        const qrsSourcingStore = new DevExpress.data.CustomStore({
+            key: "code",
+            load: function (loadOptions) {
+                const search = loadOptions.searchValue || "";
+                const url = pageConfig.API_BASE_URL + pageConfig.QRS_SOURCING_API_URL +
+                    (search ? `?search=${encodeURIComponent(search)}` : "");
+
+                return fetch(url, { credentials: "include" })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("QRS lookup unavailable");
+                        }
+                        return response.json();
+                    })
+                    .then(function (data) { return data.items || []; });
             }
         });
 
@@ -107,6 +126,45 @@
                         items: [
                             { dataField: "title", label: { text: "หัวข้อ (Title)" }, colSpan: 1, validationRules: [{ type: "required" }] },
                             {
+                                dataField: "sourceCode",
+                                label: { text: "อ้างอิงใบขอจาก QRS (Optional)" },
+                                colSpan: 1,
+                                editorType: "dxSelectBox",
+                                editorOptions: {
+                                    dataSource: qrsSourcingStore,
+                                    valueExpr: "code",
+                                    displayExpr: function (item) { return item ? `${item.code} : ${item.title}` : ""; },
+                                    searchEnabled: true,
+                                    searchExpr: ["code", "title"],
+                                    minSearchLength: 2,
+                                    showClearButton: true,
+                                    acceptCustomValue: true,
+                                    placeholder: "ค้นหาหรือพิมพ์ QRS code... (Optional)",
+                                    onCustomItemCreating: function (event) {
+                                        event.customItem = { code: event.text, title: event.text };
+                                    },
+                                    onValueChanged: function (event) {
+                                        const formData = formInstance.option("formData");
+                                        if (!event.value) {
+                                            formData.sourceSystem = null;
+                                            formData.qrsRequesterName = null;
+                                            formData.qrsPurpose = null;
+                                            formInstance.option("formData", formData);
+                                            return;
+                                        }
+
+                                        formData.sourceSystem = "QRS";
+                                        formInstance.option("formData", formData);
+
+                                        if (!event.component.option("selectedItem")) {
+                                            return;
+                                        }
+
+                                        loadQrsRequestDetails(event.value);
+                                    }
+                                }
+                            },
+                            {
                                 dataField: "vendorCode",
                                 label: { text: "ผู้ขาย (Vendor)" },
                                 colSpan: 1,
@@ -124,6 +182,8 @@
                             },
                             { dataField: "validFrom", label: { text: "มีผลตั้งแต่ (Valid From)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
                             { dataField: "validUntil", label: { text: "หมดอายุ (Valid Until)" }, editorType: "dxDateBox", editorOptions: { displayFormat: "yyyy-MM-dd" }, validationRules: [{ type: "required" }] },
+                            { dataField: "qrsRequesterName", label: { text: "ผู้ขอจาก QRS (Requester)" }, editorOptions: { readOnly: true }, colSpan: 1 },
+                            { dataField: "qrsPurpose", label: { text: "วัตถุประสงค์จาก QRS (Purpose)" }, editorType: "dxTextArea", editorOptions: { height: 80, readOnly: true }, colSpan: 1 },
                             { dataField: "remark", label: { text: "หมายเหตุ (Remark)" }, editorType: "dxTextArea", editorOptions: { height: 80 }, colSpan: 2 }
                         ]
                     }
@@ -137,6 +197,29 @@
             $("#quotationForm").after($attachmentsBody).after($attachmentsHeader);
 
             renderAttachmentsSection([], $attachmentsBody, true);
+        }
+
+        async function loadQrsRequestDetails(code) {
+            try {
+                const response = await fetch(
+                    `${pageConfig.API_BASE_URL}${pageConfig.QRS_SOURCING_API_URL}/${encodeURIComponent(code)}`,
+                    { credentials: "include" });
+
+                if (!response.ok) {
+                    throw new Error("QRS lookup unavailable");
+                }
+
+                const request = await response.json();
+                const formData = formInstance.option("formData");
+                formData.title = request.title || formData.title;
+                formData.qrsRequesterName = request.requesterName || "";
+                formData.qrsPurpose = request.purpose || "";
+                formInstance.option("formData", formData);
+            } catch (error) {
+                QcsErrorPresenter.logAndNotify("QRS lookup error", error, {
+                    message: "ไม่สามารถโหลดข้อมูล QRS ได้ ยังพิมพ์รหัสและบันทึกต่อได้ (QRS lookup unavailable)"
+                });
+            }
         }
 
         async function loadCreateModeData() {

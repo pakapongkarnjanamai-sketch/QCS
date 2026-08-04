@@ -2,6 +2,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
+using QCS.API.Authentication;
+using QCS.API.Integration;
 using QCS.API.Security;
 using QCS.API.Services;
 
@@ -39,17 +42,32 @@ namespace QCS.API.Extensions
 
             services.AddProblemDetails();
 
-            services.AddApiAuthentication();
+            services.Configure<QrsIntegrationOptions>(configuration.GetSection(QrsIntegrationOptions.SectionName));
+            services.AddHttpClient<IQrsSourcingClient, QrsSourcingClient>((serviceProvider, client) =>
+            {
+                var options = serviceProvider.GetRequiredService<IOptionsMonitor<QrsIntegrationOptions>>().CurrentValue;
+                client.BaseAddress = Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseAddress)
+                    ? new Uri(baseAddress.ToString().TrimEnd('/') + "/")
+                    : null;
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            });
+
+            services.AddApiAuthentication(configuration);
             services.AddApiAuthorization(configuration);
             services.AddApiCors(configuration);
 
             return services;
         }
 
-        private static IServiceCollection AddApiAuthentication(this IServiceCollection services)
+        private static IServiceCollection AddApiAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
+            services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
+
             services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-                .AddNegotiate();
+                .AddNegotiate()
+                .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+                    ApiKeyAuthenticationHandler.SchemeName,
+                    configureOptions: null);
 
             services.Configure<IISOptions>(options =>
             {
@@ -90,6 +108,10 @@ namespace QCS.API.Extensions
                 options.AddPolicy("DomainUser", policy =>
                     policy.RequireAssertion(context =>
                         context.User.Identity?.Name?.StartsWith(domainPrefix, StringComparison.OrdinalIgnoreCase) == true));
+
+                options.AddPolicy("IntegrationClient", policy =>
+                    policy.AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                        .RequireAuthenticatedUser());
             });
 
             return services;

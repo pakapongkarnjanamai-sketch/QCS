@@ -15,6 +15,9 @@ namespace QCS.Domain.Models
         public string VendorCode { get; set; }
         public string VendorName { get; set; }
 
+        public string? SourceSystem { get; set; }
+        public string? SourceCode { get; set; }
+
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }

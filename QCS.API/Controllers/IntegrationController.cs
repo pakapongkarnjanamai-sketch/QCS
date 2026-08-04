@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using QCS.Application.Abstractions;
+using QCS.API.Authentication;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
@@ -12,6 +14,7 @@ namespace QCS.API.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
     public class IntegrationController : ControllerBase
     {
         private readonly IRequestService _requestService;
@@ -72,6 +75,23 @@ namespace QCS.API.Controllers
             {
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+
+        [HttpGet("GetRequestsBySource")]
+        public async Task<ActionResult<List<SourcedRequestDto>>> GetRequestsBySource(
+            [FromQuery] string system,
+            [FromQuery] string number)
+        {
+            if (string.IsNullOrWhiteSpace(system) || string.IsNullOrWhiteSpace(number))
+            {
+                return BadRequest("System and number are required.");
+            }
+
+            var result = await _requestService
+                .GetBySourceQuery(system.Trim(), number.Trim())
+                .ToListAsync();
+
+            return Ok(result);
         }
     }
 }
