@@ -1,0 +1,11 @@
+namespace QCS.Domain.DTOs.Portal
+{
+    public class PortalDocumentDto
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public int DocumentTypeId { get; set; }
+        public string DocumentTypeName { get; set; } = string.Empty;
+        public string ViewUrl { get; set; } = string.Empty;
+    }
+}

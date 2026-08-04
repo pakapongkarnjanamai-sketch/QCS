@@ -19,4 +19,5 @@ export const appConfig = {
   apiBaseUrl,
   hubUrl: import.meta.env.VITE_QCS_HUB_URL?.trim() || `${apiBaseUrl}/notificationHub`,
   legacyPortalBaseUrl: normalizePath(import.meta.env.VITE_QCS_LEGACY_PORTAL_BASE_URL, '/QCS'),
+  qrsRequestBaseUrl: (import.meta.env.VITE_QRS_REQUEST_BASE_URL?.trim() || '/QRS/QuotationRequests').replace(/\/+$/, ''),
 } as const

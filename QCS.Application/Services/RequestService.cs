@@ -39,6 +39,8 @@ namespace QCS.Application.Services
         Task RejectAsync(ApprovalActionDto input);
         Task<int> GetMyPendingTaskCountAsync();
         Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(PortalRequestQuery query, CancellationToken cancellationToken = default);
+        Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default);
+        Task<PortalRequestDetailDto?> GetPortalRequestByCodeAsync(string code, CancellationToken cancellationToken = default);
     }
 
     public class RequestService : IRequestService
@@ -991,6 +993,225 @@ namespace QCS.Application.Services
                 .ToListAsync(cancellationToken);
 
             return new PortalPage<PortalRequestListItemDto>(items, totalCount, page, pageSize);
+        }
+
+        public async Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.Quotations)
+                .Include(r => r.ApprovalSteps)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+            if (request == null) return null;
+
+            var currentUserId = _currentUserService.UserId;
+
+            bool isCreator = string.Equals(request.CreatedBy, currentUserId, StringComparison.OrdinalIgnoreCase);
+            bool isApproved = request.Status == (int)RequestStatus.Approved;
+            bool isAssigned = false;
+
+            if (!isCreator && !isApproved)
+            {
+                var taskResult = await GetMyPendingTaskResultAsync(currentUserId);
+                if (taskResult.TaskIds.Contains(request.Id))
+                {
+                    isAssigned = true;
+                }
+                else if (request.ApprovalSteps.Any(s => string.Equals(s.ApproverNId, currentUserId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    isAssigned = true;
+                }
+            }
+
+            if (!isCreator && !isApproved && !isAssigned)
+            {
+                throw new UnauthorizedAccessException("You do not have permission to view this request.");
+            }
+
+            bool isFinalState = isApproved || request.Status == (int)RequestStatus.Rejected;
+
+            WorkflowRouteDetailDto? workflowRoute = null;
+            PermissionDto permissions = new PermissionDto();
+
+            if (isFinalState)
+            {
+                workflowRoute = new WorkflowRouteDetailDto
+                {
+                    Id = 0,
+                    RouteName = "History",
+                    CanInitiate = false,
+                    Steps = request.ApprovalSteps.Select(step => new WorkflowStepDto
+                    {
+                        Id = step.Id,
+                        SequenceNo = step.Sequence,
+                        StepName = step.StepName,
+                        Status = step.Status,
+                        ActionDate = step.ActionDate,
+                        ApproverName = step.ApproverName,
+                        ApproverNId = step.ApproverNId,
+                        Comment = step.Comment,
+                        Assignments = !string.IsNullOrEmpty(step.ApproverNId)
+                            ? new List<AssignmentDto> { new AssignmentDto { NId = step.ApproverNId, EmployeeName = step.ApproverName ?? "", IsCurrentUser = string.Equals(step.ApproverNId, currentUserId, StringComparison.OrdinalIgnoreCase) } }
+                            : new List<AssignmentDto>()
+                    }).OrderBy(s => s.SequenceNo).ToList()
+                };
+            }
+            else
+            {
+                workflowRoute = await _workflowService.GetWorkflowRouteDetailAsync(MainWorkflowId, request.CreatedBy);
+
+                if (workflowRoute?.Steps != null)
+                {
+                    foreach (var routeStep in workflowRoute.Steps)
+                    {
+                        var actualStep = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == routeStep.SequenceNo);
+                        if (actualStep != null)
+                        {
+                            routeStep.Status = actualStep.Status;
+                            routeStep.ActionDate = actualStep.ActionDate;
+                            routeStep.Comment = actualStep.Comment;
+                            routeStep.ApproverName = actualStep.ApproverName;
+                            routeStep.ApproverNId = actualStep.ApproverNId;
+                        }
+                    }
+                }
+                permissions = _workflowService.GetPermissions(request, workflowRoute);
+            }
+
+            workflowRoute ??= new WorkflowRouteDetailDto
+            {
+                Id = 0,
+                RouteName = string.Empty,
+                CanInitiate = false,
+                Steps = new List<WorkflowStepDto>()
+            };
+
+            var step1 = request.ApprovalSteps.FirstOrDefault(s => s.Sequence == 1);
+            string requesterName = !string.IsNullOrWhiteSpace(step1?.ApproverName)
+                ? step1.ApproverName
+                : (request.CreatedBy ?? string.Empty);
+            string requesterNId = request.CreatedBy ?? string.Empty;
+
+            string statusName = request.Status == (int)RequestStatus.Draft ? nameof(RequestStatus.Draft)
+                : request.Status == (int)RequestStatus.Pending ? nameof(RequestStatus.Pending)
+                : request.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
+                : request.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
+                : "Unknown";
+
+            string? currentStepName = request.ApprovalSteps
+                .FirstOrDefault(s => s.Sequence == request.CurrentStepId)?.StepName;
+
+            var portalWorkflowSteps = (workflowRoute.Steps ?? new List<WorkflowStepDto>())
+                .OrderBy(s => s.SequenceNo)
+                .Select(s => new PortalWorkflowStepDto
+                {
+                    Id = s.Id,
+                    SequenceNo = s.SequenceNo,
+                    StepName = s.StepName,
+                    Status = s.Status,
+                    StatusName = s.Status.HasValue
+                        ? (s.Status == (int)RequestStatus.Draft ? nameof(RequestStatus.Draft)
+                            : s.Status == (int)RequestStatus.Pending ? nameof(RequestStatus.Pending)
+                            : s.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
+                            : s.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
+                            : "Unknown")
+                        : null,
+                    ActionDate = s.ActionDate,
+                    ApproverNId = s.ApproverNId,
+                    ApproverName = s.ApproverName,
+                    Comment = s.Comment,
+                    Assignments = (s.Assignments ?? new List<AssignmentDto>()).Select(a => new PortalAssignmentDto
+                    {
+                        NId = a.NId,
+                        EmployeeName = a.EmployeeName,
+                        AssignmentType = a.AssignmentType,
+                        IsCurrentUser = string.Equals(a.NId, currentUserId, StringComparison.OrdinalIgnoreCase)
+                    }).ToList()
+                }).ToList();
+
+            var documents = request.Quotations
+                .OrderBy(q => q.DocumentTypeId)
+                .Select(q => new PortalDocumentDto
+                {
+                    Id = q.Id,
+                    FileName = q.FileName,
+                    DocumentTypeId = q.DocumentTypeId,
+                    DocumentTypeName = q.DocumentTypeId == (int)DocumentType.OriginalQuotation ? nameof(DocumentType.OriginalQuotation)
+                        : q.DocumentTypeId == (int)DocumentType.Comparison ? nameof(DocumentType.Comparison)
+                        : q.DocumentTypeId == (int)DocumentType.Specifications ? nameof(DocumentType.Specifications)
+                        : q.DocumentTypeId == (int)DocumentType.Attachment ? nameof(DocumentType.Attachment)
+                        : q.DocumentTypeId == (int)DocumentType.ExpiredQuotation ? nameof(DocumentType.ExpiredQuotation)
+                        : "Unknown",
+                    ViewUrl = $"/api/Request/ViewFile/{q.Id}"
+                }).ToList();
+
+            if (request.Status == (int)RequestStatus.Approved)
+            {
+                documents.Add(new PortalDocumentDto
+                {
+                    Id = request.Id,
+                    FileName = $"{request.Code}.pdf",
+                    DocumentTypeId = 99,
+                    DocumentTypeName = "FinalPdf",
+                    ViewUrl = $"/api/Quotation/ViewFile/{request.Id}"
+                });
+            }
+
+            var histories = request.ApprovalSteps
+                .Where(s => s.ActionDate != null || s.Status == (int)RequestStatus.Approved || s.Status == (int)RequestStatus.Rejected)
+                .OrderBy(s => s.Sequence)
+                .Select(s => new PortalHistoryDto
+                {
+                    SequenceNo = s.Sequence,
+                    StepName = s.StepName,
+                    Status = s.Status,
+                    StatusName = s.Status == (int)RequestStatus.Draft ? nameof(RequestStatus.Draft)
+                        : s.Status == (int)RequestStatus.Pending ? nameof(RequestStatus.Pending)
+                        : s.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
+                        : s.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
+                        : "Unknown",
+                    ApproverNId = s.ApproverNId,
+                    ApproverName = s.ApproverName,
+                    ActionDate = s.ActionDate,
+                    Comment = s.Comment
+                }).ToList();
+
+            return new PortalRequestDetailDto
+            {
+                Id = request.Id,
+                Code = request.Code,
+                Title = request.Title,
+                RequestDate = request.RequestDate,
+                Status = request.Status,
+                StatusName = statusName,
+                RequesterNId = requesterNId,
+                RequesterName = requesterName,
+                VendorCode = request.VendorCode,
+                VendorName = request.VendorName,
+                SourceSystem = request.SourceSystem,
+                SourceCode = request.SourceCode,
+                ValidFrom = request.ValidFrom,
+                ValidUntil = request.ValidUntil,
+                Remark = request.Remark,
+                CurrentStepId = request.CurrentStepId,
+                CurrentStepName = currentStepName,
+                Permissions = permissions,
+                WorkflowSteps = portalWorkflowSteps,
+                Documents = documents,
+                Histories = histories
+            };
+        }
+
+        public async Task<PortalRequestDetailDto?> GetPortalRequestByCodeAsync(string code, CancellationToken cancellationToken = default)
+        {
+            var id = await _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Code == code)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return id == 0 ? null : await GetPortalRequestByIdAsync(id, cancellationToken);
         }
     }
 }
