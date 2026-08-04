@@ -105,7 +105,7 @@ Set-Content -Path $appOfflinePath -Value '<html><body>PDF.Service deployment in 
 
 try {
     Write-Step 'Copying published PDF.Service to IIS target via robocopy'
-    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm
+    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm appsettings.json appsettings.Development.json
     if ($LASTEXITCODE -gt 7) {
         throw "robocopy failed with exit code $LASTEXITCODE"
     }

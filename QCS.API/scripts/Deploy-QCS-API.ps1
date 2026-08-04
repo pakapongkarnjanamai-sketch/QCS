@@ -128,7 +128,7 @@ Set-Content -Path $appOfflinePath -Value '<html><body>QCS API deployment in prog
 
 try {
     Write-Step 'Copying published API to IIS target via robocopy'
-    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm /XD logs
+    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm appsettings.json appsettings.Development.json appsettings.QA.json /XD logs
     if ($LASTEXITCODE -gt 7) {
         throw "robocopy failed with exit code $LASTEXITCODE"
     }
