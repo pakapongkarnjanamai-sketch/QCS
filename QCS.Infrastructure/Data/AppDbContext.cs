@@ -92,6 +92,13 @@ namespace QCS.Infrastructure.Data
                 if (entry.State == EntityState.Added)
                 {
                     entry.Entity.CreatedAt = _dateTime.Now;
+
+                    // Stamped only when the caller has not already set it, so an explicitly
+                    // assigned owner survives — this is what lets tests seed rows for a specific
+                    // user. Safe because no DTO or model-binding path exposes CreatedBy: the
+                    // request DTOs do not carry it and RequestService never assigns it from input.
+                    // ⚠️ The day a DTO does expose CreatedBy, this becomes a spoofing hole and
+                    // must go back to an unconditional assignment.
                     if (string.IsNullOrEmpty(entry.Entity.CreatedBy))
                     {
                         entry.Entity.CreatedBy = _currentUserService.UserId;

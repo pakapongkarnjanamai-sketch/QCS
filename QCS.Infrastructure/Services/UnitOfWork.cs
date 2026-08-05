@@ -1,6 +1,4 @@
-using System;
 using System.Collections;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Storage;
 using QCS.Application.Abstractions;
@@ -44,29 +42,10 @@ namespace QCS.Infrastructure.Services
 
         public async Task<int> CommitAsync() => await _context.SaveChangesAsync();
 
-        public IDbContextTransaction BeginTransaction()
-        {
-            if (string.Equals(_context.Database.ProviderName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.OrdinalIgnoreCase))
-            {
-                return new NullDbContextTransaction();
-            }
-
-            return _context.Database.BeginTransaction();
-        }
+        public IDbContextTransaction BeginTransaction() => _context.Database.BeginTransaction();
 
         public void ClearTrackedChanges() => _context.ChangeTracker.Clear();
 
         public void Dispose() => _context.Dispose();
-
-        private sealed class NullDbContextTransaction : IDbContextTransaction
-        {
-            public Guid TransactionId { get; } = Guid.NewGuid();
-            public void Commit() { }
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Rollback() { }
-            public Task RollbackAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Dispose() { }
-            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        }
     }
 }

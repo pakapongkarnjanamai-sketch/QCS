@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,6 +52,18 @@ namespace QCS.Api.IntegrationTests
                 services.AddDbContext<AppDbContext>(options =>
                 {
                     options.UseInMemoryDatabase(_databaseName);
+
+                    // The in-memory store has no transactions, and EF raises TransactionIgnoredWarning
+                    // as an error by default. Suppressing it here — in the test project, where the
+                    // limitation lives — lets production code call BeginTransaction() unconditionally
+                    // instead of branching on the provider.
+                    //
+                    // LIMITATION, deliberate and accepted: these tests therefore exercise
+                    // transactional paths such as RequestService.DeleteAsync WITHOUT a real
+                    // transaction, so they can prove the happy path but never prove a rollback.
+                    // Green tests here are not rollback coverage. Anything that depends on rollback
+                    // needs a relational provider.
+                    options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
                 });
 
                 services.AddAuthentication(TestAuthHandler.SchemeName)
