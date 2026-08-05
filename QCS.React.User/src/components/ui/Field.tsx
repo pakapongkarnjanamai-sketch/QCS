@@ -1,15 +1,11 @@
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-interface FieldProps extends InputHTMLAttributes<HTMLInputElement> { label: string; error?: string; endAdornment?: ReactNode }
-
-export function Field({ label, error, endAdornment, className = '', id, ...props }: FieldProps) {
-  const inputId = id ?? label.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')
-  return <label className="grid gap-1.5 text-body text-ink-strong" htmlFor={inputId}>
-    <span>{label}</span>
-    <span className="relative">
-      <input id={inputId} className={`rounded-sm border border-border-subtle bg-white px-3 py-2 text-body text-ink-strong focus:border-accent focus:outline-2 focus:outline-offset-1 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${className}`} {...props} />
-      {endAdornment}
+export function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: ReactNode }) {
+  return <label className="block" data-invalid={error ? 'true' : undefined}>
+    <span className="mb-1 block text-caption font-medium uppercase tracking-[0.08em] text-ink-muted">
+      {label}{required && <span className="ml-0.5 text-danger">*</span>}
     </span>
-    {error && <span className="text-caption text-danger">{error}</span>}
+    {children}
+    {error && <span className="mt-1 block text-caption text-danger">{error}</span>}
   </label>
 }

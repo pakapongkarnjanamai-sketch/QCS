@@ -1,8 +1,10 @@
-import { ArrowLeft, Eye, Save, Send, Trash2 } from 'lucide-react'
+import { Eye, Save, Send, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useBeforeUnload } from 'react-router'
+import { useNavigate, useParams, useBeforeUnload } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Field } from '@/components/ui/Field'
+import { appInputClassName, appTextareaClassName } from '@/components/ui/inputStyles'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
@@ -164,41 +166,29 @@ export function RequestFormPage() {
   const documents = request?.documents ?? []
   const disabled = Boolean(busy)
   return (
-    <div className="mx-auto grid max-w-5xl gap-6">
-      <Link to={requestId ? `/requests/${requestId}` : '/requests'} className="inline-flex w-fit items-center gap-2 text-body text-accent hover:underline">
-        <ArrowLeft size={16} aria-hidden />
-        Back
-      </Link>
+    <div className="mx-auto max-w-4xl space-y-6">
       <header>
         <h1 className="text-title font-semibold">{requestId ? `Edit ${request?.code ?? 'request'}` : 'New request'}</h1>
         <p className="mt-1 text-body text-ink-muted">Save a draft at any time. Required fields apply when submitting.</p>
       </header>
       {error && <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>}
-      <section className="grid gap-5 border border-border-subtle bg-white p-4 md:p-6">
-        <label className="grid gap-1.5 text-body" data-invalid={errors.title ? 'true' : undefined}>
-          Title <span className="text-danger">*</span>
-          <input value={form.title} onChange={(event) => patch({ title: event.target.value })} className="rounded-sm border border-border-subtle px-3 py-2" />
-          {errors.title && <span className="text-caption text-danger">{errors.title}</span>}
-        </label>
+      <section className="space-y-4 rounded-sm border border-border-subtle bg-white p-4">
+        <Field label="Title" required error={errors.title}>
+          <input value={form.title} onChange={(event) => patch({ title: event.target.value })} className={appInputClassName('md', 'w-full')} />
+        </Field>
         <VendorLookup value={form} errors={errors} onChange={patch} />
         <QrsSourceLookup value={form} onChange={patch} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1.5 text-body" data-invalid={errors.validFrom ? 'true' : undefined}>
-            Valid from <span className="text-danger">*</span>
-            <input type="date" value={form.validFrom} onChange={(event) => patch({ validFrom: event.target.value })} className="rounded-sm border border-border-subtle px-3 py-2" />
-            {errors.validFrom && <span className="text-caption text-danger">{errors.validFrom}</span>}
-          </label>
-          <label className="grid gap-1.5 text-body" data-invalid={errors.validUntil ? 'true' : undefined}>
-            Valid until <span className="text-danger">*</span>
-            <input type="date" value={form.validUntil} onChange={(event) => patch({ validUntil: event.target.value })} className="rounded-sm border border-border-subtle px-3 py-2" />
-            {errors.validUntil && <span className="text-caption text-danger">{errors.validUntil}</span>}
-          </label>
+          <Field label="Valid from" required error={errors.validFrom}>
+            <input type="date" value={form.validFrom} onChange={(event) => patch({ validFrom: event.target.value })} className={appInputClassName('md', 'w-full')} />
+          </Field>
+          <Field label="Valid until" required error={errors.validUntil}>
+            <input type="date" value={form.validUntil} onChange={(event) => patch({ validUntil: event.target.value })} className={appInputClassName('md', 'w-full')} />
+          </Field>
         </div>
-        <label className="grid gap-1.5 text-body" data-invalid={errors.remark ? 'true' : undefined}>
-          Remark
-          <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className="min-h-24 rounded-sm border border-border-subtle px-3 py-2" />
-          {errors.remark && <span className="text-caption text-danger">{errors.remark}</span>}
-        </label>
+        <Field label="Remark" error={errors.remark}>
+          <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
+        </Field>
         <TypedAttachmentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => window.open(document.viewUrl, '_blank', 'noopener,noreferrer')} onRemove={remove} />
         {request && <WorkflowRoutePreview steps={request.workflowSteps} />}
       </section>

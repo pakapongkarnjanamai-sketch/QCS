@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiClient, toApiError } from '@/lib/apiClient'
+import { Field } from '@/components/ui/Field'
+import { appInputClassName } from '@/components/ui/inputStyles'
 import type { SavePortalRequest } from './types'
 
 interface QrsSource { code: string; title: string }
@@ -18,5 +20,5 @@ export function QrsSourceLookup({ value, onChange }: { value: SavePortalRequest;
     const timer = window.setTimeout(() => { void apiClient.get<unknown>('/QrsSourcing/Requests', { params: { search: value.sourceCode }, signal: controller.signal }).then(({ data }) => { setSources(toSources(data)); setWarning('') }).catch((reason: unknown) => { if (!controller.signal.aborted) { setSources([]); setWarning(toApiError(reason).title) } }) }, 300)
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [value.sourceCode])
-  return <fieldset className="grid gap-2"><legend className="text-body font-medium text-ink-strong">QRS source (optional)</legend><input value={value.sourceCode} onChange={(event) => onChange({ sourceSystem: event.target.value ? 'QRS' : '', sourceCode: event.target.value })} className="rounded-sm border border-border-subtle px-3 py-2 text-body" placeholder="Enter a QRS request code" autoComplete="off" />{sources.length > 0 && <ul className="max-h-40 overflow-auto border border-border-subtle" aria-label="QRS request suggestions">{sources.map((source) => <li key={source.code}><button type="button" onClick={() => onChange({ sourceSystem: 'QRS', sourceCode: source.code })} className="w-full px-3 py-2 text-left text-body hover:bg-surface-muted">{source.code}{source.title && ` - ${source.title}`}</button></li>)}</ul>}{warning && <p className="text-caption text-ink-muted">QRS lookup is unavailable. You can still enter a QRS code manually.</p>}</fieldset>
+  return <div className="grid gap-2"><Field label="QRS source (optional)"><input value={value.sourceCode} onChange={(event) => onChange({ sourceSystem: event.target.value ? 'QRS' : '', sourceCode: event.target.value })} className={appInputClassName('md', 'w-full')} placeholder="Enter a QRS request code" autoComplete="off" /></Field>{sources.length > 0 && <ul className="max-h-40 overflow-auto rounded-sm border border-border-subtle bg-white" aria-label="QRS request suggestions">{sources.map((source) => <li key={source.code}><button type="button" onClick={() => onChange({ sourceSystem: 'QRS', sourceCode: source.code })} className="w-full px-3 py-2 text-left text-body hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent">{source.code}{source.title && ` - ${source.title}`}</button></li>)}</ul>}{warning && <p className="text-caption text-ink-muted">QRS lookup is unavailable. You can still enter a QRS code manually.</p>}</div>
 }
