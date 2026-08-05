@@ -996,7 +996,12 @@ namespace QCS.Application.Services
                         : r.Status == (int)RequestStatus.Approved ? nameof(RequestStatus.Approved)
                         : r.Status == (int)RequestStatus.Rejected ? nameof(RequestStatus.Rejected)
                         : "Unknown",
-                    RequesterName = r.ApprovalSteps.Where(s => s.Sequence == 1).Select(s => s.ApproverName).FirstOrDefault() ?? "Unknown",
+                    // Matches the detail path: the sequence-1 approver name is only filled on
+                    // submit, so a draft would otherwise read "Unknown" to the user who created it.
+                    RequesterName = r.ApprovalSteps
+                        .Where(s => s.Sequence == 1 && s.ApproverName != null && s.ApproverName != "")
+                        .Select(s => s.ApproverName)
+                        .FirstOrDefault() ?? (r.CreatedBy ?? string.Empty),
                     RequesterNId = r.CreatedBy ?? string.Empty,
                     Remark = r.Remark ?? string.Empty,
                     ValidFrom = r.ValidFrom,
@@ -1433,7 +1438,19 @@ namespace QCS.Application.Services
                 throw new InvalidOperationException("Attachments can only be added to draft requests.");
             }
 
-            int docTypeId = input.DocumentTypeId <= 0 ? (int)DocumentType.OriginalQuotation : input.DocumentTypeId;
+            // No default. An omitted type used to become an Original Quotation, which is the one
+            // type the submit rule requires, so a caller could satisfy that gate by accident.
+            if (input.DocumentTypeId is not { } requestedTypeId ||
+                !Enum.IsDefined(typeof(DocumentType), requestedTypeId))
+            {
+                throw new ArgumentException(
+                    $"Unrecognised documentTypeId '{input.DocumentTypeId}'. Valid values are: " +
+                    $"{(int)DocumentType.OriginalQuotation}, {(int)DocumentType.Comparison}, " +
+                    $"{(int)DocumentType.Specifications}, {(int)DocumentType.Attachment}, " +
+                    $"{(int)DocumentType.ExpiredQuotation}.");
+            }
+
+            int docTypeId = requestedTypeId;
 
             var files = new List<IFormFile> { input.File };
             var quotationJson = JsonSerializer.Serialize(new[]

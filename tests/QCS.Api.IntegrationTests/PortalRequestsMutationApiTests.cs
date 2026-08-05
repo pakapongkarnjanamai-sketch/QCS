@@ -320,5 +320,62 @@ namespace QCS.Api.IntegrationTests
 
             response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         }
+
+        /// <summary>
+        /// An unrecognised document type must be rejected rather than stored. The codebase already
+        /// applies this rule to RequestStatus and QcsRequestStatus: an unknown enum value throws,
+        /// it never defaults.
+        /// </summary>
+        [Fact]
+        public async Task UploadPortalAttachment_WhenDocumentTypeIdIsUndefined_Returns400BadRequest()
+        {
+            var response = await UploadAttachmentAsync(requestId: 920, code: "QC-20260804-920", documentTypeId: "77");
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        /// <summary>
+        /// Omitting the type used to default to Original Quotation - the one document type the
+        /// submit rule requires - so a caller could satisfy that gate without ever choosing it.
+        /// </summary>
+        [Fact]
+        public async Task UploadPortalAttachment_WhenDocumentTypeIdIsMissing_Returns400BadRequest()
+        {
+            var response = await UploadAttachmentAsync(requestId: 921, code: "QC-20260804-921", documentTypeId: null);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        private async Task<HttpResponseMessage> UploadAttachmentAsync(int requestId, string code, string? documentTypeId)
+        {
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Draft for attachment type validation",
+                    VendorCode = "V000",
+                    VendorName = "Initial Vendor",
+                    Status = (int)RequestStatus.Draft,
+                    CurrentStepId = 1,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var file = new ByteArrayContent(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+            file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+
+            using var form = new MultipartFormDataContent { { file, "file", "spec.pdf" } };
+            if (documentTypeId is not null)
+            {
+                form.Add(new StringContent(documentTypeId), "documentTypeId");
+            }
+
+            var client = CreateAuthenticatedClient("USER01");
+            return await client.PostAsync($"/api/Portal/Requests/{requestId}/attachments", form);
+        }
     }
 }

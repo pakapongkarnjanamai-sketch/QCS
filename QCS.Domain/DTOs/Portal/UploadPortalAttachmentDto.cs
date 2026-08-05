@@ -5,6 +5,11 @@ namespace QCS.Domain.DTOs.Portal
     public class UploadPortalAttachmentDto
     {
         public IFormFile File { get; set; } = null!;
-        public int DocumentTypeId { get; set; } = 10;
+
+        /// <summary>
+        /// Required. Deliberately nullable with no default: defaulting to Original Quotation let a
+        /// caller that never chose a type satisfy the submit rule, which requires exactly that type.
+        /// </summary>
+        public int? DocumentTypeId { get; set; }
     }
 }
