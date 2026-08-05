@@ -26,10 +26,10 @@ namespace QCS.Web.User.Security
         /// <summary>
         /// True only when cutover is switched on AND the target is somewhere this app is not.
         ///
-        /// The second half matters: if BasePath were left blank, or pointed back at the legacy
-        /// app's own root, every request would redirect to itself forever. Rather than trust
-        /// configuration, refuse to redirect and say so once — a portal that keeps working while
-        /// misconfigured beats one that loops.
+        /// The second half matters: a BasePath that is blank, equal to this app's own root, or a
+        /// path this app itself serves would make every request redirect to itself forever.
+        /// Rather than trust configuration, refuse to redirect and say so once — a portal that
+        /// keeps working while misconfigured beats one that loops.
         /// </summary>
         public bool IsEnabledFor(HttpRequest request)
         {
@@ -39,19 +39,38 @@ namespace QCS.Web.User.Security
             var basePath = options.NormalisedBasePath();
             var appRoot = request.PathBase.HasValue ? request.PathBase.Value!.TrimEnd('/') : string.Empty;
 
-            var usable = basePath.Length > 0 &&
-                !string.Equals(basePath, appRoot, StringComparison.OrdinalIgnoreCase);
-
-            if (!usable && Interlocked.CompareExchange(ref _warnedAboutBasePath, 1, 0) == 0)
+            if (basePath.Length == 0 || string.Equals(basePath, appRoot, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning(
-                    "PortalCutover is enabled but BasePath ('{BasePath}') is empty or equal to this " +
-                    "application's own root ('{AppRoot}'). Redirects are suppressed to avoid a loop.",
-                    options.BasePath,
-                    appRoot);
+                WarnOnce(options.BasePath, appRoot, "it is empty or equal to this application's own root");
+                return false;
             }
 
-            return usable;
+            // Second guard, and the one that catches a base path this application itself serves —
+            // say BasePath were '/QCS/Home'. That is not equal to the app root, so the check above
+            // lets it through, and every redirect would land back here. Checking the incoming path
+            // instead of trusting configuration closes it: if the request we are handling already
+            // lies under BasePath, the target is us, so do not redirect.
+            var incoming = $"{appRoot}{request.Path.Value}";
+            if (incoming.StartsWith(basePath + "/", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(incoming.TrimEnd('/'), basePath, StringComparison.OrdinalIgnoreCase))
+            {
+                WarnOnce(options.BasePath, appRoot, "this application is serving requests underneath it");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void WarnOnce(string? configuredBasePath, string appRoot, string reason)
+        {
+            if (Interlocked.CompareExchange(ref _warnedAboutBasePath, 1, 0) != 0) return;
+
+            _logger.LogWarning(
+                "PortalCutover is enabled but BasePath ('{BasePath}') cannot be used because {Reason}. " +
+                "This application's root is '{AppRoot}'. Redirects are suppressed to avoid a loop.",
+                configuredBasePath,
+                reason,
+                appRoot);
         }
 
         private string Base() => _options.CurrentValue.NormalisedBasePath();
