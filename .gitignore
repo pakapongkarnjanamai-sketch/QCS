@@ -412,3 +412,23 @@ UserSecrets/
 QCS.React.User/node_modules/
 QCS.React.User/dist/
 QCS.React.User/.tmp/
+
+# Same trap, second project. The `*.user` rule near the top of this file is a legacy Visual Studio
+# pattern and it matches the QCS.Web.User DIRECTORY too, which is why the whole of
+# QCS.Web.User/Security/ was silently absent from the repository — including
+# UserClaimsTransformation.cs, which Program.cs needs in order to build.
+#
+# Negated NARROWLY on purpose. A blanket `!QCS.Web.User/**` would also un-ignore
+# appsettings.Development.json and appsettings.QA.json, which the rule above deliberately keeps
+# out because they may carry connection strings, and would drag in the vendored DevExtreme CSS.
+# Git cannot re-include a file whose parent directory is excluded, so the directory has to be
+# un-ignored first and its contents re-excluded.
+!QCS.Web.User/
+QCS.Web.User/*
+!QCS.Web.User/*.cs
+!QCS.Web.User/*.csproj
+!QCS.Web.User/appsettings.json
+!QCS.Web.User/Controllers/
+!QCS.Web.User/Security/
+!QCS.Web.User/Views/
+!QCS.Web.User/scripts/
