@@ -56,6 +56,17 @@
                        
                     </ul>
                     <ul class="navbar-nav">
+                        @*
+                            Way in to the new portal while this one is still the default. Once
+                            PortalCutover:Enabled is switched on every page here redirects anyway,
+                            so this link matters precisely for the period before that — see
+                            PLAN-040. The old URLs keep working either way.
+                        *@
+                        <li class="nav-item">
+                            <a class="nav-link" href="@((Configuration["PortalCutover:BasePath"] ?? "/QCS/User").TrimEnd('/'))/">
+                                <i class="fas fa-arrow-right-to-bracket me-1" aria-hidden="true"></i> ลองใช้พอร์ทัลใหม่ (New portal)
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="#">
                                 <i class="fas fa-user-circle me-1"></i> @(User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown User")

@@ -60,6 +60,12 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IClaimsTransformation, UserClaimsTransformation>();
 
+// Portal cutover. Ships disabled; only a server's own appsettings turns it on, and turning it
+// back off is the rollback. See PLAN-040 in the QRS repo.
+builder.Services.Configure<PortalCutoverOptions>(
+    builder.Configuration.GetSection(PortalCutoverOptions.SectionName));
+builder.Services.AddSingleton<PortalCutoverRedirector>();
+
 // HTTP Client for API calls
 builder.Services.AddHttpClient("DocTrackerAPI", client =>
 {
