@@ -11,6 +11,7 @@ interface RequestTableProps {
   loadingMore: boolean
   loadMoreError?: ApiError
   returnSearch: string
+  returnPath: string
   sortBy?: string
   sortDescending: boolean
   onSort: (key: string) => void
@@ -31,7 +32,7 @@ function SortButton({ label, sortKey, active, descending, onSort }: { label: str
   return <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 rounded-sm font-medium hover:text-ink-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{label}{active && (descending ? <ChevronDown size={14} aria-label="descending" /> : <ChevronUp size={14} aria-label="ascending" />)}</button>
 }
 
-export function RequestTable({ data, refreshing, loadingMore, loadMoreError, returnSearch, sortBy, sortDescending, onSort, onRetryLoadMore, tableScrollRef, sentinelRef }: RequestTableProps) {
+export function RequestTable({ data, refreshing, loadingMore, loadMoreError, returnSearch, returnPath, sortBy, sortDescending, onSort, onRetryLoadMore, tableScrollRef, sentinelRef }: RequestTableProps) {
   return (
     <section className="min-h-0 overflow-hidden rounded-sm border border-border-subtle bg-surface-panel">
       <div ref={tableScrollRef} aria-busy={refreshing} className={`max-h-[calc(100dvh-25rem)] overflow-auto ${refreshing ? 'pointer-events-none opacity-60' : ''}`}>
@@ -54,7 +55,7 @@ export function RequestTable({ data, refreshing, loadingMore, loadMoreError, ret
 
               return (
                 <tr key={row.id} className="hover:bg-surface-muted">
-                  <td className="whitespace-nowrap px-4 py-2.5 font-medium"><Link state={{ workspaceSearch: returnSearch }} to={destination} className="rounded-sm text-accent underline decoration-1 underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{row.code}</Link></td>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-medium"><Link state={{ workspaceSearch: returnSearch, returnPath }} to={destination} className="rounded-sm text-accent underline decoration-1 underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{row.code}</Link></td>
                   <td className="px-4 py-2.5"><span className="line-clamp-2">{row.title}</span></td>
                   <td className="px-4 py-2.5 text-ink-muted">{row.vendorName || row.vendorCode || '-'}</td>
                   <td className="px-4 py-2.5 text-ink-muted">{row.requesterName || row.requesterNId || '-'}</td>

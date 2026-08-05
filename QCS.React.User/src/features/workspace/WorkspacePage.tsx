@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Inbox, Plus } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { EmptySurface, ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
@@ -19,9 +19,16 @@ function isWorkspaceView(value: string | null): value is WorkspaceView {
 interface WorkspacePageProps {
   defaultView: WorkspaceView
   showSummary?: boolean
+  title?: string
+  description?: string
+  showCreateAction?: boolean
+  lockView?: boolean
+  returnPath?: string
+  emptyMessage?: string
+  emptyIcon?: 'file' | 'inbox'
 }
 
-export function WorkspacePage({ defaultView, showSummary = false }: WorkspacePageProps) {
+export function WorkspacePage({ defaultView, showSummary = false, title, description, showCreateAction = true, lockView = false, returnPath = '/requests', emptyMessage = 'No requests found.', emptyIcon = 'file' }: WorkspacePageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState<PortalPage<PortalRequestListItem>>()
   const [summary, setSummary] = useState<WorkspaceSummaryData>()
@@ -38,7 +45,7 @@ export function WorkspacePage({ defaultView, showSummary = false }: WorkspacePag
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLTableRowElement>(null)
 
-  const view = isWorkspaceView(searchParams.get('view')) ? (searchParams.get('view') as WorkspaceView) : defaultView
+  const view = lockView ? defaultView : isWorkspaceView(searchParams.get('view')) ? (searchParams.get('view') as WorkspaceView) : defaultView
   const search = searchParams.get('q') ?? ''
   const sortBy = searchParams.get('sort') || 'requestdate'
   const sortDescending = searchParams.get('desc') !== 'false'
@@ -149,13 +156,13 @@ export function WorkspacePage({ defaultView, showSummary = false }: WorkspacePag
     <div className="flex min-h-full flex-col gap-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-title font-semibold">{showSummary ? 'Dashboard' : 'Quotation requests'}</h1>
-          <p className="mt-1 text-body text-ink-muted">{showSummary ? 'Your quotation request workspace.' : 'Manage quotation requests and sourcing progress.'}</p>
+          <h1 className="text-title font-semibold">{title ?? (showSummary ? 'Dashboard' : 'Quotation requests')}</h1>
+          <p className="mt-1 text-body text-ink-muted">{description ?? (showSummary ? 'Your quotation request workspace.' : 'Manage quotation requests and sourcing progress.')}</p>
         </div>
-        <Link to="/requests/new" state={{ workspaceSearch: returnSearch }} className="inline-flex items-center justify-center gap-2 rounded-sm bg-accent px-3 py-2 text-body font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        {showCreateAction && <Link to="/requests/new" state={{ workspaceSearch: returnSearch }} className="inline-flex items-center justify-center gap-2 rounded-sm bg-accent px-3 py-2 text-body font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
           <Plus size={16} aria-hidden />
           New request
-        </Link>
+        </Link>}
       </header>
       {showSummary && <WorkspaceSummary data={summary} activeView={view} onViewChange={(nextView) => updateParams({ view: nextView })} />}
       <WorkspaceFilters
@@ -164,6 +171,7 @@ export function WorkspacePage({ defaultView, showSummary = false }: WorkspacePag
         sortBy={sortBy}
         sortDescending={sortDescending}
         onViewChange={(nextView) => updateParams({ view: nextView })}
+        showViewFilter={!lockView}
         onSearchChange={setSearchInput}
         onSearchSubmit={() => updateParams({ q: searchInput || null })}
         onSearchClear={() => {
@@ -193,12 +201,12 @@ export function WorkspacePage({ defaultView, showSummary = false }: WorkspacePag
       )}
       {data &&
         (data.items.length > 0 ? (
-          <RequestTable data={data} refreshing={refreshing} loadingMore={loadingMore} loadMoreError={loadMoreError} returnSearch={returnSearch} sortBy={sortBy} sortDescending={sortDescending} onSort={changeSort} onRetryLoadMore={() => loadMore(true)} tableScrollRef={tableScrollRef} sentinelRef={sentinelRef} />
+          <RequestTable data={data} refreshing={refreshing} loadingMore={loadingMore} loadMoreError={loadMoreError} returnSearch={returnSearch} returnPath={returnPath} sortBy={sortBy} sortDescending={sortDescending} onSort={changeSort} onRetryLoadMore={() => loadMore(true)} tableScrollRef={tableScrollRef} sentinelRef={sentinelRef} />
         ) : (
           <EmptySurface>
             <div className="grid justify-items-center gap-3">
-              <FileText size={28} className="text-ink-soft" aria-hidden />
-              <span>No requests found.</span>
+              {emptyIcon === 'inbox' ? <Inbox size={28} className="text-ink-soft" aria-hidden /> : <FileText size={28} className="text-ink-soft" aria-hidden />}
+              <span>{emptyMessage}</span>
               {search && (
                 <AppButton
                   tone="secondary"

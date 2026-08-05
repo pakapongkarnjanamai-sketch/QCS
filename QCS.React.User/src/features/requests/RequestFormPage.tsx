@@ -8,16 +8,15 @@ import { appInputClassName, appTextareaClassName } from '@/components/ui/inputSt
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
-import { ApprovalActionDialog } from './ApprovalActionDialog'
 import { QrsSourceLookup } from './QrsSourceLookup'
 import { TypedAttachmentEditor } from './TypedAttachmentEditor'
 import { VendorLookup } from './VendorLookup'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
-import { approvePortalRequest, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, previewPortalRequest, rejectPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
+import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, previewPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
 import type { PortalDocument, PortalRequestDetail, SavePortalRequest } from './types'
 
-type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove' | 'approve' | 'reject'
+type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove'
 function fromDetail(detail: PortalRequestDetail): SavePortalRequest {
   return {
     title: detail.title ?? '',
@@ -51,7 +50,6 @@ export function RequestFormPage() {
   const [busy, setBusy] = useState<Action>()
   const [previewUrl, setPreviewUrl] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>()
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault()
   })
@@ -225,16 +223,6 @@ export function RequestFormPage() {
             Delete
           </AppButton>
         )}
-        {request?.permissions.canApprove && (
-          <AppButton onClick={() => setApprovalAction('approve')} disabled={disabled}>
-            Approve
-          </AppButton>
-        )}
-        {request?.permissions.canReject && (
-          <AppButton tone="danger" onClick={() => setApprovalAction('reject')} disabled={disabled}>
-            Reject
-          </AppButton>
-        )}
       </div>
       {previewUrl && <iframe title="Merged PDF preview" src={previewUrl} sandbox="allow-same-origin" className="h-[70vh] w-full border border-border-subtle" />}
       <ConfirmDialog
@@ -262,29 +250,6 @@ export function RequestFormPage() {
       >
         Delete this draft permanently?
       </ConfirmDialog>
-      <ApprovalActionDialog
-        action={approvalAction}
-        busy={busy === 'approve' || busy === 'reject'}
-        onClose={() => setApprovalAction(undefined)}
-        onConfirm={(comment) => {
-          if (!requestId || !approvalAction) return
-          void (async () => {
-            const action = approvalAction
-            setBusy(action)
-            try {
-              await (action === 'approve' ? approvePortalRequest(requestId, { comment }) : rejectPortalRequest(requestId, { comment }))
-              setDirty(false)
-              toast.success(action === 'approve' ? 'Request approved.' : 'Request rejected.')
-              navigate(`/requests/${requestId}`)
-            } catch (reason) {
-              setError(toApiError(reason))
-            } finally {
-              setBusy(undefined)
-              setApprovalAction(undefined)
-            }
-          })()
-        }}
-      />
     </div>
   )
 }

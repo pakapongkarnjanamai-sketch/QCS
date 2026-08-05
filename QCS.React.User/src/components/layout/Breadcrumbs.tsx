@@ -15,6 +15,7 @@ export function Breadcrumbs() {
     } else if (requestDetail) crumbs.push({ label: 'Request', to: pathname })
   } else if (pathname.startsWith('/quotations/')) crumbs.push({ label: 'Quotation', to: pathname })
   else if (pathname.startsWith('/quotations')) crumbs.push({ label: 'Quotations', to: pathname })
+  else if (pathname.startsWith('/inbox')) crumbs.push({ label: 'My approvals', to: pathname })
   return (
     <nav
       aria-label="Breadcrumb"

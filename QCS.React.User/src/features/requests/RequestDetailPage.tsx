@@ -7,9 +7,11 @@ import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { qrsRequestUrl } from '@/config/appConfig'
 import { PdfViewer } from '@/features/quotations/PdfViewer'
 import { toApiError, type ApiError } from '@/lib/apiClient'
+import { toast } from '@/lib/toast'
+import { ApprovalActionDialog } from './ApprovalActionDialog'
 import { DocumentList } from './DocumentList'
 import { HistoryList } from './HistoryList'
-import { getPortalRequestById } from './requestApi'
+import { approvePortalRequest, getPortalRequestById, rejectPortalRequest } from './requestApi'
 import type { PortalDocument, PortalRequestDetail } from './types'
 import { WorkflowTimeline } from './WorkflowTimeline'
 
@@ -29,6 +31,8 @@ export function RequestDetailPage() {
   const [loading, setLoading] = useState(true)
   const [retryToken, setRetryToken] = useState(0)
   const [preview, setPreview] = useState<PortalDocument>()
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>()
+  const [busyAction, setBusyAction] = useState<'approve' | 'reject'>()
   const numericId = Number(id)
   useEffect(() => {
     if (!Number.isInteger(numericId) || numericId <= 0) {
@@ -49,9 +53,10 @@ export function RequestDetailPage() {
       })
     return () => controller.abort()
   }, [numericId, retryToken])
-  const returnSearch = (location.state as { workspaceSearch?: string } | null)
-    ?.workspaceSearch
-  const backTo = returnSearch ? `/requests?${returnSearch}` : '/requests'
+  const routeState = location.state as { workspaceSearch?: string; returnPath?: string } | null
+  const returnSearch = routeState?.workspaceSearch
+  const returnPath = routeState?.returnPath ?? '/requests'
+  const backTo = returnSearch ? `${returnPath}?${returnSearch}` : returnPath
   if (loading && !request) return <LoadingSurface />
   if (!request)
     return (
@@ -67,6 +72,24 @@ export function RequestDetailPage() {
         </div>
       </ErrorSurface>
     )
+  const runApprovalAction = async (comment: string) => {
+    const action = approvalAction
+    if (!action) return
+    setBusyAction(action)
+    setError(undefined)
+    try {
+      await (action === 'approve'
+        ? approvePortalRequest(request.id, { comment })
+        : rejectPortalRequest(request.id, { comment }))
+      toast.success(action === 'approve' ? 'Request approved.' : 'Request rejected.')
+      setApprovalAction(undefined)
+      setRetryToken((value) => value + 1)
+    } catch (reason) {
+      setError(toApiError(reason))
+    } finally {
+      setBusyAction(undefined)
+    }
+  }
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <Link
@@ -94,17 +117,21 @@ export function RequestDetailPage() {
             {formatDate(request.requestDate)}
           </p>
         </div>
-        {request.sourceSystem === 'QRS' && request.sourceCode && (
-          <a
-            href={qrsRequestUrl(request.sourceCode)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            Open source request {request.sourceCode}
-            <ExternalLink size={15} aria-hidden />
-          </a>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {request.sourceSystem === 'QRS' && request.sourceCode && (
+            <a
+              href={qrsRequestUrl(request.sourceCode)}
+              target="_blank"
+              rel="noreferrer"
+              className="mr-1 inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Open source request {request.sourceCode}
+              <ExternalLink size={15} aria-hidden />
+            </a>
+          )}
+          {request.permissions.canApprove && <AppButton disabled={Boolean(busyAction)} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
+          {request.permissions.canReject && <AppButton tone="danger" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
+        </div>
       </header>
       <section className="rounded-sm border border-border-subtle bg-white">
         <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
@@ -150,6 +177,7 @@ export function RequestDetailPage() {
         </div>
       </section>
       <PdfViewer document={preview} onClose={() => setPreview(undefined)} />
+      <ApprovalActionDialog action={approvalAction} busy={Boolean(busyAction)} onClose={() => { if (!busyAction) setApprovalAction(undefined) }} onConfirm={(comment) => void runApprovalAction(comment)} />
     </div>
   )
 }

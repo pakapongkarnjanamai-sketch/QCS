@@ -23,6 +23,7 @@ function PortalRoutes() {
   return <AppLayout><Routes>
     <Route index element={<LegacyWorkspaceRoute />} />
     <Route path="requests" element={<WorkspacePage defaultView="my-requests" />} />
+    <Route path="inbox" element={<WorkspacePage defaultView="my-tasks" title="My approvals" description="Requests waiting on you." showCreateAction={false} lockView returnPath="/inbox" emptyMessage="Nothing waiting on you" emptyIcon="inbox" />} />
     <Route path="requests/new" element={<RequestFormPage />} />
     <Route path="requests/:id/edit" element={<RequestFormPage />} />
     <Route path="requests/:id" element={<RequestDetailPage />} />
