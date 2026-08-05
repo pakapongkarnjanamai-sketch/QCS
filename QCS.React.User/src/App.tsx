@@ -28,6 +28,12 @@ function PortalRoutes() {
     <Route path="requests/:id/edit" element={<RequestFormPage />} />
     <Route path="requests/:id" element={<RequestDetailPage />} />
     <Route path="quotations/:code" element={<QuotationDetailPage />} />
+    {/* The sidebar's Quotations entry lands here: approved quotation documents are the
+        all-approved view of the same workspace, not a separate screen. */}
+    <Route path="quotations" element={<WorkspacePage defaultView="all-approved" title="Quotations" description="Approved quotation documents." showCreateAction={false} lockView returnPath="/quotations" />} />
+    {/* Matches QRS: an unknown path returns to the workspace instead of rendering an empty
+        shell. Without this, /quotations rendered a blank page under the chrome. */}
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></AppLayout>
 }
 

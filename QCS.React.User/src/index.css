@@ -27,4 +27,20 @@
   html, body, #root { min-height: 100%; margin: 0; }
   body { font-family: var(--font-sans); }
   button, input { font: inherit; }
+
+  /* Custom subtle thin scrollbar for table and panel scrolling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.85 0.01 250);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-soft);
+  }
 }
