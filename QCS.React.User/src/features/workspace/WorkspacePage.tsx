@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileText, Inbox, Plus } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
+import { AppLinkButton } from '@/components/ui/AppLinkButton'
 import { EmptySurface, ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { useSignalR } from '@/hooks/useSignalR'
@@ -153,16 +154,18 @@ export function WorkspacePage({ defaultView, showSummary = false, title, descrip
   const returnSearch = searchParams.toString()
 
   return (
-    <div className="flex min-h-full flex-col gap-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    // h-full + min-h-0, matching QRS's RequestListPage: the table below claims the remaining
+    // height with flex-1 instead of subtracting a guessed header height from the viewport.
+    <div className="flex h-full min-h-0 flex-col gap-6">
+      <header className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-title font-semibold">{title ?? (showSummary ? 'Dashboard' : 'Quotation requests')}</h1>
           <p className="mt-1 text-body text-ink-muted">{description ?? (showSummary ? 'Your quotation request workspace.' : 'Manage quotation requests and sourcing progress.')}</p>
         </div>
-        {showCreateAction && <Link to="/requests/new" state={{ workspaceSearch: returnSearch }} className="inline-flex items-center justify-center gap-2 rounded-sm bg-accent px-3 py-2 text-body font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        {showCreateAction && <AppLinkButton to="/requests/new" state={{ workspaceSearch: returnSearch }}>
           <Plus size={16} aria-hidden />
           New request
-        </Link>}
+        </AppLinkButton>}
       </header>
       {showSummary && <WorkspaceSummary data={summary} activeView={view} onViewChange={(nextView) => updateParams({ view: nextView })} />}
       <WorkspaceFilters
@@ -193,7 +196,7 @@ export function WorkspacePage({ defaultView, showSummary = false, title, descrip
               {error.title}
               {data ? ' Showing the previous results.' : ''}
             </span>
-            <AppButton tone="secondary" onClick={invalidate}>
+            <AppButton variant="secondary" onClick={invalidate}>
               Try again
             </AppButton>
           </div>
@@ -209,7 +212,7 @@ export function WorkspacePage({ defaultView, showSummary = false, title, descrip
               <span>{emptyMessage}</span>
               {search && (
                 <AppButton
-                  tone="secondary"
+                  variant="secondary"
                   onClick={() => {
                     setSearchInput('')
                     updateParams({ q: null })

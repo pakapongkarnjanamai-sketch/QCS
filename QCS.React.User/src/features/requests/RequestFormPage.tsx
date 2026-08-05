@@ -192,7 +192,7 @@ export function RequestFormPage() {
       </section>
       <div className="flex flex-wrap justify-end gap-2">
         <AppButton
-          tone="secondary"
+          variant="secondary"
           onClick={async () => {
             if (!requestId) return
             setBusy('preview')
@@ -218,7 +218,7 @@ export function RequestFormPage() {
           {busy === 'submit' ? 'Submitting...' : 'Submit'}
         </AppButton>
         {requestId && request?.permissions.canDelete && (
-          <AppButton tone="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
+          <AppButton variant="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
             <Trash2 size={16} aria-hidden />
             Delete
           </AppButton>

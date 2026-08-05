@@ -35,6 +35,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Same footer QRS puts at the foot of its sidebar. It was missing here entirely. */}
+      <div className="mt-auto border-t border-border-subtle p-4 text-caption text-ink-muted">
+        <p>© {new Date().getFullYear()}</p>
+      </div>
     </aside>
   )
 

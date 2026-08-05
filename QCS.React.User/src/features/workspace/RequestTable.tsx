@@ -34,8 +34,8 @@ function SortButton({ label, sortKey, active, descending, onSort }: { label: str
 
 export function RequestTable({ data, refreshing, loadingMore, loadMoreError, returnSearch, returnPath, sortBy, sortDescending, onSort, onRetryLoadMore, tableScrollRef, sentinelRef }: RequestTableProps) {
   return (
-    <section className="min-h-0 overflow-hidden rounded-sm border border-border-subtle bg-surface-panel">
-      <div ref={tableScrollRef} aria-busy={refreshing} className={`max-h-[calc(100dvh-25rem)] overflow-auto ${refreshing ? 'pointer-events-none opacity-60' : ''}`}>
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-border-subtle bg-surface-panel">
+      <div ref={tableScrollRef} aria-busy={refreshing} className={`min-h-0 flex-1 overflow-auto ${refreshing ? 'pointer-events-none opacity-60' : ''}`}>
         <table className="min-w-[960px] w-full border-collapse text-left text-body">
           <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-muted text-caption uppercase tracking-[0.08em] text-ink-muted">
             <tr>
@@ -65,7 +65,7 @@ export function RequestTable({ data, refreshing, loadingMore, loadMoreError, ret
                 </tr>
               )
             })}
-            {data.hasNextPage && <tr ref={sentinelRef}><td colSpan={7} className="px-4 py-2.5 text-center text-caption text-ink-muted">{loadMoreError ? <span className="inline-flex items-center gap-2">Could not load more requests.<AppButton tone="secondary" onClick={onRetryLoadMore}>Try again</AppButton></span> : loadingMore && <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Loading more...</span>}</td></tr>}
+            {data.hasNextPage && <tr ref={sentinelRef}><td colSpan={7} className="px-4 py-2.5 text-center text-caption text-ink-muted">{loadMoreError ? <span className="inline-flex items-center gap-2">Could not load more requests.<AppButton variant="secondary" onClick={onRetryLoadMore}>Try again</AppButton></span> : loadingMore && <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Loading more...</span>}</td></tr>}
           </tbody>
         </table>
       </div>

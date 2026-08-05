@@ -64,7 +64,7 @@ export function RequestDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <span>{error?.title || 'Request unavailable.'}</span>
           <AppButton
-            tone="secondary"
+            variant="secondary"
             onClick={() => setRetryToken((value) => value + 1)}
           >
             Try again
@@ -130,7 +130,7 @@ export function RequestDetailPage() {
             </a>
           )}
           {request.permissions.canApprove && <AppButton disabled={Boolean(busyAction)} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
-          {request.permissions.canReject && <AppButton tone="danger" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
+          {request.permissions.canReject && <AppButton variant="danger" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
         </div>
       </header>
       <section className="rounded-sm border border-border-subtle bg-white">

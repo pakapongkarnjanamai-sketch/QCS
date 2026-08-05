@@ -1,12 +1,12 @@
 import type { ButtonHTMLAttributes } from 'react'
+import { appButtonClassName, type AppButtonSize, type AppButtonVariant } from './appButtonStyles'
 
-type AppButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'primary' | 'secondary' | 'danger' }
+/** Matches QRS.Web's AppButton, including its prop names — see PLANS/README.md rule 8. */
+type AppButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: AppButtonVariant
+  size?: AppButtonSize
+}
 
-export function AppButton({ className = '', tone = 'primary', type = 'button', ...props }: AppButtonProps) {
-  const toneClass = tone === 'primary'
-    ? 'bg-accent text-white hover:bg-accent-hover'
-    : tone === 'danger'
-      ? 'border border-danger bg-white text-danger hover:bg-red-50'
-      : 'border border-border-subtle bg-white text-ink-strong hover:bg-surface-muted'
-  return <button type={type} className={`rounded-sm px-3 py-2 text-body font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${toneClass} ${className}`} {...props} />
+export function AppButton({ className = '', variant = 'primary', size = 'md', type = 'button', ...props }: AppButtonProps) {
+  return <button type={type} className={appButtonClassName(variant, size, className)} {...props} />
 }

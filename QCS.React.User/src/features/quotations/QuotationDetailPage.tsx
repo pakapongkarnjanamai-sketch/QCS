@@ -55,7 +55,7 @@ export function QuotationDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <span>{error?.title || 'Quotation unavailable.'}</span>
           <AppButton
-            tone="secondary"
+            variant="secondary"
             onClick={() => setRetryToken((value) => value + 1)}
           >
             Try again
