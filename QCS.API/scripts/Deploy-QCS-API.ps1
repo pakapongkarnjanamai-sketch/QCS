@@ -101,7 +101,7 @@ if (-not (Test-Path $ProjectPath)) {
 $Credential = Resolve-DeployCredential -SuppliedCredential $Credential -Path $CredentialPath
 $appOfflinePath = Join-Path $TargetPath 'app_offline.htm'
 $backupRoot = Join-Path $PublishPath '_backup'
-$appPoolName = 'QCS-Service-Pool'
+$appPoolName = 'QCS-Api-Pool'
 
 Write-Step 'Publishing QCS.API'
 if (Test-Path $PublishPath) {
