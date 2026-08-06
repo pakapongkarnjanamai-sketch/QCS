@@ -1,4 +1,5 @@
 import { ExternalLink, Paperclip } from 'lucide-react'
+import { formatFileSize } from './format'
 import type { PortalDocument } from './types'
 
 export function DocumentList({
@@ -27,7 +28,9 @@ export function DocumentList({
               {document.fileName}
             </p>
             <p className="text-caption text-ink-muted">
-              {document.documentTypeName}
+              {[document.documentTypeName, formatFileSize(document.fileSize)]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
           <button

@@ -9,7 +9,7 @@ import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
 import { QrsSourceLookup } from './QrsSourceLookup'
-import { TypedAttachmentEditor } from './TypedAttachmentEditor'
+import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
@@ -193,7 +193,7 @@ export function RequestFormPage() {
         <Field label="Remark" error={errors.remark}>
           <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
-        <TypedAttachmentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
+        <TypedDocumentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
         {request && <WorkflowRoutePreview steps={request.workflowSteps} />}
       </section>
       <div className="flex flex-wrap justify-end gap-2">
