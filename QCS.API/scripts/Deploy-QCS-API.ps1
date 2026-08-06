@@ -17,39 +17,9 @@ function Write-Step {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
 
-function Invoke-CheckedRequest {
-    param(
-        [string]$Url,
-        [string]$Label,
-        [int]$MaxAttempts = 3
-    )
-
-    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-        try {
-            # Use native Windows curl.exe to bypass SSL issues and TLS protocol constraints under PowerShell 5.1
-            $statusString = & "curl.exe" -k -s -w "%{http_code}" -o "NUL" --negotiate -u ":" $Url
-            $statusCode = [int]$statusString
-
-            if ($statusCode -ge 200 -and $statusCode -lt 400) {
-                Write-Host ("{0}: {1} ({2})" -f $Label, $statusCode, $Url) -ForegroundColor Green
-                return
-            }
-
-            if ($statusCode -eq 401 -or $statusCode -eq 405) {
-                Write-Host ("{0}: {1} ({2}) [Warning: Service is Responsive]" -f $Label, $statusCode, $Url) -ForegroundColor Yellow
-                return
-            }
-
-            throw "$Label failed with status ${statusCode}: $Url"
-        }
-        catch {
-            if ($attempt -eq $MaxAttempts) {
-                throw
-            }
-            Start-Sleep -Seconds 2
-        }
-    }
-}
+# Invoke-CheckedRequest was deleted on 2026-08-06. It counted 401 as success ("Service is
+# Responsive"), which made the suite report green through a PROD outage. Smoke checks now live in
+# Test-QCS-ApiSmoke.ps1, which asserts the status each endpoint is supposed to return.
 
 function Backup-FileIfExists {
     param(
@@ -141,16 +111,11 @@ finally {
 
 if (-not $SkipSmokeTest) {
     Write-Step 'Running API smoke tests'
-    $base = $PublicApiBaseUrl.TrimEnd('/')
-    Invoke-CheckedRequest -Url "$base/api/Dashboard/Summary" -Label 'Dashboard summary'
-    Invoke-CheckedRequest -Url "$base/api/Dashboard/RequesterTrend?days=7&top=5" -Label 'Requester trend'
-    Invoke-CheckedRequest -Url "$base/api/Dashboard/ValidityStatus" -Label 'Validity status'
-    Invoke-CheckedRequest -Url "$base/api/Dashboard/ActiveVendors?top=10" -Label 'Active vendors'
-    Invoke-CheckedRequest -Url "$base/api/Request/Admin/All?skip=0&take=1&requireTotalCount=true" -Label 'Admin all requests'
-    Invoke-CheckedRequest -Url "$base/api/Request/Admin/Requesters?skip=0&take=5&sort=%5B%7B%22selector%22%3A%22quotationCount%22%2C%22desc%22%3Atrue%7D%5D" -Label 'Admin requesters'
-    Invoke-CheckedRequest -Url "$base/api/Dashboard/RequestTrend?timeframe=7d&aggregation=day" -Label 'Trend window'
-    Invoke-CheckedRequest -Url "$base/api/Session/Me" -Label 'Session me'
-    Invoke-CheckedRequest -Url "$base/api/Portal/Requests?view=MyRequests&page=1&pageSize=1" -Label 'Portal requests'
+
+    # The suite lives in Test-QCS-ApiSmoke.ps1 so it can also be run on its own against any
+    # environment, without deploying to it. It throws on failure, and $ErrorActionPreference is
+    # Stop, so a failed check fails the deploy.
+    & (Join-Path $PSScriptRoot 'Test-QCS-ApiSmoke.ps1') -BaseUrl $PublicApiBaseUrl
 }
 
 Write-Step 'API deploy completed successfully'
