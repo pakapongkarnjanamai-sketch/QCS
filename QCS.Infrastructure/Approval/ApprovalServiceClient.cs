@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using QCS.Application.Abstractions;
@@ -61,7 +63,7 @@ namespace QCS.Infrastructure.Approval
             return new ApprovalPreviewResult(
                 MapResolvedSteps(workflow?.Steps),
                 workflow?.Name,
-                workflow?.Version);
+                workflow?.Version?.ToString(CultureInfo.InvariantCulture));
         }
 
         public async Task<ApprovalDocumentSummary> CreateDocumentAsync(
@@ -402,8 +404,8 @@ namespace QCS.Infrastructure.Approval
         private sealed record SourceInputDto(string System, string Number, string Url);
 
         private sealed record ResolveWorkflowRequestDto(
-            string DocumentTypeCode,
-            string RequesterNId,
+            [property: JsonPropertyName("documentType")] string DocumentTypeCode,
+            [property: JsonPropertyName("requesterUsername")] string RequesterNId,
             IReadOnlyList<string> DocumentOrgCodes,
             IReadOnlyDictionary<string, object?> ConditionalData);
 
@@ -419,7 +421,7 @@ namespace QCS.Infrastructure.Approval
 
         private sealed record ResolvedWorkflowDto(
             string Name,
-            string Version,
+            int? Version,
             IReadOnlyList<ResolvedWorkflowStepDto>? Steps);
 
         private sealed record CreateDocumentCommandDto(
