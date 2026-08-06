@@ -16,6 +16,7 @@ const documentTypes = [
 interface TypedDocumentEditorProps {
   documents: PortalDocument[]
   disabled: boolean
+  uploading: boolean
   error?: string
   onUpload: (files: File[]) => void
   onAddReference: (code: string) => Promise<string | undefined>
@@ -31,6 +32,7 @@ function isPdf(file: File) {
 export function TypedDocumentEditor({
   documents,
   disabled,
+  uploading,
   error,
   onUpload,
   onAddReference,
@@ -62,7 +64,7 @@ export function TypedDocumentEditor({
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-sm border border-border-subtle bg-white px-3 text-body font-medium hover:bg-surface-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
             <Upload className="size-3.5" aria-hidden />
-            Upload PDFs
+            {uploading ? 'Uploading...' : 'Upload PDFs'}
             <input
               type="file"
               className="sr-only"

@@ -141,18 +141,38 @@ export function RequestFormPage() {
     }
   }
   const upload = async (files: File[]) => {
-    if (!requestId) {
-      toast.warning('Save the draft before uploading attachments.')
+    const nextErrors = validateRequest(
+      form,
+      'draft',
+      Boolean(request?.documents.some((document) => document.documentTypeId === 10)),
+    )
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length) {
+      focusFirstInvalid()
       return
     }
+
     setBusy('upload')
+    setError(undefined)
+    let targetRequestId = requestId
     try {
-      for (const file of files) await uploadPortalAttachment(requestId, file, defaultUploadDocumentTypeId)
-      const detail = await getPortalRequestById(requestId)
+      if (!targetRequestId) {
+        const draft = await createPortalDraft(form)
+        targetRequestId = draft.id
+        setDirty(false)
+        navigate(`/requests/${draft.id}/edit`, { replace: true })
+      }
+
+      for (const file of files) {
+        await uploadPortalAttachment(targetRequestId, file, defaultUploadDocumentTypeId)
+      }
+      const detail = await getPortalRequestById(targetRequestId)
       setRequest(detail)
       toast.success(files.length === 1 ? 'Document uploaded.' : `${files.length} documents uploaded.`)
     } catch (reason) {
-      setRequest(await getPortalRequestById(requestId).catch(() => request))
+      if (targetRequestId) {
+        setRequest(await getPortalRequestById(targetRequestId).catch(() => request))
+      }
       setError(toApiError(reason))
     } finally {
       setBusy(undefined)
@@ -233,7 +253,7 @@ export function RequestFormPage() {
         <Field label="Remark" error={errors.remark}>
           <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
-        <TypedDocumentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onAddReference={addReference} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
+        <TypedDocumentEditor documents={documents} disabled={disabled} uploading={busy === 'upload'} error={errors.attachments} onUpload={upload} onAddReference={addReference} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
         <WorkflowRoutePreview
           preview={routePreview}
           loading={routeLoading}
