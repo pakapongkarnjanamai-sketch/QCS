@@ -27,7 +27,8 @@
 │                       IIS (Windows Server)                    │
 │                                                              │
 │  /QCS/admin    ──▶  QCS.React.Admin   (React SPA)           │
-│  /QCS          ──▶  QCS.Web.User      (MVC User Portal)      │
+│  /QCS/User     ──▶  QCS.React.User    (React SPA — portal)   │
+│  /QCS          ──▶  redirect ไป /QCS/User (static)          │
 │  /QCS/Service  ──▶  QCS.API           (ASP.NET Core API)     │
 │  /PDF/Admin    ──▶  PDF.Admin         (MVC PDF Admin)        │
 │  /PDF/Service  ──▶  PDF.Service       (PDF Merge/Stamp API)  │
@@ -37,7 +38,7 @@
 | โปรเจค | บทบาท | ผู้ใช้งาน |
 |--------|-------|-----------|
 | `QCS.React.Admin` | Admin Portal (SPA) | IT Admin, Procurement Admin |
-| `QCS.Web.User` | User Portal (MVC) | Requester, Approver ทั่วไป |
+| `QCS.React.User` | User Portal (React SPA) | Requester, Approver ทั่วไป |
 | `QCS.API` | Backend REST API | รับ request จากทุก frontend |
 | `PDF.Admin` | PDF Management UI | Admin จัดการ Template |
 | `PDF.Service` | PDF Merge & Stamp API | Internal service สร้าง PDF สุดท้าย |
@@ -80,7 +81,6 @@ QCS/
 │       ├── lib/                # apiClient.ts, createDataSource.ts, toast.ts
 │       └── pages/              # overview, requests, quotations, users, vendors, workflow
 │
-├── QCS.Web.User/               # ASP.NET Core MVC — User Portal
 ├── PDF.Admin/                  # ASP.NET Core MVC — PDF Admin
 └── PDF.Service/                # ASP.NET Core Web API — PDF Processing
 ```
@@ -264,21 +264,9 @@ NIKONOA\N1234  →  ExtractNId()  →  "N1234"
 
 > NId `N4734` → hard-coded SuperAdmin เสมอ (root account)
 
-### ApiUserSyncMiddleware — QCS.Web.User
-
-MVC Portal sync roles ผ่าน HTTP call ไปที่ QCS.API แทน ClaimsTransformation:
-
-```
-NIKONOA\N1234 (Windows Identity)
-    │
-    ▼  POST /api/users/windows-auth → QCS.API
-UserDto + Roles[] กลับมา
-    │
-    ▼  สร้าง ClaimsPrincipal ใหม่
-HttpContext.User = ClaimsPrincipal ที่มี Role claims
-    │
-    ▼  Cache 10 นาที (MemoryCache) เพื่อลด HTTP calls
-```
+> **ApiUserSyncMiddleware ถูกลบแล้ว** — เป็นของ MVC portal (`QCS.Web.User`) ซึ่งถูกถอดออกใน
+> PLAN-051 Phase 6 พร้อมตัว middleware และ `ApiUserService` ที่ไม่มีผู้เรียกเหลือ ทุก portal ตอนนี้
+> เป็น SPA ที่คุยกับ `QCS.API` ตรง ๆ และ auth เกิดที่ API ที่เดียว ไม่มีการ sync role ข้ามแอปอีก
 
 ### React Admin — Auth Pattern
 
@@ -405,7 +393,8 @@ npm run dev
 ```
 Site Root (e.g. ap-server-01)
 └── /QCS
-    ├── /            → QCS.Web.User   (Windows Auth: On)
+    ├── /            → redirect ไป /QCS/User (static web.config, ไม่มีแอป)
+    ├── /User        → QCS.React.User (static SPA + URL Rewrite)
     ├── /Service     → QCS.API        (Windows Auth: On, CORS enabled)
     └── /Admin       → QCS.React.Admin (static SPA + URL Rewrite)
 ```

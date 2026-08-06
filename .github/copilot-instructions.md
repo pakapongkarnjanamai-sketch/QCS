@@ -12,7 +12,8 @@ QCS (Quotation Compare System) is a procurement and quotation management platfor
 - **Backend**: ASP.NET Core Web API (`QCS.API`) — Clean Architecture (Domain / Application / Infrastructure / API)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS (`QCS.React.Admin`) — Vite 8, DevExtreme React 24.2
 - **Admin portal (legacy)**: ASP.NET Core MVC (`QCS.Web.Admin`)
-- **User portal (legacy)**: ASP.NET Core MVC (`QCS.Web.User`)
+- **User portal**: React SPA (`QCS.React.User`) at `/QCS/User` — the only user portal. The MVC
+  portal was removed in PLAN-051 Phase 6; `/QCS` is now a static redirect to it.
 
 ### Business domain summary
 - QCS is used to create and control **Quotation** documents under company procurement rules.

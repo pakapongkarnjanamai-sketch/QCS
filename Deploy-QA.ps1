@@ -15,31 +15,30 @@ function Write-Header {
     Write-Host "===============================================" -ForegroundColor Yellow
 }
 
-# 1. Deploy QCS.Web.User (Parent Root Application)
-Write-Header "1/4 Deploying QCS.Web.User (MVC Web Portal) to QA"
-& "$Root\QCS.Web.User\scripts\Deploy-QCS-Web-User.ps1" `
-    -TargetPath "\\10.10.143.39\wwwroot\QCS" `
-    -PublicWebBaseUrl "https://ap-ntc2138-qawb/QCS" `
-    -Environment QA `
-    -SkipSmokeTest:$SkipSmokeTest
+# The MVC portal step used to be first here. QCS.Web.User was removed in PLAN-051 Phase 6 and
+# QCS.React.User is now the only user portal; /QCS serves a static one-hop redirect to /QCS/User,
+# provisioned by scripts/Setup-QCS-QA-IIS.ps1 rather than deployed on every release.
 
-# 2. Deploy QCS.API (Backend API Sub-Application)
-Write-Header "2/4 Deploying QCS.API (REST API Backend) to QA"
+# 1. Deploy QCS.API (Backend API Sub-Application)
+Write-Header "1/4 Deploying QCS.API (REST API Backend) to QA"
+# -ServerHost is mandatory since PLAN-052 hardened this script; without it the deploy stops on a
+# prompt rather than running. Every target is named explicitly here — there are no defaults left.
 & "$Root\QCS.API\scripts\Deploy-QCS-API.ps1" `
+    -Environment QA `
+    -ServerHost "AP-NTC2138-QAWB" `
     -TargetPath "\\10.10.143.39\wwwroot\QCS\Service" `
     -PublicApiBaseUrl "https://ap-ntc2138-qawb/QCS/Service" `
-    -Environment QA `
     -SkipSmokeTest:$SkipSmokeTest
 
-# 3. Deploy PDF.Service (Document Rendering Service)
-Write-Header "3/4 Deploying PDF.Service to QA"
+# 2. Deploy PDF.Service (Document Rendering Service)
+Write-Header "2/4 Deploying PDF.Service to QA"
 & "$Root\PDF.Service\scripts\Deploy-PDF-Service.ps1" `
     -TargetPath "\\10.10.143.39\wwwroot\QCS\PDF" `
     -PublicServiceBaseUrl "http://ap-ntc2138-qawb/QCS/PDF" `
     -SkipHealthCheck:$SkipSmokeTest
 
-# 4. Deploy QCS.React.Admin (Static SPA Sub-Application)
-Write-Header "4/5 Deploying QCS.React.Admin (Vite/React SPA) to QA"
+# 3. Deploy QCS.React.Admin (Static SPA Sub-Application)
+Write-Header "3/4 Deploying QCS.React.Admin (Vite/React SPA) to QA"
 & "$Root\QCS.React.Admin\scripts\Deploy-QCS-React-Admin.ps1" `
     -TargetPath "\\10.10.143.39\wwwroot\QCS\Admin" `
     -PublicBasePath "/QCS/admin" `
@@ -49,8 +48,8 @@ Write-Header "4/5 Deploying QCS.React.Admin (Vite/React SPA) to QA"
     -PublicSiteOrigin "https://ap-ntc2138-qawb" `
     -SkipSmokeTest:$SkipSmokeTest
 
-# 5. Deploy QCS.React.User (Static SPA Sub-Application)
-Write-Header "5/5 Deploying QCS.React.User (Vite/React SPA) to QA"
+# 4. Deploy QCS.React.User (Static SPA Sub-Application)
+Write-Header "4/4 Deploying QCS.React.User (Vite/React SPA) to QA"
 & "$Root\QCS.React.User\scripts\Deploy-QCS-React-User.ps1" `
     -TargetPath "\\10.10.143.39\wwwroot\QCS\User" `
     -PublicBasePath "/QCS/User" `

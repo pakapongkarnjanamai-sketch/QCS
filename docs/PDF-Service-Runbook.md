@@ -20,9 +20,13 @@ QCS final PDF generation is split across two applications:
 
 Primary user flow:
 
-1. User opens `QCS.Web.User` quotation viewer at `/QCS/Quotation/View/{code}`.
-2. Viewer calls `QCS.API` `/api/Quotation/ByCode/{code}` to load request metadata.
-3. If request is fully approved, viewer calls `QCS.API` `/api/Quotation/ViewFile/{requestId}`.
+1. User opens the `QCS.React.User` quotation view at `/QCS/User/quotations/{code}`. (This was
+   `/QCS/Quotation/View/{code}` in the MVC portal, removed in PLAN-051 Phase 6; `/QCS` now
+   redirects to `/QCS/User`.)
+2. The view calls `QCS.API` `/api/Quotation/ByCode/{code}` to load request metadata.
+3. If the request is `Completed`, the view calls `QCS.API` `/api/Quotation/ViewFile/{requestId}`.
+   Note `Completed`, not "fully approved" — `WaitingEffective` is approved but not yet in force and
+   is deliberately not quotation-ready.
 4. `QCS.API` calls `PDF.Service` `/api/Pdf/merge-stamp`.
 5. `PDF.Service` stamps and merges all quotation attachments.
 6. `QCS.API` returns `application/pdf` to the viewer.

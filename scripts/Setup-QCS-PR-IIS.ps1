@@ -6,6 +6,11 @@
         Invoke-Command -ComputerName AP-NTC2137-PRWB -Credential $cred -FilePath .\scripts\Setup-QCS-PR-IIS.ps1
 
 .DESCRIPTION
+    NOT YET UPDATED FOR PLAN-051. PROD still runs the MVC portal and the pre-migration schema, so
+    this file deliberately still describes that layout. Changing it to match QA before PROD has
+    actually been cut over would make it describe a server that does not exist. The PROD cutover is
+    a reviewed human-only plan; this script is updated as part of it, alongside Deploy-PR.ps1.
+
     Creates the following IIS application structure under Default Web Site:
         /QCS              -> QCS.Web.User (MVC)           -> QCS-Web-Pool
         /QCS/Service      -> QCS.API (REST API)            -> QCS-Api-Pool

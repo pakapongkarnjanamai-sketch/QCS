@@ -366,7 +366,6 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Project specific wwwroot folders
-QCS.Web.User/wwwroot/
 QCS.API/wwwroot/
 QCS.Web.Admin/wwwroot/
 
@@ -413,22 +412,9 @@ QCS.React.User/node_modules/
 QCS.React.User/dist/
 QCS.React.User/.tmp/
 
-# Same trap, second project. The `*.user` rule near the top of this file is a legacy Visual Studio
-# pattern and it matches the QCS.Web.User DIRECTORY too, which is why the whole of
-# QCS.Web.User/Security/ was silently absent from the repository — including
-# UserClaimsTransformation.cs, which Program.cs needs in order to build.
-#
-# Negated NARROWLY on purpose. A blanket `!QCS.Web.User/**` would also un-ignore
-# appsettings.Development.json and appsettings.QA.json, which the rule above deliberately keeps
-# out because they may carry connection strings, and would drag in the vendored DevExtreme CSS.
-# Git cannot re-include a file whose parent directory is excluded, so the directory has to be
-# un-ignored first and its contents re-excluded.
-!QCS.Web.User/
-QCS.Web.User/*
-!QCS.Web.User/*.cs
-!QCS.Web.User/*.csproj
-!QCS.Web.User/appsettings.json
-!QCS.Web.User/Controllers/
-!QCS.Web.User/Security/
-!QCS.Web.User/Views/
-!QCS.Web.User/scripts/
+# The QCS.Web.User negations that used to sit here were removed with the project in PLAN-051
+# Phase 6. They existed because the legacy `*.user` rule near the top of this file matches a
+# DIRECTORY named QCS.Web.User, which had silently kept that project's Security/ folder out of the
+# repository. The trap itself is still live: any future directory whose name ends in `.user` will
+# be swallowed the same way, and the symptom is a fresh clone that does not build rather than an
+# error from git.

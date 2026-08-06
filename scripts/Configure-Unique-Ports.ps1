@@ -56,8 +56,6 @@ $allocated = $null # clear variable references
 Write-Host "=== Configuring QCS Unique Ports ===" -ForegroundColor Cyan
 Write-Host "QCS.API HTTP Port       -> $($ports.ApiHttp)"
 Write-Host "QCS.API HTTPS Port      -> $($ports.ApiHttps)"
-Write-Host "QCS.Web.User HTTP Port  -> $($ports.WebHttp)"
-Write-Host "QCS.Web.User HTTPS Port -> $($ports.WebHttps)"
 Write-Host "PDF.Service HTTP Port   -> $($ports.PdfHttp)"
 Write-Host "PDF.Service HTTPS Port  -> $($ports.PdfHttps)"
 Write-Host "QCS.React.Admin Port    -> $($ports.React)"
@@ -75,16 +73,11 @@ if (Test-Path $apiLaunchPath) {
     Write-Host "Updated QCS.API launchSettings.json successfully." -ForegroundColor Green
 }
 
-# 2. Update QCS.Web.User launchSettings.json
-$webLaunchPath = Join-Path $projectRoot "QCS.Web.User/Properties/launchSettings.json"
-if (Test-Path $webLaunchPath) {
-    $content = Get-Content $webLaunchPath -Raw
-    $content = $content -replace '"applicationUrl":\s*"https://localhost:\d+;http://localhost:\d+"', "`"applicationUrl`": `"https://localhost:$($ports.WebHttps);http://localhost:$($ports.WebHttp)`""
-    Set-Content -Path $webLaunchPath -Value $content -Encoding UTF8
-    Write-Host "Updated QCS.Web.User launchSettings.json successfully." -ForegroundColor Green
-}
+# QCS.Web.User's launchSettings step was removed with the project in PLAN-051 Phase 6. WebHttp and
+# WebHttps are still allocated above so the port arithmetic and any saved local settings keep their
+# existing offsets; they are simply no longer written anywhere.
 
-# 3. Update PDF.Service launchSettings.json
+# 2. Update PDF.Service launchSettings.json
 $pdfLaunchPath = Join-Path $projectRoot "PDF.Service/Properties/launchSettings.json"
 if (Test-Path $pdfLaunchPath) {
     $content = Get-Content $pdfLaunchPath -Raw
@@ -93,25 +86,16 @@ if (Test-Path $pdfLaunchPath) {
     Write-Host "Updated PDF.Service launchSettings.json successfully." -ForegroundColor Green
 }
 
-# 4. Update QCS.Web.User appsettings.Development.json (ApiSettings:BaseUrl)
-$webAppsettingsDevPath = Join-Path $projectRoot "QCS.Web.User/appsettings.Development.json"
-if (Test-Path $webAppsettingsDevPath) {
-    $content = Get-Content $webAppsettingsDevPath -Raw
-    $content = $content -replace '"BaseUrl":\s*"https://localhost:\d+/api"', "`"BaseUrl`": `"https://localhost:$($ports.ApiHttps)/api`""
-    Set-Content -Path $webAppsettingsDevPath -Value $content -Encoding UTF8
-    Write-Host "Updated QCS.Web.User appsettings.Development.json successfully." -ForegroundColor Green
-}
-
-# 5. Update QCS.API appsettings.Development.json (CORS & PDF service url)
+# 3. Update QCS.API appsettings.Development.json (CORS & PDF service url)
 $apiAppsettingsDevPath = Join-Path $projectRoot "QCS.API/appsettings.Development.json"
 if (Test-Path $apiAppsettingsDevPath) {
     $content = Get-Content $apiAppsettingsDevPath -Raw
     # Update React Admin ports
     $content = $content -replace '"http://localhost:\d+"', "`"http://localhost:$($ports.React)`""
     $content = $content -replace '"http://127.0.0.1:\d+"', "`"http://127.0.0.1:$($ports.React)`""
-    # Update Web.User ports in CORS
-    $content = $content -replace '"http://localhost:\d+"', "`"http://localhost:$($ports.WebHttp)`""
-    $content = $content -replace '"https://localhost:\d+"', "`"https://localhost:$($ports.WebHttps)`""
+    # The two Web.User CORS rewrites that followed were removed with the project. They were also a
+    # bug: the first re-matched the same '"http://localhost:\d+"' pattern the React line had just
+    # written, so the React origin was immediately overwritten with the MVC port.
     # Update PDF Service URL
     $content = $content -replace '"PdfServiceUrl":\s*"https://localhost:\d+"', "`"PdfServiceUrl`": `"https://localhost:$($ports.PdfHttps)`""
     Set-Content -Path $apiAppsettingsDevPath -Value $content -Encoding UTF8

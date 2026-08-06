@@ -13,14 +13,14 @@
 			}
 		},
 		{
-			"name": "QCS.Web.User",
-			"type": "dotnet",
+			"name": "QCS.React.User",
+			"type": "node-terminal",
 			"request": "launch",
-			"projectPath": "${workspaceFolder}/QCS.Web.User/QCS.Web.User.csproj",
+			"command": "npm run dev",
+			"cwd": "${workspaceFolder}/QCS.React.User",
 			"serverReadyAction": {
 				"action": "openExternally",
-				"pattern": "\\bNow listening on:\\s+(https?://\\S+)",
-				"uriFormat": "%s"
+				"pattern": "Local:\\s+(https?://\\S+)"
 			}
 		},
 		{
@@ -48,11 +48,11 @@
 	],
 	"compounds": [
 		{
-			"name": "Full System (API + Web.User + PDF + React)",
+			"name": "Full System (API + PDF + React User + React Admin)",
 			"configurations": [
 				"QCS.API",
-				"QCS.Web.User",
 				"PDF.Service",
+				"QCS.React.User",
 				"QCS.React.Admin"
 			],
 			"stopAll": true

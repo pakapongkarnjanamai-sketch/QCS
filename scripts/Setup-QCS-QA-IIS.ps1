@@ -7,10 +7,16 @@
 
 .DESCRIPTION
     Creates the following IIS application structure under Default Web Site:
-        /QCS              -> QCS.Web.User (MVC)           -> QCS-Web-Pool
+        /QCS              -> static redirect to /QCS/User  -> QCS-Web-Pool (No Managed Code)
         /QCS/Service      -> QCS.API (REST API)            -> QCS-Api-Pool
         /QCS/PDF          -> PDF.Service (Document API)    -> QCS-Pdf-Pool
         /QCS/Admin        -> QCS.React.Admin (Static SPA)  -> QCS-Admin-Pool
+        /QCS/User         -> QCS.React.User (Static SPA)   -> QCS-User-Pool
+
+    /QCS hosted the MVC portal until PLAN-051 Phase 6. It remains an IIS application only because
+    the four applications below are nested under it; it now serves one web.config and no code.
+    QCS-User-Pool belongs to QCS.React.User and must NOT be removed with the MVC portal — the pool
+    that went with MVC is QCS-Web-Pool, and it is kept for the redirect.
 
     All app pools: No Managed Code, Integrated pipeline.
     Auth: Windows Auth ON / Anonymous OFF for .NET apps; Anonymous ON / Windows OFF for React SPA.
@@ -28,12 +34,18 @@ $appcmd = Join-Path $env:SystemRoot 'System32\inetsrv\appcmd.exe'
 
 # ── App definitions ──────────────────────────────────────────────────────
 $Apps = @(
+    # /QCS was the MVC portal. PLAN-051 Phase 6 removed it; this is now a static redirect to
+    # /QCS/User so existing bookmarks keep working. It stays an IIS application only because the
+    # sub-applications below live under it — the pool runs No Managed Code and serves one
+    # web.config, no .NET application. Anonymous is required: a redirect the browser cannot reach
+    # without authenticating first is not a redirect a bookmark survives.
     @{
         Name         = 'QCS'
         PhysicalPath = "$PhysicalRoot\QCS"
         PoolName     = 'QCS-Web-Pool'
-        WindowsAuth  = $true
-        AnonAuth     = $false
+        WindowsAuth  = $false
+        AnonAuth     = $true
+        RedirectTo   = '/QCS/User/'
     },
     @{
         Name         = 'QCS/Service'
@@ -121,6 +133,47 @@ function Set-AppAuth {
     & $appcmd set config "$AppPath" "-section:system.webServer/security/authentication/anonymousAuthentication" "-enabled:$anonAuthValue" /commit:apphost 2>&1 | Out-Null
 }
 
+<#
+    Writes the web.config that turns /QCS into a one-hop redirect to the React portal.
+
+    Two details matter and neither is optional:
+
+    * inheritInChildApplications="false" — without it, /QCS/Service, /QCS/User, /QCS/Admin and
+      /QCS/PDF inherit this httpRedirect and every one of them starts redirecting to /QCS/User/.
+      That breaks the API and puts the SPA in a loop, and it looks like a routing bug rather than
+      a config inheritance bug.
+    * exactDestination="true" with childOnly="false" — the appended path must not be carried over.
+      An old bookmark to /QCS/Request/Detail/5 has no equivalent path under the SPA, so it goes to
+      the portal root rather than to a React route that does not exist.
+
+    302, not 301: a permanent redirect is cached by browsers indefinitely and would outlive any
+    decision to change this.
+#>
+function Write-RedirectStub {
+    param(
+        [string]$PhysicalPath,
+        [string]$Destination
+    )
+
+    if (-not (Test-Path $PhysicalPath)) {
+        New-Item -ItemType Directory -Path $PhysicalPath -Force | Out-Null
+    }
+
+    $configPath = Join-Path $PhysicalPath 'web.config'
+    $content = @"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <httpRedirect enabled="true" destination="$Destination" exactDestination="true" childOnly="false" httpResponseStatus="Found" />
+    </system.webServer>
+  </location>
+</configuration>
+"@
+    Set-Content -Path $configPath -Value $content -Encoding UTF8
+    Write-Host "    Redirect: /QCS -> $Destination" -ForegroundColor DarkCyan
+}
+
 function Grant-AppPoolAcl {
     param(
         [string]$PhysicalPath,
@@ -159,6 +212,24 @@ foreach ($app in $Apps) {
     Ensure-WebApplication -SiteName $Site -AppName $app.Name -PhysicalPath $app.PhysicalPath -PoolName $app.PoolName
     Set-AppAuth -AppPath "$Site/$($app.Name)" -WindowsAuth $app.WindowsAuth -AnonAuth $app.AnonAuth
     Grant-AppPoolAcl -PhysicalPath $app.PhysicalPath -PoolName $app.PoolName -AnonAuth $app.AnonAuth
+    if ($app.ContainsKey('RedirectTo')) {
+        Write-RedirectStub -PhysicalPath $app.PhysicalPath -Destination $app.RedirectTo
+    }
+}
+
+# The old MVC application left its binaries and views under $PhysicalRoot\QCS. They are dead files
+# that would still be served if any path happened to match, so name what is expected to remain.
+Write-Host "`n=== Leftover MVC content under $PhysicalRoot\QCS ===" -ForegroundColor Yellow
+$expected = @('web.config', 'Service', 'PDF', 'Admin', 'User', 'logs', '_backup')
+$leftovers = @(Get-ChildItem -LiteralPath "$PhysicalRoot\QCS" -Force -ErrorAction SilentlyContinue |
+    Where-Object { $expected -notcontains $_.Name })
+if ($leftovers.Count -eq 0) {
+    Write-Host "[*] None." -ForegroundColor Green
+} else {
+    # Reported, never deleted here. This script provisions; removing deployed content is a
+    # decision for whoever is doing the cutover, with a backup taken first.
+    Write-Host "[!] Remove these by hand once the redirect is verified:" -ForegroundColor Yellow
+    $leftovers | ForEach-Object { Write-Host "    $($_.Name)" -ForegroundColor Yellow }
 }
 
 # Restart all QCS app pools
