@@ -385,19 +385,19 @@ Invoke-SmokeCheck -Label 'Central approval route preview' `
     -JsonBody $previewBody `
     -ExpectJsonPath @('steps')
 
-$missingRequestId = 2147483647
-$actionBody = @{ comment = 'Route existence smoke check' } | ConvertTo-Json -Compress
-Invoke-SmokeCheck -Label 'Return route exists without mutating data' `
-    -Url "$base/api/Portal/Requests/$missingRequestId/return" `
-    -Method 'POST' `
-    -JsonBody $actionBody `
-    -ExpectStatus @(404)
-
-Invoke-SmokeCheck -Label 'Cancel route exists without mutating data' `
-    -Url "$base/api/Portal/Requests/$missingRequestId/cancel" `
-    -Method 'POST' `
-    -JsonBody $actionBody `
-    -ExpectStatus @(404)
+# 🔴 The two checks that stood here POSTed to request id 2147483647 and expected 404, reasoning
+# that the route exists but the document does not. **404 cannot tell those apart.** A missing route
+# answers 404 just as readily as a missing document, and on 2026-08-06 that is exactly what
+# happened: QA had no return or cancel route at all and both checks reported PASS.
+#
+# A GET against a POST-only route is the discriminator. 405 means the path matched and only the
+# method was wrong, so the route is mapped; 404 means nothing is there. A GET also cannot mutate,
+# which was the original intent, so nothing is lost by dropping the fake id.
+foreach ($portalAction in @('submit', 'approve', 'reject', 'return', 'cancel')) {
+    Invoke-SmokeCheck -Label "Portal $portalAction route is mapped" `
+        -Url "$base/api/Portal/Requests/1/$portalAction" `
+        -ExpectStatus @(405)
+}
 
 # ---------------------------------------------------------------------------------------------
 # The section that would have caught the 2026-08-06 outage. Everything below reads a request
@@ -479,7 +479,14 @@ if ($null -eq $portalId) {
     Add-Result -Label 'Portal detail checks' -Outcome 'SKIP' -Detail 'caller has no visible portal requests' -Url "$base/api/Portal/Requests"
 }
 else {
-    $portalFields = @('id', 'code', 'title', 'statusName', 'permissions', 'documents', 'workflowSteps', 'histories')
+    # permissions.canSubmit is asserted by path because it is the flag the detail page now reads to
+    # decide whether to offer Submit at all. If the permission block silently reverts to the old
+    # four flags, every action button disappears and no status code changes.
+    $portalFields = @(
+        'id', 'code', 'title', 'statusName', 'documents', 'workflowSteps', 'histories',
+        'permissions', 'permissions.canSubmit', 'permissions.canReturn', 'permissions.canCancel',
+        'permissions.isCreator', 'permissions.availableActions'
+    )
 
     Invoke-SmokeCheck -Label 'Portal detail by id' `
         -Url "$base/api/Portal/Requests/$portalId" `
@@ -491,6 +498,7 @@ else {
             -ExpectJsonPath $portalFields
     }
 }
+
 
 # ---------------------------------------------------------------------------------------------
 Write-Step 'Integration surface and its auth gate'
