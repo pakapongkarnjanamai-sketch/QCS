@@ -9,7 +9,7 @@ namespace QCS.Application.Abstractions
         bool IsUrgent,
         string RequesterOrgCode,
         IReadOnlyList<string> DocumentOrgCodes,
-        IReadOnlyDictionary<string, object?> ConditionalData,
+        IReadOnlyDictionary<string, string?> ConditionalData,
         DateTime? EffectiveDate = null
     );
 

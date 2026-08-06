@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using QCS.Application.Abstractions;
+using System.Globalization;
 
 namespace QCS.Infrastructure.Approval
 {
@@ -30,12 +31,12 @@ namespace QCS.Infrastructure.Approval
                 IsUrgent: false,
                 context.RequesterOrgCode,
                 new[] { context.RequesterOrgCode },
-                new Dictionary<string, object?>
+                new Dictionary<string, string?>
                 {
                     ["vendorCode"] = context.VendorCode,
-                    ["validFrom"] = context.ValidFrom,
-                    ["validUntil"] = context.ValidUntil,
-                    ["attachmentCount"] = context.AttachmentCount,
+                    ["validFrom"] = context.ValidFrom?.ToString("O", CultureInfo.InvariantCulture),
+                    ["validUntil"] = context.ValidUntil?.ToString("O", CultureInfo.InvariantCulture),
+                    ["attachmentCount"] = context.AttachmentCount.ToString(CultureInfo.InvariantCulture),
                     ["sourceSystem"] = options.SourceSystem
                 },
                 context.ValidFrom);

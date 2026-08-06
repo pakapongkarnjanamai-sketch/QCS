@@ -37,7 +37,11 @@ namespace QCS.Api.IntegrationTests
                 false,
                 "ORG1",
                 new[] { "ORG1" },
-                new Dictionary<string, object?> { ["vendorCode"] = "V001" });
+                new Dictionary<string, string?>
+                {
+                    ["vendorCode"] = "V001",
+                    ["attachmentCount"] = "3"
+                });
 
             var result = await client.PreviewRouteAsync(request, "USER01");
 
@@ -47,6 +51,7 @@ namespace QCS.Api.IntegrationTests
             var root = payload.RootElement;
             root.GetProperty("documentType").GetString().ShouldBe("QC");
             root.GetProperty("requesterUsername").GetString().ShouldBe("USER01");
+            root.GetProperty("conditionalData").GetProperty("attachmentCount").GetString().ShouldBe("3");
             root.TryGetProperty("documentTypeCode", out _).ShouldBeFalse();
             root.TryGetProperty("requesterNId", out _).ShouldBeFalse();
         }

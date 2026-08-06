@@ -47,7 +47,7 @@ namespace QCS.Infrastructure.Approval
                 Options.DocumentTypeCode,
                 actingNId,
                 request.DocumentOrgCodes,
-                request.ConditionalData.ToDictionary());
+                request.ConditionalData);
 
             var workflowClient = _httpClientFactory.CreateClient(WorkflowHttpClientName);
             using var response = await workflowClient.PostAsJsonAsync(
@@ -78,7 +78,7 @@ namespace QCS.Infrastructure.Approval
                 request.IsUrgent,
                 request.RequesterOrgCode,
                 request.DocumentOrgCodes,
-                request.ConditionalData.ToDictionary(),
+                request.ConditionalData,
                 request.EffectiveDate,
                 DocumentNumber: null,
                 NId: actingNId);
@@ -407,7 +407,7 @@ namespace QCS.Infrastructure.Approval
             [property: JsonPropertyName("documentType")] string DocumentTypeCode,
             [property: JsonPropertyName("requesterUsername")] string RequesterNId,
             IReadOnlyList<string> DocumentOrgCodes,
-            IReadOnlyDictionary<string, object?> ConditionalData);
+            IReadOnlyDictionary<string, string?> ConditionalData);
 
         private sealed record ResolvedWorkflowAssigneeDto(
             string Username,
@@ -431,7 +431,7 @@ namespace QCS.Infrastructure.Approval
             bool IsUrgent,
             string RequesterOrgCode,
             IReadOnlyList<string> DocumentOrgCodes,
-            IReadOnlyDictionary<string, object?> ConditionalData,
+            IReadOnlyDictionary<string, string?> ConditionalData,
             DateTime? EffectiveDate,
             string? DocumentNumber,
             string NId);

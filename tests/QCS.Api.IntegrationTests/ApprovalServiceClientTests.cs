@@ -47,6 +47,8 @@ namespace QCS.Api.IntegrationTests
                 new[] { "vendorCode", "validFrom", "validUntil", "attachmentCount", "sourceSystem" },
                 ignoreOrder: true);
             request.ConditionalData["sourceSystem"].ShouldBe("QCS");
+            request.ConditionalData["attachmentCount"].ShouldBe("3");
+            request.ConditionalData["validFrom"].ShouldBe("2026-08-01T00:00:00.0000000");
         }
 
         [Fact]
