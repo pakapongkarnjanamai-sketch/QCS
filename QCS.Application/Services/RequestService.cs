@@ -40,6 +40,7 @@ namespace QCS.Application.Services
         Task SubmitPortalRequestAsync(int id, CancellationToken cancellationToken = default);
         Task DeletePortalDraftAsync(int id, CancellationToken cancellationToken = default);
         Task<PortalAttachmentDto> AddPortalAttachmentAsync(int requestId, UploadPortalAttachmentDto input, CancellationToken cancellationToken = default);
+        Task AddExpiredQuotationReferenceAsync(int requestId, AddExpiredQuotationReferenceDto input, CancellationToken cancellationToken = default);
         Task UpdatePortalDocumentsAsync(int requestId, UpdatePortalDocumentsDto input, CancellationToken cancellationToken = default);
         Task DeletePortalAttachmentAsync(int requestId, int attachmentId, CancellationToken cancellationToken = default);
         Task ApprovePortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default);
@@ -508,16 +509,18 @@ namespace QCS.Application.Services
         {
             var q = await _unitOfWork.Repository<Quotation>().GetAll()
                 .Include(x => x.AttachmentFile)
+                .Include(x => x.SourceQuotation).ThenInclude(source => source!.AttachmentFile)
                 .FirstOrDefaultAsync(x => x.Id == fileId);
 
             if (q == null) return null;
 
-            if (q.AttachmentFile?.Data != null)
+            var attachment = q.AttachmentFile ?? q.SourceQuotation?.AttachmentFile;
+            if (attachment?.Data != null)
             {
                 return new AttachmentResultDto
                 {
-                    Data = q.AttachmentFile.Data,
-                    ContentType = q.AttachmentFile.ContentType ?? "application/octet-stream",
+                    Data = attachment.Data,
+                    ContentType = attachment.ContentType ?? "application/octet-stream",
                     FileName = q.FileName
                 };
             }
@@ -657,7 +660,7 @@ namespace QCS.Application.Services
         public async Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default)
         {
             var request = await _unitOfWork.Repository<Request>().GetAll()
-                .Include(r => r.Quotations)
+                .Include(r => r.Quotations).ThenInclude(q => q.SourceQuotation).ThenInclude(source => source!.Request)
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
@@ -814,6 +817,7 @@ namespace QCS.Application.Services
                         : q.DocumentTypeId == (int)DocumentType.ExpiredQuotation ? nameof(DocumentType.ExpiredQuotation)
                         : "Unknown",
                     SortOrder = q.SortOrder,
+                    ReferenceCode = q.SourceQuotation?.Request.Code,
                     FileSize = q.FileSize,
                     ViewUrl = $"/api/Request/ViewFile/{q.Id}"
                 }).ToList();
@@ -1184,6 +1188,107 @@ namespace QCS.Application.Services
             };
         }
 
+        public async Task AddExpiredQuotationReferenceAsync(int requestId, AddExpiredQuotationReferenceDto input, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(input.Code))
+            {
+                throw new ArgumentException("Expired quotation Code is required.");
+            }
+
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(target => target.Quotations)
+                .FirstOrDefaultAsync(target => target.Id == requestId, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {requestId} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to add quotation references to this request.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Quotation references can only be added to draft requests.");
+            }
+
+            var normalizedCode = input.Code.Trim().ToUpperInvariant();
+            var sourceRequest = await _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Include(source => source.Quotations)
+                .FirstOrDefaultAsync(source => source.Code == normalizedCode, cancellationToken);
+
+            if (sourceRequest == null)
+            {
+                throw new KeyNotFoundException($"Request {normalizedCode} not found.");
+            }
+
+            if (sourceRequest.Id == request.Id)
+            {
+                throw new InvalidOperationException("A request cannot reference itself.");
+            }
+
+            if (sourceRequest.Status != (int)RequestStatus.Completed)
+            {
+                throw new InvalidOperationException("The referenced request must be Completed.");
+            }
+
+            if (!sourceRequest.ValidUntil.HasValue || sourceRequest.ValidUntil.Value >= _dateTime.Now)
+            {
+                throw new InvalidOperationException("The referenced request has not expired.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.VendorCode) ||
+                !string.Equals(request.VendorCode.Trim(), sourceRequest.VendorCode?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("The referenced request must use the same Vendor Code.");
+            }
+
+            var sourceQuotations = sourceRequest.Quotations
+                .Where(quotation => quotation.DocumentTypeId == (int)DocumentType.OriginalQuotation
+                    && quotation.SourceQuotationId == null
+                    && quotation.AttachmentFileId.HasValue)
+                .OrderBy(quotation => quotation.SortOrder)
+                .ThenBy(quotation => quotation.Id)
+                .ToList();
+
+            if (sourceQuotations.Count == 0)
+            {
+                throw new InvalidOperationException("The referenced request has no Original Quotation PDF.");
+            }
+
+            var sourceIds = sourceQuotations.Select(quotation => quotation.Id).ToHashSet();
+            if (request.Quotations.Any(quotation => quotation.SourceQuotationId.HasValue
+                && sourceIds.Contains(quotation.SourceQuotationId.Value)))
+            {
+                throw new InvalidOperationException($"Request {normalizedCode} is already referenced.");
+            }
+
+            var nextSortOrder = request.Quotations.Count == 0
+                ? 1
+                : request.Quotations.Max(quotation => quotation.SortOrder) + 1;
+
+            foreach (var sourceQuotation in sourceQuotations)
+            {
+                request.Quotations.Add(new Quotation
+                {
+                    FileName = sourceQuotation.FileName,
+                    FilePath = "Reference",
+                    ContentType = sourceQuotation.ContentType,
+                    FileSize = sourceQuotation.FileSize,
+                    DocumentTypeId = (int)DocumentType.ExpiredQuotation,
+                    SortOrder = nextSortOrder++,
+                    SourceQuotationId = sourceQuotation.Id
+                });
+            }
+
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"อ้างอิงใบเสนอราคาหมดอายุ {normalizedCode} ในเอกสาร {request.Code}");
+        }
+
         public async Task UpdatePortalDocumentsAsync(int requestId, UpdatePortalDocumentsDto input, CancellationToken cancellationToken = default)
         {
             var request = await _unitOfWork.Repository<Request>().GetAll()
@@ -1219,6 +1324,12 @@ namespace QCS.Application.Services
             }
 
             var quotationsById = request.Quotations.ToDictionary(quotation => quotation.Id);
+            if (input.Documents.Any(document => quotationsById[document.Id].SourceQuotationId.HasValue
+                && document.DocumentTypeId != (int)DocumentType.ExpiredQuotation))
+            {
+                throw new ArgumentException("Referenced quotations must remain Expired Quotation documents.");
+            }
+
             for (var index = 0; index < input.Documents.Count; index++)
             {
                 var update = input.Documents[index];

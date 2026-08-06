@@ -16,6 +16,11 @@ namespace QCS.Domain.Models
         public int DocumentTypeId { get; set; } // 10, 20, 30
         public int SortOrder { get; set; }
 
+        public int? SourceQuotationId { get; set; }
+
+        [ForeignKey("SourceQuotationId")]
+        public virtual Quotation? SourceQuotation { get; set; }
+
         public int? AttachmentFileId { get; set; }
 
         [ForeignKey("AttachmentFileId")]

@@ -81,7 +81,10 @@ export interface PortalRequestPermissions {
 // fileSize was missing here while the DTO has always sent it. It is always present in the
 // response — WhenWritingNull omits nulls, not zeros — but it is 0 on the generated FinalPdf row,
 // which is built without one. Callers must treat 0 as "unknown", not as an empty file.
-export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; sortOrder: number; fileSize: number; viewUrl: string }
+export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; sortOrder: number; referenceCode?: string; fileSize: number; viewUrl: string }
+
+// Mirrors QCS.Domain.DTOs.Portal.AddExpiredQuotationReferenceDto.
+export interface AddExpiredQuotationReference { code: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalWorkflowStepDto.
 export interface PortalWorkflowStep { id: number; sequenceNo: number; stepName: string; status?: number; statusName?: string; actionDate?: string; isCurrentStep: boolean; approverNId?: string; approverName?: string; comment?: string; assignments: PortalAssignment[] }

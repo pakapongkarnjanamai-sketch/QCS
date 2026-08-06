@@ -70,6 +70,14 @@ namespace QCS.Infrastructure.Data
                     .HasDatabaseName("IX_Requests_ApprovalDocumentId");
             });
 
+            modelBuilder.Entity<Quotation>(entity =>
+            {
+                entity.HasOne(quotation => quotation.SourceQuotation)
+                    .WithMany()
+                    .HasForeignKey(quotation => quotation.SourceQuotationId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<AdminUserAccess>(entity =>
             {
                 entity.Property(x => x.NId)

@@ -896,6 +896,234 @@ namespace QCS.Api.IntegrationTests
             response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         }
 
+        [Fact]
+        public async Task AddExpiredQuotationReference_WhenEligible_LinksOriginalFilesWithoutCopyingBinary()
+        {
+            const int targetRequestId = 12000;
+            const int sourceRequestId = 12001;
+            const int firstSourceQuotationId = 1200101;
+            const int secondSourceQuotationId = 1200102;
+            var firstBytes = "%PDF-1.4 first source"u8.ToArray();
+            var secondBytes = "%PDF-1.4 second source"u8.ToArray();
+
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(targetRequestId) != null) return;
+
+                db.Requests.Add(new Request
+                {
+                    Id = targetRequestId,
+                    Code = "QC-20260806-12000",
+                    Title = "Replacement quotation",
+                    VendorCode = "V100",
+                    VendorName = "Vendor 100",
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+
+                var source = new Request
+                {
+                    Id = sourceRequestId,
+                    Code = "QC-20250101-12001",
+                    Title = "Expired quotation",
+                    VendorCode = "V100",
+                    VendorName = "Vendor 100",
+                    ValidUntil = DateTime.Now.AddDays(-1),
+                    Status = (int)RequestStatus.Completed,
+                    CreatedBy = "SOURCE01",
+                    IsActive = true
+                };
+                source.Quotations.Add(CreateSourceQuotation(firstSourceQuotationId, "old-one.pdf", firstBytes));
+                source.Quotations.Add(CreateSourceQuotation(secondSourceQuotationId, "old-two.pdf", secondBytes));
+                db.Requests.Add(source);
+            });
+
+            var attachmentCountBeforeReference = 0;
+            _factory.SeedDatabase(db => attachmentCountBeforeReference = db.AttachmentFiles.Count());
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/expired-quotation-references",
+                new AddExpiredQuotationReferenceDto { Code = " qc-20250101-12001 " });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            int[] referenceIds = Array.Empty<int>();
+            _factory.SeedDatabase(db =>
+            {
+                var references = db.Quotations
+                    .Where(quotation => quotation.RequestId == targetRequestId)
+                    .OrderBy(quotation => quotation.SortOrder)
+                    .ToList();
+                references.Count.ShouldBe(2);
+                references.Select(quotation => quotation.DocumentTypeId)
+                    .ShouldAllBe(documentTypeId => documentTypeId == (int)DocumentType.ExpiredQuotation);
+                references.Select(quotation => quotation.SourceQuotationId)
+                    .ShouldBe(new int?[] { firstSourceQuotationId, secondSourceQuotationId });
+                references.ShouldAllBe(quotation => quotation.AttachmentFileId == null);
+                db.AttachmentFiles.Count().ShouldBe(attachmentCountBeforeReference);
+                referenceIds = references.Select(quotation => quotation.Id).ToArray();
+            });
+
+            var detail = await client.GetFromJsonAsync<PortalRequestDetailDto>($"/api/Portal/Requests/{targetRequestId}");
+            detail.ShouldNotBeNull();
+            detail.Documents.Select(document => document.ReferenceCode)
+                .ShouldAllBe(referenceCode => referenceCode == "QC-20250101-12001");
+
+            var fileResponse = await client.GetAsync($"/api/Request/ViewFile/{referenceIds[0]}");
+            fileResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+            (await fileResponse.Content.ReadAsByteArrayAsync()).ShouldBe(firstBytes);
+        }
+
+        [Theory]
+        [InlineData(12100, RequestStatus.InProcess, -1, "V100")]
+        [InlineData(12110, RequestStatus.Completed, 1, "V100")]
+        [InlineData(12120, RequestStatus.Completed, -1, "OTHER")]
+        public async Task AddExpiredQuotationReference_WhenSourceIsIneligible_Returns400BadRequest(
+            int targetRequestId,
+            RequestStatus sourceStatus,
+            int validUntilOffsetDays,
+            string sourceVendorCode)
+        {
+            var sourceCode = SeedExpiredReferenceScenario(
+                targetRequestId,
+                sourceStatus,
+                DateTime.Now.AddDays(validUntilOffsetDays),
+                sourceVendorCode);
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/expired-quotation-references",
+                new AddExpiredQuotationReferenceDto { Code = sourceCode });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task AddExpiredQuotationReference_WhenNotOwner_Returns403Forbidden()
+        {
+            const int targetRequestId = 12130;
+            var sourceCode = SeedExpiredReferenceScenario(
+                targetRequestId,
+                RequestStatus.Completed,
+                DateTime.Now.AddDays(-1),
+                "V100",
+                "OWNER01");
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/expired-quotation-references",
+                new AddExpiredQuotationReferenceDto { Code = sourceCode });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
+        [Fact]
+        public async Task AddExpiredQuotationReference_WhenRepeatedOrRetyped_RejectsBothChanges()
+        {
+            const int targetRequestId = 12140;
+            var sourceCode = SeedExpiredReferenceScenario(
+                targetRequestId,
+                RequestStatus.Completed,
+                DateTime.Now.AddDays(-1),
+                "V100");
+            var client = CreateAuthenticatedClient("USER01");
+            var referenceInput = new AddExpiredQuotationReferenceDto { Code = sourceCode };
+
+            (await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/expired-quotation-references",
+                referenceInput)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            (await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/expired-quotation-references",
+                referenceInput)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+            var detail = await client.GetFromJsonAsync<PortalRequestDetailDto>($"/api/Portal/Requests/{targetRequestId}");
+            detail.ShouldNotBeNull();
+            var reference = detail.Documents.ShouldHaveSingleItem();
+            var updateResponse = await client.PutAsJsonAsync(
+                $"/api/Portal/Requests/{targetRequestId}/attachments",
+                new UpdatePortalDocumentsDto
+                {
+                    Documents =
+                    {
+                        new PortalDocumentUpdateDto
+                        {
+                            Id = reference.Id,
+                            DocumentTypeId = (int)DocumentType.Attachment
+                        }
+                    }
+                });
+
+            updateResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        private string SeedExpiredReferenceScenario(
+            int targetRequestId,
+            RequestStatus sourceStatus,
+            DateTime sourceValidUntil,
+            string sourceVendorCode,
+            string owner = "USER01")
+        {
+            var sourceRequestId = targetRequestId + 1;
+            var sourceQuotationId = sourceRequestId * 100 + 1;
+            var sourceCode = $"QC-20250101-{sourceRequestId}";
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(targetRequestId) != null) return;
+                db.Requests.Add(new Request
+                {
+                    Id = targetRequestId,
+                    Code = $"QC-20260806-{targetRequestId}",
+                    Title = "Replacement quotation",
+                    VendorCode = "V100",
+                    VendorName = "Vendor 100",
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = owner,
+                    IsActive = true
+                });
+                var source = new Request
+                {
+                    Id = sourceRequestId,
+                    Code = sourceCode,
+                    Title = "Source quotation",
+                    VendorCode = sourceVendorCode,
+                    VendorName = "Source vendor",
+                    ValidUntil = sourceValidUntil,
+                    Status = (int)sourceStatus,
+                    CreatedBy = "SOURCE01",
+                    IsActive = true
+                };
+                source.Quotations.Add(CreateSourceQuotation(
+                    sourceQuotationId,
+                    "source.pdf",
+                    "%PDF-1.4 source"u8.ToArray()));
+                db.Requests.Add(source);
+            });
+            return sourceCode;
+        }
+
+        private static Quotation CreateSourceQuotation(int id, string fileName, byte[] data)
+        {
+            return new Quotation
+            {
+                Id = id,
+                FileName = fileName,
+                FilePath = "Database",
+                FileSize = data.LongLength,
+                ContentType = "application/pdf",
+                DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                SortOrder = id,
+                AttachmentFile = new AttachmentFile
+                {
+                    ContentType = "application/pdf",
+                    FileSize = data.LongLength,
+                    Data = data
+                }
+            };
+        }
+
         private void SeedRequestWithDocuments(int requestId, RequestStatus status, string owner, int firstDocumentId, int secondDocumentId)
         {
             _factory.SeedDatabase(db =>

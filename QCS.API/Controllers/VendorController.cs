@@ -54,6 +54,75 @@ namespace QCS.API.Controllers
             return Array.Empty<JsonElement>();
         }
 
+        private static int GetIntValue(JsonElement source, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!source.TryGetProperty(key, out var value))
+                {
+                    continue;
+                }
+
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+                {
+                    return number;
+                }
+
+                if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out number))
+                {
+                    return number;
+                }
+            }
+
+            return 0;
+        }
+
+        [HttpGet("ActiveLookup")]
+        [ProducesResponseType(typeof(IReadOnlyList<ActiveVendorLookupDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status502BadGateway)]
+        public async Task<ActionResult<IReadOnlyList<ActiveVendorLookupDto>>> GetActiveVendorLookup(CancellationToken cancellationToken)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient("VendorApi");
+                using var response = await client.GetAsync("Vendors/LookupActive", cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Problem(
+                        statusCode: StatusCodes.Status502BadGateway,
+                        title: "Vendor lookup unavailable",
+                        detail: "The active vendor directory could not be loaded.");
+                }
+
+                await using var content = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var document = await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
+                var vendors = EnumerateVendorItems(document.RootElement)
+                    .Where(item => item.ValueKind == JsonValueKind.Object)
+                    .Select(item => new ActiveVendorLookupDto
+                    {
+                        Id = GetIntValue(item, "id", "Id"),
+                        Name = GetStringValue(item, "name", "Name"),
+                        Code = GetStringValue(item, "code", "Code")
+                    })
+                    .Where(vendor => vendor.Name != "-" && vendor.Code != "-")
+                    .GroupBy(vendor => vendor.Code, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .ToList();
+
+                return Ok(vendors);
+            }
+            catch (Exception ex) when (
+                ex is HttpRequestException or JsonException ||
+                ex is TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status502BadGateway,
+                    title: "Vendor lookup unavailable",
+                    detail: "The active vendor directory could not be loaded.");
+            }
+        }
+
         private async Task<List<VendorGridDto>> LoadVendorGridRowsAsync()
         {
             var client = _httpClientFactory.CreateClient("VendorApi");

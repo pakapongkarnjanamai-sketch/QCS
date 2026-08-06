@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, UpdatePortalDocuments } from './types'
+import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, UpdatePortalDocuments } from './types'
 
 function resolveDocumentUrls(request: PortalRequestDetail): PortalRequestDetail {
   return {
@@ -48,6 +48,11 @@ export async function uploadPortalAttachment(id: number, file: File, documentTyp
 
 export async function deletePortalAttachment(id: number, attachmentId: number): Promise<void> {
   await apiClient.delete(`/Portal/Requests/${id}/attachments/${attachmentId}`)
+}
+
+export async function addExpiredQuotationReference(id: number, code: string): Promise<void> {
+  const input: AddExpiredQuotationReference = { code }
+  await apiClient.post(`/Portal/Requests/${id}/expired-quotation-references`, input)
 }
 
 export async function updatePortalDocuments(id: number, documents: PortalDocument[]): Promise<void> {

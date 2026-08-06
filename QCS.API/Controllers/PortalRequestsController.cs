@@ -309,6 +309,49 @@ namespace QCS.API.Controllers
             }
         }
 
+        [HttpPost("{id:int}/expired-quotation-references")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> AddExpiredQuotationReference([FromRoute] int id, [FromBody] AddExpiredQuotationReferenceDto input, CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'id' must be greater than 0.");
+            }
+
+            try
+            {
+                await _requestService.AddExpiredQuotationReferenceAsync(id, input, cancellationToken);
+                return Ok(new { success = true, message = "Expired quotation referenced successfully" });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Access denied",
+                    detail: ex.Message);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid operation",
+                    detail: ex.Message);
+            }
+        }
+
         [HttpPut("{id:int}/attachments")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

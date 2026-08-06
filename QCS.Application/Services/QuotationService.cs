@@ -82,6 +82,7 @@ namespace QCS.Application.Services
 
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations).ThenInclude(q => q.AttachmentFile)
+                .Include(r => r.Quotations).ThenInclude(q => q.SourceQuotation).ThenInclude(source => source!.AttachmentFile)
                 .Include(r => r.ApprovalSteps)
                 .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
 
@@ -141,16 +142,21 @@ namespace QCS.Application.Services
                 DocumentName = request.Code +"_"+ request.Title,
                 ReferenceCode = request.Code,
                 PdfFiles = request.Quotations
-                    .Where(q => q.AttachmentFile != null)
+                    .Where(q => q.AttachmentFile != null || q.SourceQuotation != null && q.SourceQuotation.AttachmentFile != null)
                     .OrderBy(q => q.SortOrder)
                     .ThenBy(q => q.Id)
-                    .Select(q => new PdfFileDto
+                    .Select(q => new
                     {
-                        Name = q.FileName,
-                        DocumentTypeId = q.DocumentTypeId,
-                        ContentType = q.ContentType ?? "application/pdf",
-                        Data = q.AttachmentFile.Data,
-                        Length = q.FileSize
+                        Quotation = q,
+                        Attachment = q.AttachmentFile ?? q.SourceQuotation!.AttachmentFile!
+                    })
+                    .Select(item => new PdfFileDto
+                    {
+                        Name = item.Quotation.FileName,
+                        DocumentTypeId = item.Quotation.DocumentTypeId,
+                        ContentType = item.Attachment.ContentType ?? "application/pdf",
+                        Data = item.Attachment.Data,
+                        Length = item.Attachment.FileSize
                     }).ToList(),
                 ApprovalData = new ApprovalDataDto
                 {
