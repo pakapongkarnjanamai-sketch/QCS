@@ -46,6 +46,10 @@ namespace QCS.Infrastructure
             services.AddHttpClient("VendorApi", client =>
             {
                 client.BaseAddress = new Uri(vendorApiBaseUrl);
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                UseDefaultCredentials = true
             });
 
             var employeeLookupFullApi = configuration["ExternalServices:EmployeeLookupFullApi"]
