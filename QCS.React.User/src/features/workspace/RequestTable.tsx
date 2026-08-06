@@ -36,16 +36,20 @@ export function RequestTable({ data, refreshing, loadingMore, loadMoreError, ret
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-sm border border-border-subtle bg-surface-panel">
       <div ref={tableScrollRef} aria-busy={refreshing} className={`min-h-0 flex-1 overflow-auto ${refreshing ? 'pointer-events-none opacity-60' : ''}`}>
-        <table className="min-w-[960px] w-full border-collapse text-left text-body">
-          <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-muted text-caption uppercase tracking-[0.08em] text-ink-muted">
+        {/* min-w is QCS's own and stays: these seven operational columns must not be hidden
+            (PLAN-037), and the table has its own scroll region so it never pushes the page
+            sideways. Everything else matches QRS: no border-collapse, and text-left on the
+            thead rather than the table. */}
+        <table className="min-w-[960px] w-full text-body">
+          <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-muted text-left text-caption uppercase tracking-[0.08em] text-ink-muted">
             <tr>
-              <th className="whitespace-nowrap px-4 py-2.5"><SortButton label="CODE" sortKey="code" active={sortBy === 'code'} descending={sortDescending} onSort={onSort} /></th>
-              <th className="px-4 py-2.5"><SortButton label="TITLE" sortKey="title" active={sortBy === 'title'} descending={sortDescending} onSort={onSort} /></th>
-              <th className="px-4 py-2.5"><SortButton label="VENDOR" sortKey="vendorname" active={sortBy === 'vendorname'} descending={sortDescending} onSort={onSort} /></th>
-              <th className="px-4 py-2.5">REQUESTER</th>
-              <th className="whitespace-nowrap px-4 py-2.5"><SortButton label="REQUEST DATE" sortKey="requestdate" active={sortBy === 'requestdate'} descending={sortDescending} onSort={onSort} /></th>
-              <th className="whitespace-nowrap px-4 py-2.5">VALIDITY</th>
-              <th className="whitespace-nowrap px-4 py-2.5"><SortButton label="STATUS" sortKey="status" active={sortBy === 'status'} descending={sortDescending} onSort={onSort} /></th>
+              <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-medium"><SortButton label="CODE" sortKey="code" active={sortBy === 'code'} descending={sortDescending} onSort={onSort} /></th>
+              <th scope="col" className="px-4 py-2.5 font-medium"><SortButton label="TITLE" sortKey="title" active={sortBy === 'title'} descending={sortDescending} onSort={onSort} /></th>
+              <th scope="col" className="px-4 py-2.5 font-medium"><SortButton label="VENDOR" sortKey="vendorname" active={sortBy === 'vendorname'} descending={sortDescending} onSort={onSort} /></th>
+              <th scope="col" className="px-4 py-2.5 font-medium">REQUESTER</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-medium"><SortButton label="REQUEST DATE" sortKey="requestdate" active={sortBy === 'requestdate'} descending={sortDescending} onSort={onSort} /></th>
+              <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-medium">VALIDITY</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-medium"><SortButton label="STATUS" sortKey="status" active={sortBy === 'status'} descending={sortDescending} onSort={onSort} /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-subtle">
@@ -68,6 +72,12 @@ export function RequestTable({ data, refreshing, loadingMore, loadMoreError, ret
             {data.hasNextPage && <tr ref={sentinelRef}><td colSpan={7} className="px-4 py-2.5 text-center text-caption text-ink-muted">{loadMoreError ? <span className="inline-flex items-center gap-2">Could not load more requests.<AppButton variant="secondary" onClick={onRetryLoadMore}>Try again</AppButton></span> : loadingMore && <span className="inline-flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden />Loading more...</span>}</td></tr>}
           </tbody>
         </table>
+      </div>
+      {/* Row count, as QRS closes its table. QCS had one and lost it somewhere along the way.
+          shrink-0 is not decoration: the section is a flex column whose scroll region takes
+          flex-1, so without it this bar is the thing that gets squeezed. */}
+      <div className="shrink-0 border-t border-border-subtle px-4 py-2.5 text-caption text-ink-muted">
+        {data.totalCount} request{data.totalCount === 1 ? '' : 's'}
       </div>
     </section>
   )
