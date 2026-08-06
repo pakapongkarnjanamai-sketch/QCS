@@ -128,8 +128,14 @@ namespace QCS.API.Controllers
                 // Inline, for the same reason as Request/ViewFile: a file name passed to File()
                 // sets Content-Disposition: attachment and the stamped PDF downloads instead of
                 // previewing. The name is kept on the header so "save as" still offers it.
-                Response.Headers.ContentDisposition =
-                    new System.Net.Mime.ContentDisposition { FileName = fileDto.FileName, Inline = true }.ToString();
+                //
+                // SetHttpFileName, not System.Net.Mime.ContentDisposition: that one encodes a
+                // non-ASCII name as an RFC 2047 word (=?utf-8?B?...?=) folded across a line break,
+                // which browsers do not decode in this header — a Thai file name would arrive as
+                // mojibake. This emits an ASCII fallback plus the RFC 5987 filename*.
+                var disposition = new Microsoft.Net.Http.Headers.ContentDispositionHeaderValue("inline");
+                disposition.SetHttpFileName(fileDto.FileName);
+                Response.Headers.ContentDisposition = disposition.ToString();
 
                 return File(fileDto.Data, fileDto.ContentType);
             }
