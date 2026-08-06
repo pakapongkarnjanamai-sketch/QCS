@@ -26,7 +26,7 @@ Write-Header "1/4 Deploying QCS.API (REST API Backend) to QA"
 & "$Root\QCS.API\scripts\Deploy-QCS-API.ps1" `
     -Environment QA `
     -ServerHost "AP-NTC2138-QAWB" `
-    -TargetPath "\\10.10.143.39\wwwroot\QCS\Service" `
+    -TargetPath "\\AP-NTC2138-QAWB\wwwroot\QCS\Service" `
     -PublicApiBaseUrl "https://ap-ntc2138-qawb/QCS/Service" `
     -SkipSmokeTest:$SkipSmokeTest
 
