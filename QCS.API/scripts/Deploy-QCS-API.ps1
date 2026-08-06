@@ -164,8 +164,19 @@ try {
             Import-Module WebAdministration
             Stop-WebAppPool -Name $PoolName
             $state = (Get-WebAppPoolState -Name $PoolName).Value
+
             if ($state -ne 'Stopped') {
-                throw "App pool '$PoolName' did not stop. Current state: $state."
+                $workers = @(Get-CimInstance Win32_Process -Filter "Name='w3wp.exe'" |
+                    Where-Object { $_.CommandLine -match [regex]::Escape($PoolName) })
+
+                foreach ($worker in $workers) {
+                    Stop-Process -Id $worker.ProcessId -Force
+                }
+
+                $state = (Get-WebAppPoolState -Name $PoolName).Value
+                if ($state -ne 'Stopped') {
+                    throw "App pool '$PoolName' did not stop after terminating its $($workers.Count) worker(s). Current state: $state."
+                }
             }
         }
     }
@@ -190,7 +201,22 @@ finally {
             Invoke-Command -Session $session -ArgumentList $appPoolName -ScriptBlock {
                 param($PoolName)
                 Import-Module WebAdministration
-                Start-WebAppPool -Name $PoolName
+                $state = (Get-WebAppPoolState -Name $PoolName).Value
+                if ($state -eq 'Stopping') {
+                    $workers = @(Get-CimInstance Win32_Process -Filter "Name='w3wp.exe'" |
+                        Where-Object { $_.CommandLine -match [regex]::Escape($PoolName) })
+                    foreach ($worker in $workers) {
+                        Stop-Process -Id $worker.ProcessId -Force
+                    }
+                    $state = (Get-WebAppPoolState -Name $PoolName).Value
+                }
+
+                if ($state -eq 'Stopped') {
+                    Start-WebAppPool -Name $PoolName
+                }
+                elseif ($state -ne 'Started') {
+                    throw "App pool '$PoolName' cannot be started from state '$state'."
+                }
             }
         }
         catch {
