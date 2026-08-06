@@ -1,6 +1,14 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, UpdatePortalDocuments } from './types'
+import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, SavePortalRequestPayload, UpdatePortalDocuments } from './types'
+
+function toSavePortalRequestPayload(input: SavePortalRequest): SavePortalRequestPayload {
+  return {
+    ...input,
+    validFrom: input.validFrom || null,
+    validUntil: input.validUntil || null,
+  }
+}
 
 function resolveDocumentUrls(request: PortalRequestDetail): PortalRequestDetail {
   return {
@@ -23,12 +31,12 @@ export async function getPortalRequestByCode(code: string, signal?: AbortSignal)
 }
 
 export async function createPortalDraft(input: SavePortalRequest): Promise<PortalSaveResult> {
-  const { data } = await apiClient.post<PortalSaveResult>('/Portal/Requests', input)
+  const { data } = await apiClient.post<PortalSaveResult>('/Portal/Requests', toSavePortalRequestPayload(input))
   return data
 }
 
 export async function updatePortalDraft(id: number, input: SavePortalRequest): Promise<PortalSaveResult> {
-  const { data } = await apiClient.put<PortalSaveResult>(`/Portal/Requests/${id}`, input)
+  const { data } = await apiClient.put<PortalSaveResult>(`/Portal/Requests/${id}`, toSavePortalRequestPayload(input))
   return data
 }
 
@@ -80,6 +88,6 @@ export async function cancelPortalRequest(id: number, input: PortalApprovalActio
  * is the only way the form may show a route — the graph lives in the central workflow, not here.
  */
 export async function getRoutePreview(input: SavePortalRequest, signal?: AbortSignal): Promise<RoutePreview> {
-  const { data } = await apiClient.post<RoutePreview>('/Portal/Requests/route-preview', input, { signal })
+  const { data } = await apiClient.post<RoutePreview>('/Portal/Requests/route-preview', toSavePortalRequestPayload(input), { signal })
   return data
 }

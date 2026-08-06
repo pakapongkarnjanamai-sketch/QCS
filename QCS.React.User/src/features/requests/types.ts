@@ -29,7 +29,7 @@ export interface PortalRequestDetail {
   histories: PortalHistory[]
 }
 
-// Mirrors QCS.Domain.DTOs.Portal.SavePortalRequestDto.
+// Browser form state. Date inputs require strings; requestApi maps blanks to null on the wire.
 export interface SavePortalRequest {
   title: string
   vendorCode: string
@@ -39,6 +39,12 @@ export interface SavePortalRequest {
   validFrom: string
   validUntil: string
   remark: string
+}
+
+// Mirrors QCS.Domain.DTOs.Portal.SavePortalRequestDto.
+export interface SavePortalRequestPayload extends Omit<SavePortalRequest, 'validFrom' | 'validUntil'> {
+  validFrom: string | null
+  validUntil: string | null
 }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalSaveResultDto.
