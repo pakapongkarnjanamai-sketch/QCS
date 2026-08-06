@@ -170,7 +170,13 @@ try {
                     Where-Object { $_.CommandLine -match [regex]::Escape($PoolName) })
 
                 foreach ($worker in $workers) {
-                    Stop-Process -Id $worker.ProcessId -Force
+                    $process = Get-Process -Id $worker.ProcessId -ErrorAction SilentlyContinue
+                    if ($null -ne $process) {
+                        Stop-Process -Id $worker.ProcessId -Force
+                        if (-not $process.WaitForExit(30000)) {
+                            throw "Worker $($worker.ProcessId) for app pool '$PoolName' did not exit within 30 seconds."
+                        }
+                    }
                 }
 
                 $state = (Get-WebAppPoolState -Name $PoolName).Value
@@ -186,7 +192,7 @@ try {
     Set-Content -Path $appOfflinePath -Value '<html><body>QCS API deployment in progress.</body></html>' -Encoding UTF8
 
     Write-Step 'Copying published API to IIS target via robocopy'
-    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm appsettings.json appsettings.Development.json appsettings.QA.json /XD logs
+    & robocopy $PublishPath $TargetPath /MIR /R:2 /W:1 /XF app_offline.htm appsettings.json appsettings.Development.json appsettings.QA.json '*.pre-gpcs-*.bak' /XD logs _backup
     if ($LASTEXITCODE -gt 7) {
         throw "robocopy failed with exit code $LASTEXITCODE"
     }
@@ -206,7 +212,13 @@ finally {
                     $workers = @(Get-CimInstance Win32_Process -Filter "Name='w3wp.exe'" |
                         Where-Object { $_.CommandLine -match [regex]::Escape($PoolName) })
                     foreach ($worker in $workers) {
-                        Stop-Process -Id $worker.ProcessId -Force
+                        $process = Get-Process -Id $worker.ProcessId -ErrorAction SilentlyContinue
+                        if ($null -ne $process) {
+                            Stop-Process -Id $worker.ProcessId -Force
+                            if (-not $process.WaitForExit(30000)) {
+                                throw "Worker $($worker.ProcessId) for app pool '$PoolName' did not exit within 30 seconds."
+                            }
+                        }
                     }
                     $state = (Get-WebAppPoolState -Name $PoolName).Value
                 }

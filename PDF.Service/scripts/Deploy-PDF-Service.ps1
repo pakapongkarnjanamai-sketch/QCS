@@ -25,7 +25,7 @@ function Test-ServiceHealth {
 
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri $Url -UseDefaultCredentials -Method Head
+            $response = Invoke-WebRequest -Uri $Url -Method Head -SkipHttpErrorCheck
             if ($AcceptedStatusCodes -contains [int]$response.StatusCode) {
                 Write-Host ("{0}: {1} ({2})" -f $Label, $response.StatusCode, $Url) -ForegroundColor Green
                 return $true
@@ -49,7 +49,6 @@ function Test-ServiceHealth {
                 Write-Host ("{0}: FAILED - {1}" -f $Label, $_.Exception.Message) -ForegroundColor Yellow
                 return $false
             }
-            Start-Sleep -Seconds 2
         }
     }
     return $false
@@ -115,9 +114,6 @@ finally {
         Remove-Item $appOfflinePath -Force
     }
 }
-
-Write-Step 'Waiting for application pool to restart'
-Start-Sleep -Seconds 3
 
 if (-not $SkipHealthCheck) {
     Write-Step 'Verifying PDF.Service health'
