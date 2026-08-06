@@ -163,7 +163,7 @@ export function WorkspacePage({ defaultView, showSummary = false, title, descrip
           <p className="mt-1 text-body text-ink-muted">{description ?? (showSummary ? 'Your quotation request workspace.' : 'Manage quotation requests and sourcing progress.')}</p>
         </div>
         {showCreateAction && <AppLinkButton to="/requests/new" state={{ workspaceSearch: returnSearch }}>
-          <Plus size={16} aria-hidden />
+          <Plus className="size-4" aria-hidden />
           New request
         </AppLinkButton>}
       </header>
@@ -208,7 +208,7 @@ export function WorkspacePage({ defaultView, showSummary = false, title, descrip
         ) : (
           <EmptySurface>
             <div className="grid justify-items-center gap-3">
-              {emptyIcon === 'inbox' ? <Inbox size={28} className="text-ink-soft" aria-hidden /> : <FileText size={28} className="text-ink-soft" aria-hidden />}
+              {emptyIcon === 'inbox' ? <Inbox className="size-8 text-ink-soft" aria-hidden /> : <FileText className="size-8 text-ink-soft" aria-hidden />}
               <span>{emptyMessage}</span>
               {search && (
                 <AppButton

@@ -11,6 +11,7 @@ import { toast } from '@/lib/toast'
 import { QrsSourceLookup } from './QrsSourceLookup'
 import { TypedAttachmentEditor } from './TypedAttachmentEditor'
 import { VendorLookup } from './VendorLookup'
+import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
 import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, previewPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
@@ -48,7 +49,10 @@ export function RequestFormPage() {
   const [errors, setErrors] = useState<RequestFormErrors>({})
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState<Action>()
-  const [previewUrl, setPreviewUrl] = useState('')
+  // One preview surface for both an attachment and the merged PDF — same modal the detail pages
+  // use. The merged PDF is a blob, which is why this holds a url and a name rather than a
+  // document row.
+  const [preview, setPreview] = useState<PdfPreview>()
   const [confirmDelete, setConfirmDelete] = useState(false)
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault()
@@ -69,11 +73,13 @@ export function RequestFormPage() {
       })
     return () => controller.abort()
   }, [requestId])
+  // Blob urls from the merged preview must be released; attachment urls are plain paths and
+  // startsWith keeps this from trying to revoke those.
   useEffect(
     () => () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      if (preview?.url.startsWith('blob:')) URL.revokeObjectURL(preview.url)
     },
-    [previewUrl],
+    [preview],
   )
   const patch = (next: Partial<SavePortalRequest>) => {
     setForm((current) => ({ ...current, ...next }))
@@ -187,7 +193,7 @@ export function RequestFormPage() {
         <Field label="Remark" error={errors.remark}>
           <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
-        <TypedAttachmentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => window.open(document.viewUrl, '_blank', 'noopener,noreferrer')} onRemove={remove} />
+        <TypedAttachmentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
         {request && <WorkflowRoutePreview steps={request.workflowSteps} />}
       </section>
       <div className="flex flex-wrap justify-end gap-2">
@@ -198,7 +204,7 @@ export function RequestFormPage() {
             setBusy('preview')
             try {
               const blob = await previewPortalRequest(requestId)
-              setPreviewUrl(URL.createObjectURL(blob))
+              setPreview({ url: URL.createObjectURL(blob), fileName: `${form.title || "Request"} — merged preview.pdf` })
             } catch (reason) {
               setError(toApiError(reason))
             } finally {
@@ -207,24 +213,24 @@ export function RequestFormPage() {
           }}
           disabled={disabled || !requestId}
         >
-          <Eye size={16} aria-hidden /> Preview
+          <Eye className="size-4" aria-hidden /> Preview
         </AppButton>
         <AppButton onClick={() => void save()} disabled={disabled}>
-          <Save size={16} aria-hidden />
+          <Save className="size-4" aria-hidden />
           {busy === 'save' ? 'Saving...' : 'Save draft'}
         </AppButton>
         <AppButton onClick={() => void submit()} disabled={disabled}>
-          <Send size={16} aria-hidden />
+          <Send className="size-4" aria-hidden />
           {busy === 'submit' ? 'Submitting...' : 'Submit'}
         </AppButton>
         {requestId && request?.permissions.canDelete && (
           <AppButton variant="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
-            <Trash2 size={16} aria-hidden />
+            <Trash2 className="size-4" aria-hidden />
             Delete
           </AppButton>
         )}
       </div>
-      {previewUrl && <iframe title="Merged PDF preview" src={previewUrl} sandbox="allow-same-origin" className="h-[70vh] w-full border border-border-subtle" />}
+      <PdfViewer document={preview} onClose={() => { if (preview?.url.startsWith("blob:")) URL.revokeObjectURL(preview.url); setPreview(undefined) }} />
       <ConfirmDialog
         open={confirmDelete}
         title="Delete draft"

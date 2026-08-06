@@ -21,7 +21,7 @@ export function DocumentList({
           key={document.id}
           className="flex min-w-0 items-center gap-3 px-4 py-2.5"
         >
-          <Paperclip size={16} className="shrink-0 text-ink-soft" aria-hidden />
+          <Paperclip className="size-4 shrink-0 text-ink-soft" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="truncate text-body font-medium">
               {document.fileName}
@@ -36,7 +36,7 @@ export function DocumentList({
             className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-sm px-2 text-body text-accent hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             View
-            <ExternalLink size={14} aria-hidden />
+            <ExternalLink className="size-3.5" aria-hidden />
           </button>
         </li>
       ))}

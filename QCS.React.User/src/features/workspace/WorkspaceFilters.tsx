@@ -26,7 +26,7 @@ export function WorkspaceFilters({ view, search, sortBy, sortDescending, showVie
     <div className="relative min-w-56 flex-1">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" aria-hidden />
       <input type="search" aria-label="Search requests" value={search} onChange={(event) => onSearchChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onSearchSubmit() }} placeholder="Search requests" className={appInputClassName('md', `w-full pl-8 ${search ? 'pr-9' : 'pr-3'}`)} />
-      {search && <IconButton className="absolute right-0 top-1/2 -translate-y-1/2" label="Clear search" onClick={onSearchClear}><X size={16} /></IconButton>}
+      {search && <IconButton className="absolute right-0 top-1/2 -translate-y-1/2" label="Clear search" onClick={onSearchClear}><X className="size-4" /></IconButton>}
     </div>
     {showViewFilter && <select aria-label="Request view" value={view} onChange={(event) => onViewChange(event.target.value as WorkspaceView)} className={appInputClassName('md', 'w-auto text-ink-strong')}>{workspaceViews.map((option) => <option key={option} value={option}>{workspaceViewLabels[option]}</option>)}</select>}
     <select aria-label="Sort requests" value={`${sortBy ?? 'requestdate'}:${sortDescending ? 'desc' : 'asc'}`} onChange={(event) => { const [nextSortBy, direction] = event.target.value.split(':'); onSortChange(nextSortBy, direction === 'desc') }} className={appInputClassName('md', 'w-auto text-ink-strong')}>

@@ -88,7 +88,7 @@ export function QuotationDetailPage() {
             className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Open source request {request.sourceCode}
-            <ExternalLink size={15} aria-hidden />
+            <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
       </header>
@@ -116,7 +116,7 @@ export function QuotationDetailPage() {
         </h2>
         <DocumentList documents={request.documents} onPreview={setPreview} />
       </section>
-      <PdfViewer document={preview} onClose={() => setPreview(undefined)} />
+      <PdfViewer document={preview && { url: preview.viewUrl, fileName: preview.fileName }} onClose={() => setPreview(undefined)} />
     </div>
   )
 }

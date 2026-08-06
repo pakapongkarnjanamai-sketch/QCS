@@ -24,13 +24,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <p className="truncate text-caption text-ink-muted">Quotation Request System</p>
         </Link>
         <IconButton className="ml-auto lg:hidden" label="Close menu" onClick={() => setMobileOpen(false)}>
-          <X size={18} />
+          <X className="size-5" />
         </IconButton>
       </div>
       <nav className="grid gap-1 p-3">
         {navigation.map(({ icon: Icon, label, path }) => (
           <NavLink key={path} to={path} end={path === '/'} onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-sm px-3 text-body font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${isActive ? 'bg-accent-soft text-accent' : 'text-ink-muted hover:bg-surface-muted hover:text-ink-strong'}`}>
-            <Icon size={16} aria-hidden />
+            <Icon className="size-4" aria-hidden />
             <span>{label}</span>
           </NavLink>
         ))}
@@ -52,19 +52,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle bg-surface-panel px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <IconButton className="lg:hidden" label="Open navigation" onClick={() => setMobileOpen((open) => !open)}>
-              <Menu size={18} />
+              <Menu className="size-5" />
             </IconButton>
             <Breadcrumbs />
           </div>
           <div className="hidden items-center gap-4 text-right md:flex">
+            {/* Values carry text-ink-strong and are NOT transformed. The uppercase here was mine
+                and was wrong: QRS renders session.displayName as it comes, and the QRS screenshot
+                that prompted it only looked uppercase because that user's display name resolves
+                to their NID. Forcing toUpperCase shouted a real person's name at them. */}
             <div>
               <p className="text-caption uppercase tracking-[0.14em] text-ink-muted">User</p>
-              <p className="max-w-44 truncate text-body font-medium">{session.data?.displayName?.toUpperCase() || 'Unavailable'}</p>
+              <p className="max-w-44 truncate text-body font-medium text-ink-strong">{session.data?.displayName || 'Unavailable'}</p>
             </div>
-            <div className="h-8 w-px bg-border-subtle" />
+            <div className="h-8 w-px bg-border-subtle" aria-hidden />
             <div>
               <p className="text-caption uppercase tracking-[0.14em] text-ink-muted">Today</p>
-              <p className="text-body font-medium">{today}</p>
+              <p className="text-body font-medium text-ink-strong">{today}</p>
             </div>
           </div>
         </header>

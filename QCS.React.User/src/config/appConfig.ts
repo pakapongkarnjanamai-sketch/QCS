@@ -23,14 +23,15 @@ export const appConfig = {
 } as const
 
 /**
- * Deep link to a QRS request from its business code.
+ * Deep link straight to the QRS request's detail page, from its business code.
  *
- * QRS routes request detail as /requests/:id by integer id, and QCS only ever holds the code —
- * the cross-system key is deliberately the code, not the id. So this targets the QRS request
- * LIST filtered to that one code, which QRS already supports, rather than a by-code route that
- * would have to be built there. `view=all` is required: the QRS list defaults to the caller's
- * own requests, and a QCS purchaser is usually not the QRS requester.
+ * QRS's detail route now accepts a code as well as an integer id: it resolves the code through
+ * its own list search and replaces the URL with the canonical /requests/{id}. That change lives
+ * in QRS, and it is what lets this be a link to the document rather than to a filtered list.
+ *
+ * The code stays the cross-system key — see DOC/INTEGRATION-QCS.md. QCS is not given a QRS id,
+ * because ids are per-database and break on a restore.
  */
 export function qrsRequestUrl(code: string): string {
-  return `${appConfig.qrsRequestBaseUrl}?q=${encodeURIComponent(code)}&view=all`
+  return `${appConfig.qrsRequestBaseUrl}/${encodeURIComponent(code)}`
 }

@@ -29,7 +29,7 @@ function isFinal(row: PortalRequestListItem): boolean {
 }
 
 function SortButton({ label, sortKey, active, descending, onSort }: { label: string; sortKey: string; active: boolean; descending: boolean; onSort: (key: string) => void }) {
-  return <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 rounded-sm font-medium hover:text-ink-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{label}{active && (descending ? <ChevronDown size={14} aria-label="descending" /> : <ChevronUp size={14} aria-label="ascending" />)}</button>
+  return <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 rounded-sm font-medium hover:text-ink-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{label}{active && (descending ? <ChevronDown className="size-3.5" aria-label="descending" /> : <ChevronUp className="size-3.5" aria-label="ascending" />)}</button>
 }
 
 export function RequestTable({ data, refreshing, loadingMore, loadMoreError, returnSearch, returnPath, sortBy, sortDescending, onSort, onRetryLoadMore, tableScrollRef, sentinelRef }: RequestTableProps) {

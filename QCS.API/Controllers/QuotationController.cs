@@ -125,7 +125,13 @@ namespace QCS.API.Controllers
                 Response.Headers.Pragma = "no-cache";
                 Response.Headers.Expires = "0";
 
-                return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
+                // Inline, for the same reason as Request/ViewFile: a file name passed to File()
+                // sets Content-Disposition: attachment and the stamped PDF downloads instead of
+                // previewing. The name is kept on the header so "save as" still offers it.
+                Response.Headers.ContentDisposition =
+                    new System.Net.Mime.ContentDisposition { FileName = fileDto.FileName, Inline = true }.ToString();
+
+                return File(fileDto.Data, fileDto.ContentType);
             }
             catch (KeyNotFoundException)
             {

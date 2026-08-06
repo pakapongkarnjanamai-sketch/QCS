@@ -294,7 +294,14 @@ namespace QCS.API.Controllers
             if (fileDto == null || fileDto.Data == null)
                 return NotFound("File content missing");
 
-            return File(fileDto.Data, fileDto.ContentType, fileDto.FileName);
+            // Inline, not attachment. Passing a file name to File() sets
+            // Content-Disposition: attachment, which makes the browser download the PDF instead of
+            // rendering it — so the portal's preview modal could never show anything. Setting the
+            // header explicitly keeps the file name for "save as" while allowing preview.
+            Response.Headers.ContentDisposition =
+                new System.Net.Mime.ContentDisposition { FileName = fileDto.FileName, Inline = true }.ToString();
+
+            return File(fileDto.Data, fileDto.ContentType);
         }
 
         [HttpPost("PreviewMergeStamp")]

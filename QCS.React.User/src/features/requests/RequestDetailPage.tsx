@@ -1,6 +1,6 @@
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
@@ -10,10 +10,9 @@ import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
 import { ApprovalActionDialog } from './ApprovalActionDialog'
 import { DocumentList } from './DocumentList'
-import { HistoryList } from './HistoryList'
+import { ApprovalSteps } from './ApprovalSteps'
 import { approvePortalRequest, getPortalRequestById, rejectPortalRequest } from './requestApi'
 import type { PortalDocument, PortalRequestDetail } from './types'
-import { WorkflowTimeline } from './WorkflowTimeline'
 
 function formatDate(value?: string): string {
   return value
@@ -25,7 +24,6 @@ function formatDate(value?: string): string {
 
 export function RequestDetailPage() {
   const { id } = useParams()
-  const location = useLocation()
   const [request, setRequest] = useState<PortalRequestDetail>()
   const [error, setError] = useState<ApiError>()
   const [loading, setLoading] = useState(true)
@@ -53,10 +51,6 @@ export function RequestDetailPage() {
       })
     return () => controller.abort()
   }, [numericId, retryToken])
-  const routeState = location.state as { workspaceSearch?: string; returnPath?: string } | null
-  const returnSearch = routeState?.workspaceSearch
-  const returnPath = routeState?.returnPath ?? '/requests'
-  const backTo = returnSearch ? `${returnPath}?${returnSearch}` : returnPath
   if (loading && !request) return <LoadingSurface />
   if (!request)
     return (
@@ -92,13 +86,6 @@ export function RequestDetailPage() {
   }
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Link
-        to={backTo}
-        className="inline-flex w-fit items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        <ArrowLeft size={16} aria-hidden />
-        Back to requests
-      </Link>
       {error && (
         <ErrorSurface>{error.title} Showing the previous details.</ErrorSurface>
       )}
@@ -126,7 +113,7 @@ export function RequestDetailPage() {
               className="mr-1 inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               Open source request {request.sourceCode}
-              <ExternalLink size={15} aria-hidden />
+              <ExternalLink className="size-3.5" aria-hidden />
             </a>
           )}
           {request.permissions.canApprove && <AppButton disabled={Boolean(busyAction)} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
@@ -152,31 +139,14 @@ export function RequestDetailPage() {
           {request.remark && <Detail label="Remark" value={request.remark} />}
         </dl>
       </section>
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-sm border border-border-subtle bg-white">
-          <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-            Documents
-          </h2>
-          <DocumentList documents={request.documents} onPreview={setPreview} />
-        </section>
-        <section className="rounded-sm border border-border-subtle bg-white">
-          <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-            Workflow
-          </h2>
-          <div className="p-4">
-            <WorkflowTimeline steps={request.workflowSteps} />
-          </div>
-        </section>
-      </div>
       <section className="rounded-sm border border-border-subtle bg-white">
         <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-          History
+          Documents
         </h2>
-        <div className="p-4">
-          <HistoryList histories={request.histories} />
-        </div>
+        <DocumentList documents={request.documents} onPreview={setPreview} />
       </section>
-      <PdfViewer document={preview} onClose={() => setPreview(undefined)} />
+      <ApprovalSteps steps={request.workflowSteps} histories={request.histories} />
+      <PdfViewer document={preview && { url: preview.viewUrl, fileName: preview.fileName }} onClose={() => setPreview(undefined)} />
       <ApprovalActionDialog action={approvalAction} busy={Boolean(busyAction)} onClose={() => { if (!busyAction) setApprovalAction(undefined) }} onConfirm={(comment) => void runApprovalAction(comment)} />
     </div>
   )
