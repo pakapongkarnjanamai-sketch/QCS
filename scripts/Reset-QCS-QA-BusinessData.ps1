@@ -158,6 +158,22 @@ try {
     Write-Step 'Deleting business data (single transaction)'
     $transaction = $connection.BeginTransaction()
     try {
+        # Quotations gained a self-referencing FK in 20260806071626_AddExpiredQuotationReference
+        # (SourceQuotationId, DeleteBehavior.Restrict) so an expired quotation can be reused by a
+        # later request. A single DELETE over the whole table should satisfy the constraint, but
+        # "should" is not what a destructive script runs on: breaking the self-reference first makes
+        # the delete order-independent and costs one statement.
+        $breakSelfReference = $connection.CreateCommand()
+        $breakSelfReference.Transaction = $transaction
+        $breakSelfReference.CommandText = @'
+IF COL_LENGTH('dbo.Quotations', 'SourceQuotationId') IS NOT NULL
+    UPDATE [dbo].[Quotations] SET [SourceQuotationId] = NULL WHERE [SourceQuotationId] IS NOT NULL;
+'@
+        $unlinked = $breakSelfReference.ExecuteNonQuery()
+        if ($unlinked -gt 0) {
+            Write-Host ("  {0,-18} {1} self-references cleared first" -f 'Quotations', $unlinked) -ForegroundColor DarkGray
+        }
+
         foreach ($table in $tables) {
             $delete = $connection.CreateCommand()
             $delete.Transaction = $transaction
