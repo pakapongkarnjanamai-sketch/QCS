@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { PortalApprovalAction, PortalAttachment, PortalRequestDetail, PortalSaveResult, SavePortalRequest } from './types'
+import type { PortalApprovalAction, PortalAttachment, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest } from './types'
 
 function resolveDocumentUrls(request: PortalRequestDetail): PortalRequestDetail {
   return {
@@ -58,3 +58,16 @@ export async function previewPortalRequest(id: number): Promise<Blob> {
 export async function approvePortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/approve`, input) }
 
 export async function rejectPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/reject`, input) }
+
+export async function returnPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/return`, input) }
+
+export async function cancelPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/cancel`, input) }
+
+/**
+ * Asks the server which route this request would take if submitted now. It writes nothing, and it
+ * is the only way the form may show a route — the graph lives in the central workflow, not here.
+ */
+export async function getRoutePreview(input: SavePortalRequest, signal?: AbortSignal): Promise<RoutePreview> {
+  const { data } = await apiClient.post<RoutePreview>('/Portal/Requests/route-preview', input, { signal })
+  return data
+}

@@ -39,11 +39,19 @@ type Category = {
 }
 
 const CATEGORIES: Category[] = [
+// Labels are the central Approval Service's status names; the route URLs are historical and stay
+// as they are. `Admin/Pending` filters InProcess and `Admin/Approved` filters Completed — renaming
+// the endpoints would have broken every caller to rename a word.
+//
+// These four queues do NOT cover every status. Returned, Waiting effective and Cancelled have no
+// queue of their own, so a request in one of those appears under All and nowhere else. That is why
+// All leads and why the note below says so: an operator who adds up the other four and compares to
+// All must not read the difference as missing data.
   {
     key: 'all',
     label: 'All',
     path: '/api/Request/Admin/All',
-    description: 'All requests in the system',
+    description: 'Every request, including Returned, Waiting effective and Cancelled',
   },
   {
     key: 'draft',
@@ -53,21 +61,21 @@ const CATEGORIES: Category[] = [
   },
   {
     key: 'pending',
-    label: 'Pending',
+    label: 'In process',
     path: '/api/Request/Admin/Pending',
-    description: 'Awaiting approval',
+    description: 'Somewhere in the approval route',
   },
   {
     key: 'approved',
-    label: 'Approved',
+    label: 'Completed',
     path: '/api/Request/Admin/Approved',
-    description: 'Fully approved',
+    description: 'Approved and in force — quotation ready',
   },
   {
     key: 'rejected',
     label: 'Rejected',
     path: '/api/Request/Admin/Rejected',
-    description: 'Rejected by approver',
+    description: 'Rejected by an approver',
   },
 ]
 

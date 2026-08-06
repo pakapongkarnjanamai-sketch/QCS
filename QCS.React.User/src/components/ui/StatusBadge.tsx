@@ -1,32 +1,51 @@
 /**
- * One place decides what colour a status is — and it agrees with QRS.
+ * One place decides what a status is called and what colour it is — and it agrees with QRS.
  *
- * Every tone below is copied from `QRS.Web`'s `StatusBadge`, mapped by MEANING rather than by
- * name, because the two systems label the same thing differently: QCS's `Pending` is QRS's
- * `In process`, and QCS's `Approved` is QRS's `Completed`. A user moving between the portals
- * must not see the same state in two different colours. See PLANS/README.md rule 8.
+ * Both portals now mirror the central Approval Service's seven document statuses, so this maps by
+ * NAME rather than by meaning as it used to. Tones and labels are copied from `QRS.Web`'s
+ * `StatusBadge` and `REQUEST_STATUS_LABEL`: a user moving between the portals must not see the
+ * same state in two colours or under two names. See PLANS/README.md rule 8.
+ *
+ * The API sends the enum name (`InProcess`, `WaitingEffective`), so the label is looked up rather
+ * than printed — "WaitingEffective" is not what a reader should be shown.
  */
-const TONE: Record<string, string> = {
-  draft: 'bg-surface-panel text-ink-muted ring-border-subtle',
-  pending: 'bg-accent-soft text-accent ring-accent/25',
-  'in process': 'bg-accent-soft text-accent ring-accent/25',
-  returned: 'bg-amber-50 text-amber-800 ring-amber-200',
-  approved: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  rejected: 'bg-red-50 text-red-700 ring-red-200',
-  cancelled: 'bg-slate-200 text-slate-600 ring-slate-300',
+const CENTRAL: Record<string, { label: string; tone: string }> = {
+  draft: { label: 'Draft', tone: 'bg-surface-panel text-ink-muted ring-border-subtle' },
+  inprocess: { label: 'In process', tone: 'bg-accent-soft text-accent ring-accent/25' },
+  returned: { label: 'Returned', tone: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  rejected: { label: 'Rejected', tone: 'bg-red-50 text-red-700 ring-red-200' },
+  waitingeffective: { label: 'Waiting effective', tone: 'bg-violet-50 text-violet-700 ring-violet-200' },
+  completed: { label: 'Completed', tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  cancelled: { label: 'Cancelled', tone: 'bg-slate-200 text-slate-600 ring-slate-300' },
+}
+
+/**
+ * Words this portal no longer produces for a REQUEST, kept because the same badge renders workflow
+ * STEP statuses, which the central service words freely, and retained terminal legacy rows. A new
+ * central status belongs in CENTRAL above, never here.
+ */
+const LEGACY: Record<string, string> = {
+  pending: CENTRAL.inprocess.tone,
+  'in process': CENTRAL.inprocess.tone,
+  approved: CENTRAL.completed.tone,
+  skipped: CENTRAL.draft.tone,
+  inreview: CENTRAL.inprocess.tone,
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const normalizedStatus = status.trim().toLowerCase()
-  const tone = TONE[normalizedStatus]
-    ?? (normalizedStatus.includes('reject') || normalizedStatus.includes('cancel')
-      ? TONE.rejected
-      : normalizedStatus.includes('approv') || normalizedStatus.includes('complet')
-        ? TONE.approved
-        : normalizedStatus.includes('process')
-          ? TONE['in process']
-          : TONE.pending)
+  const key = (status ?? '').trim().toLowerCase()
+  const central = CENTRAL[key]
 
-  return <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-caption font-medium ring-1 ring-inset ${tone}`}>{status || 'Unknown'}</span>
+  const tone =
+    central?.tone ??
+    LEGACY[key] ??
+    (key.includes('reject') || key.includes('cancel')
+      ? CENTRAL.rejected.tone
+      : key.includes('complet') || key.includes('approv')
+        ? CENTRAL.completed.tone
+        : key.includes('return')
+          ? CENTRAL.returned.tone
+          : CENTRAL.inprocess.tone)
+
+  return <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-caption font-medium ring-1 ring-inset ${tone}`}>{central?.label ?? status ?? 'Unknown'}</span>
 }

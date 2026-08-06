@@ -20,7 +20,9 @@ export function WorkflowTimeline({ steps }: { steps: PortalWorkflowStep[] }) {
     <ol className="space-y-3">
       {steps.map((step) => (
         <li key={step.id} className="flex gap-3 text-body">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-muted text-caption font-medium">
+          {/* Where the document actually is, straight from the service's isCurrentStep — not
+              inferred from a status string or a step count. */}
+          <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-caption font-medium ${step.isCurrentStep ? 'bg-accent text-white' : 'bg-surface-muted'}`}>
             {step.sequenceNo}
           </span>
           <div className="min-w-0">

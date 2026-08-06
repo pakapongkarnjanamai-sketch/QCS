@@ -24,8 +24,16 @@ function formatDate(value?: string): string {
   return value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : '-'
 }
 
+/**
+ * Only `Completed` is quotation-ready.
+ *
+ * This used to also test `currentStepId === 99`, a sentinel from the local workflow engine that no
+ * longer exists — the central service numbers steps by sequence and has no terminal magic number.
+ * `WaitingEffective` is deliberately NOT final: the document is approved but not yet in force, and
+ * routing it to the quotation view would present it as usable when it is not.
+ */
 function isFinal(row: PortalRequestListItem): boolean {
-  return row.currentStepId === 99 || ['approved', 'completed'].includes(row.statusName.toLowerCase())
+  return row.statusName.trim().toLowerCase() === 'completed'
 }
 
 function SortButton({ label, sortKey, active, descending, onSort }: { label: string; sortKey: string; active: boolean; descending: boolean; onSort: (key: string) => void }) {

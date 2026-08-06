@@ -13,9 +13,9 @@ import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
-import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, previewPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
+import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
-import type { PortalDocument, PortalRequestDetail, SavePortalRequest } from './types'
+import type { PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest } from './types'
 
 type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove'
 function fromDetail(detail: PortalRequestDetail): SavePortalRequest {
@@ -53,6 +53,9 @@ export function RequestFormPage() {
   // use. The merged PDF is a blob, which is why this holds a url and a name rather than a
   // document row.
   const [preview, setPreview] = useState<PdfPreview>()
+  const [routePreview, setRoutePreview] = useState<RoutePreview>()
+  const [routeLoading, setRouteLoading] = useState(false)
+  const [routeError, setRouteError] = useState<string>()
   const [confirmDelete, setConfirmDelete] = useState(false)
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault()
@@ -194,7 +197,21 @@ export function RequestFormPage() {
           <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
         <TypedDocumentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
-        {request && <WorkflowRoutePreview steps={request.workflowSteps} />}
+        <WorkflowRoutePreview
+          preview={routePreview}
+          loading={routeLoading}
+          error={routeError}
+          onLoad={() => {
+            setRouteLoading(true)
+            setRouteError(undefined)
+            // Sends the form as it stands, not the saved draft: the point is to answer "who will
+            // approve what I am about to submit", and unsaved edits can change the route.
+            void getRoutePreview(form)
+              .then(setRoutePreview)
+              .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
+              .finally(() => setRouteLoading(false))
+          }}
+        />
       </section>
       <div className="flex flex-wrap justify-end gap-2">
         <AppButton

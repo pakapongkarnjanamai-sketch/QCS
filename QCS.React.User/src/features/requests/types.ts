@@ -15,6 +15,12 @@ export interface PortalRequestDetail {
   validFrom?: string
   validUntil?: string
   remark?: string
+  approvalDocumentId?: string
+  approvalDocumentNumber?: string
+  // currentStepSequence is the central sequence and is null before submit. currentStepId is the
+  // legacy field, kept on the DTO for existing callers — prefer currentStepSequence for anything
+  // new, and never compare either against a sentinel like 99.
+  currentStepSequence?: number
   currentStepId: number
   currentStepName?: string
   permissions: PortalRequestPermissions
@@ -42,14 +48,27 @@ export interface PortalSaveResult { id: number; code: string }
 export interface PortalAttachment { id: number; fileName: string; documentTypeId: number; documentTypeName: string; viewUrl: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalApprovalActionDto.
-export interface PortalApprovalAction { comment: string }
+export interface PortalApprovalAction { comment: string; returnToStepSequence?: number }
 
-// Mirrors QCS.Domain.DTOs.PermissionDto.
+/**
+ * Mirrors QCS.Domain.DTOs.PermissionDto.
+ *
+ * canSubmit/canApprove/canReject/canReturn/canCancel come from the central Approval Service and
+ * are the ONLY thing that may decide whether an action is offered. Do not infer a right from the
+ * status, the step number or the signed-in NID — the service owns that decision and this mirror
+ * is what it reported. canEdit/canDelete stay local and apply to a local Draft only.
+ */
 export interface PortalRequestPermissions {
+  canSubmit: boolean
   canApprove: boolean
   canReject: boolean
+  canReturn: boolean
+  canCancel: boolean
   canEdit: boolean
   canDelete: boolean
+  isCreator: boolean
+  isCurrentAssignee: boolean
+  availableActions: string[]
 }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalDocumentDto.
@@ -59,7 +78,18 @@ export interface PortalRequestPermissions {
 export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; fileSize: number; viewUrl: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalWorkflowStepDto.
-export interface PortalWorkflowStep { id: number; sequenceNo: number; stepName: string; status?: number; statusName?: string; actionDate?: string; approverNId?: string; approverName?: string; comment?: string; assignments: PortalAssignment[] }
+export interface PortalWorkflowStep { id: number; sequenceNo: number; stepName: string; status?: number; statusName?: string; actionDate?: string; isCurrentStep: boolean; approverNId?: string; approverName?: string; comment?: string; assignments: PortalAssignment[] }
+
+// Mirrors QCS.Application.Abstractions.ApprovalAssigneeView.
+export interface RoutePreviewAssignee { username: string; employeeName?: string; displayStatus?: string; actedAt?: string; comment?: string }
+
+// Mirrors QCS.Application.Abstractions.ApprovalStepView.
+export interface RoutePreviewStep { sequenceNo: number; stepName: string; status?: string; isFinalStep: boolean; assignees: RoutePreviewAssignee[] }
+
+// Mirrors QCS.Application.Abstractions.ApprovalPreviewResult.
+// The step list is whatever the published workflow currently resolves to — one step or forty.
+// Nothing here may assume a count.
+export interface RoutePreview { steps: RoutePreviewStep[]; workflowName?: string; workflowVersion?: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalAssignmentDto.
 export interface PortalAssignment { nId: string; employeeName: string; assignmentType: string; isCurrentUser: boolean }

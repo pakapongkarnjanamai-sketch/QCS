@@ -112,10 +112,14 @@ type OverviewLoadResult = {
 }
 
 const queueDefinitions: Array<Pick<QueueCount, 'key' | 'label' | 'description'>> = [
+// Central Approval Service status names. The four queues after All are a SUBSET, not a partition:
+// Returned, Waiting effective and Cancelled have no queue, so Draft + In process + Completed +
+// Rejected will not add up to All. Said plainly in All's description, because an unexplained gap
+// between the cards reads as lost documents.
   {
     key: 'all',
     label: 'All',
-    description: 'Every document currently tracked in QCS.',
+    description: 'Every document. The four queues below exclude Returned, Waiting effective and Cancelled, so they will not sum to this.',
   },
   {
     key: 'draft',
@@ -124,18 +128,18 @@ const queueDefinitions: Array<Pick<QueueCount, 'key' | 'label' | 'description'>>
   },
   {
     key: 'pending',
-    label: 'Pending',
-    description: 'Waiting for approval decision.',
+    label: 'In process',
+    description: 'Somewhere in the approval route.',
   },
   {
     key: 'approved',
-    label: 'Approved',
-    description: 'Completed approval route and ready downstream.',
+    label: 'Completed',
+    description: 'Approved and in force — quotation ready.',
   },
   {
     key: 'rejected',
     label: 'Rejected',
-    description: 'Returned for correction or canceled.',
+    description: 'Rejected by an approver.',
   },
 ]
 
@@ -273,8 +277,8 @@ async function fetchOverviewData(signal: AbortSignal): Promise<OverviewLoadResul
   ;([
     { key: 'All queue', value: allResult },
     { key: 'Draft queue', value: draftResult },
-    { key: 'Pending queue', value: pendingResult },
-    { key: 'Approved queue', value: approvedResult },
+    { key: 'In process queue', value: pendingResult },
+    { key: 'Completed queue', value: approvedResult },
     { key: 'Rejected queue', value: rejectedResult },
   ] as const).forEach((item) => {
     if (item.value.status === 'rejected' && !isAbortReason(item.value.reason)) {

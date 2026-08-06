@@ -8,11 +8,11 @@ import { qrsRequestUrl } from '@/config/appConfig'
 import { PdfViewer } from '@/features/quotations/PdfViewer'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
-import { ApprovalActionDialog } from './ApprovalActionDialog'
+import { ApprovalActionDialog, type ApprovalActionKind } from './ApprovalActionDialog'
 import { DocumentList } from './DocumentList'
 import { ApprovalSteps } from './ApprovalSteps'
-import { approvePortalRequest, getPortalRequestById, rejectPortalRequest } from './requestApi'
-import type { PortalDocument, PortalRequestDetail } from './types'
+import { approvePortalRequest, cancelPortalRequest, getPortalRequestById, rejectPortalRequest, returnPortalRequest, submitPortalRequest } from './requestApi'
+import type { PortalApprovalAction, PortalDocument, PortalRequestDetail } from './types'
 
 function formatDate(value?: string): string {
   return value
@@ -29,8 +29,8 @@ export function RequestDetailPage() {
   const [loading, setLoading] = useState(true)
   const [retryToken, setRetryToken] = useState(0)
   const [preview, setPreview] = useState<PortalDocument>()
-  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>()
-  const [busyAction, setBusyAction] = useState<'approve' | 'reject'>()
+  const [approvalAction, setApprovalAction] = useState<ApprovalActionKind>()
+  const [busyAction, setBusyAction] = useState<ApprovalActionKind>()
   const numericId = Number(id)
   useEffect(() => {
     if (!Number.isInteger(numericId) || numericId <= 0) {
@@ -66,16 +66,25 @@ export function RequestDetailPage() {
         </div>
       </ErrorSurface>
     )
-  const runApprovalAction = async (comment: string) => {
+  // Every action re-reads the document afterwards rather than patching local state: the central
+  // service decides what the request becomes, and a locally-guessed status is how the mirror and
+  // the authority start to disagree.
+  const ACTION_RUNNERS: Record<ApprovalActionKind, { run: (input: PortalApprovalAction) => Promise<unknown>; success: string }> = {
+    submit: { run: () => submitPortalRequest(request.id), success: 'Request submitted.' },
+    approve: { run: (input) => approvePortalRequest(request.id, input), success: 'Request approved.' },
+    reject: { run: (input) => rejectPortalRequest(request.id, input), success: 'Request rejected.' },
+    return: { run: (input) => returnPortalRequest(request.id, input), success: 'Request returned.' },
+    cancel: { run: (input) => cancelPortalRequest(request.id, input), success: 'Request cancelled.' },
+  }
+
+  const runApprovalAction = async (input: PortalApprovalAction) => {
     const action = approvalAction
     if (!action) return
     setBusyAction(action)
     setError(undefined)
     try {
-      await (action === 'approve'
-        ? approvePortalRequest(request.id, { comment })
-        : rejectPortalRequest(request.id, { comment }))
-      toast.success(action === 'approve' ? 'Request approved.' : 'Request rejected.')
+      await ACTION_RUNNERS[action].run(input)
+      toast.success(ACTION_RUNNERS[action].success)
       setApprovalAction(undefined)
       setRetryToken((value) => value + 1)
     } catch (reason) {
@@ -116,8 +125,14 @@ export function RequestDetailPage() {
               <ExternalLink className="size-3.5" aria-hidden />
             </a>
           )}
+          {/* Strictly from the central permission flags — never from status, step number or NID.
+              The service knows the graph; this page only reports what it was told it may do. A
+              workflow with more steps, or different ones, changes these flags and nothing here. */}
+          {request.permissions.canSubmit && <AppButton disabled={Boolean(busyAction)} onClick={() => setApprovalAction('submit')}>Submit</AppButton>}
           {request.permissions.canApprove && <AppButton disabled={Boolean(busyAction)} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
           {request.permissions.canReject && <AppButton variant="danger" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
+          {request.permissions.canReturn && <AppButton variant="secondary" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('return')}>Return</AppButton>}
+          {request.permissions.canCancel && <AppButton variant="secondary" disabled={Boolean(busyAction)} onClick={() => setApprovalAction('cancel')}>Cancel request</AppButton>}
         </div>
       </header>
       <section className="rounded-sm border border-border-subtle bg-white">
@@ -147,7 +162,15 @@ export function RequestDetailPage() {
       </section>
       <ApprovalSteps steps={request.workflowSteps} histories={request.histories} />
       <PdfViewer document={preview && { url: preview.viewUrl, fileName: preview.fileName }} onClose={() => setPreview(undefined)} />
-      <ApprovalActionDialog action={approvalAction} busy={Boolean(busyAction)} onClose={() => { if (!busyAction) setApprovalAction(undefined) }} onConfirm={(comment) => void runApprovalAction(comment)} />
+      <ApprovalActionDialog
+        action={approvalAction}
+        busy={Boolean(busyAction)}
+        // Only steps already acted on can be returned to, and only ones before the current point.
+        // The service validates this too; offering an impossible target just wastes a round trip.
+        steps={request.workflowSteps.filter((step) => !step.isCurrentStep && Boolean(step.actionDate))}
+        onClose={() => { if (!busyAction) setApprovalAction(undefined) }}
+        onConfirm={(input) => void runApprovalAction(input)}
+      />
     </div>
   )
 }
