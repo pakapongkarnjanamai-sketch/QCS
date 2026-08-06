@@ -24,18 +24,25 @@ interface PdfViewerProps {
 
 export function PdfViewer({ document, onClose }: PdfViewerProps) {
   return (
-    <Modal open={Boolean(document)} title={document?.fileName ?? 'Document preview'} onClose={onClose} className="h-full max-w-none">
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <a href={document?.url} target="_blank" rel="noreferrer" className={appButtonClassName('secondary', 'sm', 'w-fit')}>
-          <ExternalLink className="size-3.5" aria-hidden />
-          Open in a new tab
-        </a>
-        {document && (
-          <object data={document.url} type="application/pdf" className="min-h-0 w-full flex-1 border border-border-subtle" aria-label={`Preview of ${document.fileName}`}>
-            <p className="p-4 text-body text-ink-muted">This browser cannot preview the document. Use Open in a new tab.</p>
-          </object>
-        )}
-      </div>
+    <Modal
+      open={Boolean(document)}
+      title={document?.fileName ?? 'Document preview'}
+      onClose={onClose}
+      className="h-full max-w-5xl"
+      // The body has to be told to grow; see the note on Modal's contentClassName. The wrapper
+      // div that used to carry these classes sat inside a body that never grew, so flex-1 had
+      // nothing to resolve against and the object rendered at zero height.
+      contentClassName="flex min-h-0 flex-1 flex-col gap-3 p-5"
+    >
+      <a href={document?.url} target="_blank" rel="noreferrer" className={appButtonClassName('secondary', 'sm', 'w-fit')}>
+        <ExternalLink className="size-3.5" aria-hidden />
+        Open in a new tab
+      </a>
+      {document && (
+        <object data={document.url} type="application/pdf" className="min-h-0 w-full flex-1 border border-border-subtle" aria-label={`Preview of ${document.fileName}`}>
+          <p className="p-4 text-body text-ink-muted">This browser cannot preview the document. Use Open in a new tab.</p>
+        </object>
+      )}
     </Modal>
   )
 }
