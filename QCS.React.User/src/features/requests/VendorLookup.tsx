@@ -17,16 +17,21 @@ const maximumSuggestions = 20
 interface VendorLookupProps {
   value: SavePortalRequest
   errors: Record<string, string>
+  disabled?: boolean
   onChange: (patch: Partial<SavePortalRequest>) => void
 }
 
-export function VendorLookup({ value, errors, onChange }: VendorLookupProps) {
+export function VendorLookup({ value, errors, disabled = false, onChange }: VendorLookupProps) {
   const [vendors, setVendors] = useState<ActiveVendorOption[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [warning, setWarning] = useState('')
 
   useEffect(() => {
+    if (disabled) {
+      setLoading(false)
+      return undefined
+    }
     const controller = new AbortController()
     void apiClient.get<ActiveVendorOption[]>('/Vendor/ActiveLookup', { signal: controller.signal })
       .then(({ data }) => {
@@ -43,10 +48,10 @@ export function VendorLookup({ value, errors, onChange }: VendorLookupProps) {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [])
+  }, [disabled])
 
   const normalizedQuery = query.trim().toLocaleLowerCase()
-  const options = normalizedQuery.length < minimumQueryLength
+  const options = disabled || normalizedQuery.length < minimumQueryLength
     ? []
     : vendors
       .filter((vendor) => vendor.code.toLocaleLowerCase().includes(normalizedQuery)
@@ -69,6 +74,7 @@ export function VendorLookup({ value, errors, onChange }: VendorLookupProps) {
         <Field label="Code">
           <input
             value={value.vendorCode}
+            disabled={disabled}
             onChange={(event) => updateField('vendorCode', event.target.value)}
             className={appInputClassName('md', 'w-full')}
             autoComplete="off"
@@ -79,6 +85,7 @@ export function VendorLookup({ value, errors, onChange }: VendorLookupProps) {
         <Field label="Name">
           <input
             value={value.vendorName}
+            disabled={disabled}
             onChange={(event) => updateField('vendorName', event.target.value)}
             className={appInputClassName('md', 'w-full')}
             autoComplete="off"

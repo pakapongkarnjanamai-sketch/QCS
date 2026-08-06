@@ -180,7 +180,7 @@ export function TypedDocumentEditor({
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex justify-end">
-                      <IconButton size="sm" label={`View ${document.fileName}`} disabled={disabled} onClick={() => onView(document)}>
+                      <IconButton size="sm" label={`View ${document.fileName}`} onClick={() => onView(document)}>
                         <ExternalLink className="size-3.5" aria-hidden />
                       </IconButton>
                       <IconButton size="sm" label={`Delete ${document.fileName}`} tone="danger" disabled={disabled} onClick={() => onRemove(document)}>

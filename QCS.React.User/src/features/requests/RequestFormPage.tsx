@@ -1,21 +1,25 @@
-import { Eye, Save, Send, Trash2 } from 'lucide-react'
+import { ExternalLink, Eye, Save, Send, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useBeforeUnload } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Field } from '@/components/ui/Field'
 import { appInputClassName, appTextareaClassName } from '@/components/ui/inputStyles'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
+import { qrsRequestUrl } from '@/config/appConfig'
 import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
+import { ApprovalActionDialog, type ApprovalActionKind } from './ApprovalActionDialog'
+import { ApprovalSteps } from './ApprovalSteps'
 import { QrsSourceLookup } from './QrsSourceLookup'
 import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
-import { addExpiredQuotationReference, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
+import { addExpiredQuotationReference, approvePortalRequest, cancelPortalRequest, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, rejectPortalRequest, returnPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
-import type { PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest } from './types'
+import type { PortalApprovalAction, PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest } from './types'
 
 type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove' | 'documents' | 'reference'
 const defaultUploadDocumentTypeId = 40
@@ -59,6 +63,8 @@ export function RequestFormPage() {
   const [routeLoading, setRouteLoading] = useState(false)
   const [routeError, setRouteError] = useState<string>()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [approvalAction, setApprovalAction] = useState<ApprovalActionKind>()
+  const [busyApprovalAction, setBusyApprovalAction] = useState<ApprovalActionKind>()
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault()
   })
@@ -103,7 +109,7 @@ export function RequestFormPage() {
       const result = requestId ? await updatePortalDraft(requestId, form) : await createPortalDraft(form)
       setDirty(false)
       toast.success('Draft saved.')
-      navigate(`/requests/${result.id}/edit`, { replace: true })
+      navigate(`/requests/${result.id}`, { replace: true })
     } catch (reason) {
       const apiError = toApiError(reason)
       setError(apiError)
@@ -130,7 +136,9 @@ export function RequestFormPage() {
       await submitPortalRequest(requestId)
       setDirty(false)
       toast.success('Request submitted.')
-      navigate(`/requests/${requestId}`)
+      const detail = await getPortalRequestById(requestId)
+      setRequest(detail)
+      setForm(fromDetail(detail))
     } catch (reason) {
       const apiError = toApiError(reason)
       setError(apiError)
@@ -160,7 +168,7 @@ export function RequestFormPage() {
         const draft = await createPortalDraft(form)
         targetRequestId = draft.id
         setDirty(false)
-        navigate(`/requests/${draft.id}/edit`, { replace: true })
+        navigate(`/requests/${draft.id}`, { replace: true })
       }
 
       for (const file of files) {
@@ -225,36 +233,75 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+  const runApprovalAction = async (input: PortalApprovalAction) => {
+    const action = approvalAction
+    if (!action || !requestId) return
+    const runners: Record<ApprovalActionKind, () => Promise<void>> = {
+      submit: () => submitPortalRequest(requestId),
+      approve: () => approvePortalRequest(requestId, input),
+      reject: () => rejectPortalRequest(requestId, input),
+      return: () => returnPortalRequest(requestId, input),
+      cancel: () => cancelPortalRequest(requestId, input),
+    }
+    setBusyApprovalAction(action)
+    setError(undefined)
+    try {
+      await runners[action]()
+      const detail = await getPortalRequestById(requestId)
+      setRequest(detail)
+      setForm(fromDetail(detail))
+      setApprovalAction(undefined)
+    } catch (reason) {
+      setError(toApiError(reason))
+    } finally {
+      setBusyApprovalAction(undefined)
+    }
+  }
   if (loading) return <LoadingSurface />
   if (error && !request && requestId) return <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>
   const documents = request?.documents ?? []
-  const disabled = Boolean(busy)
+  const disabled = Boolean(busy || busyApprovalAction)
+  const canEdit = !requestId || request?.permissions.canEdit === true
+  const formDisabled = disabled || !canEdit
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <h1 className="text-title font-semibold">{requestId ? `Edit ${request?.code ?? 'request'}` : 'New request'}</h1>
-        <p className="mt-1 text-body text-ink-muted">Save a draft at any time. Required fields apply when submitting.</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-title font-semibold">{requestId ? `${canEdit ? 'Edit ' : ''}${request?.code ?? 'request'}` : 'New request'}</h1>
+            {request && <StatusBadge status={request.statusName} />}
+          </div>
+          <p className="mt-1 text-body text-ink-muted">
+            {canEdit ? 'Save a draft at any time. Required fields apply when submitting.' : 'Request details and approval progress.'}
+          </p>
+        </div>
+        {request?.sourceSystem === 'QRS' && request.sourceCode && (
+          <a href={qrsRequestUrl(request.sourceCode)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+            Open source request {request.sourceCode}
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        )}
       </header>
       {error && <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>}
       <section className="space-y-4 rounded-sm border border-border-subtle bg-white p-4">
         <Field label="Title" required error={errors.title}>
-          <input value={form.title} onChange={(event) => patch({ title: event.target.value })} className={appInputClassName('md', 'w-full')} />
+          <input value={form.title} disabled={formDisabled} onChange={(event) => patch({ title: event.target.value })} className={appInputClassName('md', 'w-full')} />
         </Field>
-        <VendorLookup value={form} errors={errors} onChange={patch} />
-        <QrsSourceLookup value={form} onChange={patch} />
+        <VendorLookup value={form} errors={errors} disabled={formDisabled} onChange={patch} />
+        <QrsSourceLookup value={form} disabled={formDisabled} onChange={patch} />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Valid from" required error={errors.validFrom}>
-            <input type="date" value={form.validFrom} onChange={(event) => patch({ validFrom: event.target.value })} className={appInputClassName('md', 'w-full')} />
+            <input type="date" value={form.validFrom} disabled={formDisabled} onChange={(event) => patch({ validFrom: event.target.value })} className={appInputClassName('md', 'w-full')} />
           </Field>
           <Field label="Valid until" required error={errors.validUntil}>
-            <input type="date" value={form.validUntil} onChange={(event) => patch({ validUntil: event.target.value })} className={appInputClassName('md', 'w-full')} />
+            <input type="date" value={form.validUntil} disabled={formDisabled} onChange={(event) => patch({ validUntil: event.target.value })} className={appInputClassName('md', 'w-full')} />
           </Field>
         </div>
         <Field label="Remark" error={errors.remark}>
-          <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
+          <textarea value={form.remark} disabled={formDisabled} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
-        <TypedDocumentEditor documents={documents} disabled={disabled} uploading={busy === 'upload'} error={errors.attachments} onUpload={upload} onAddReference={addReference} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
-        <WorkflowRoutePreview
+        <TypedDocumentEditor documents={documents} disabled={formDisabled} uploading={busy === 'upload'} error={errors.attachments} onUpload={upload} onAddReference={addReference} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
+        {canEdit && <WorkflowRoutePreview
           preview={routePreview}
           loading={routeLoading}
           error={routeError}
@@ -268,7 +315,7 @@ export function RequestFormPage() {
               .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
               .finally(() => setRouteLoading(false))
           }}
-        />
+        />}
       </section>
       <div className="flex flex-wrap justify-end gap-2">
         <AppButton
@@ -289,14 +336,19 @@ export function RequestFormPage() {
         >
           <Eye className="size-4" aria-hidden /> Preview
         </AppButton>
-        <AppButton onClick={() => void save()} disabled={disabled}>
+        {canEdit && <AppButton onClick={() => void save()} disabled={disabled}>
           <Save className="size-4" aria-hidden />
           {busy === 'save' ? 'Saving...' : 'Save draft'}
-        </AppButton>
-        <AppButton onClick={() => void submit()} disabled={disabled}>
+        </AppButton>}
+        {canEdit && <AppButton onClick={() => void submit()} disabled={disabled}>
           <Send className="size-4" aria-hidden />
           {busy === 'submit' ? 'Submitting...' : 'Submit'}
-        </AppButton>
+        </AppButton>}
+        {!canEdit && request?.permissions.canSubmit && <AppButton disabled={disabled} onClick={() => setApprovalAction('submit')}>Submit</AppButton>}
+        {request?.permissions.canApprove && <AppButton disabled={disabled} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
+        {request?.permissions.canReject && <AppButton variant="danger" disabled={disabled} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
+        {request?.permissions.canReturn && <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('return')}>Return</AppButton>}
+        {request?.permissions.canCancel && <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('cancel')}>Cancel request</AppButton>}
         {requestId && request?.permissions.canDelete && (
           <AppButton variant="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
             <Trash2 className="size-4" aria-hidden />
@@ -304,7 +356,15 @@ export function RequestFormPage() {
           </AppButton>
         )}
       </div>
+      {requestId && !canEdit && <ApprovalSteps steps={request?.workflowSteps ?? []} histories={request?.histories ?? []} />}
       <PdfViewer document={preview} onClose={() => { if (preview?.url.startsWith("blob:")) URL.revokeObjectURL(preview.url); setPreview(undefined) }} />
+      <ApprovalActionDialog
+        action={approvalAction}
+        busy={Boolean(busyApprovalAction)}
+        steps={(request?.workflowSteps ?? []).filter((step) => !step.isCurrentStep && Boolean(step.actionDate))}
+        onClose={() => { if (!busyApprovalAction) setApprovalAction(undefined) }}
+        onConfirm={(input) => void runApprovalAction(input)}
+      />
       <ConfirmDialog
         open={confirmDelete}
         title="Delete draft"

@@ -12,7 +12,6 @@ import { Link, useLocation } from 'react-router'
 const labels: Record<string, string> = {
   requests: 'Requests',
   new: 'New request',
-  edit: 'Edit request',
   inbox: 'My approvals',
   quotations: 'Quotations',
 }
