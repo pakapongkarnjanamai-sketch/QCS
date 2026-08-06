@@ -45,7 +45,13 @@ export interface SavePortalRequest {
 export interface PortalSaveResult { id: number; code: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalAttachmentDto.
-export interface PortalAttachment { id: number; fileName: string; documentTypeId: number; documentTypeName: string; viewUrl: string }
+export interface PortalAttachment { id: number; fileName: string; originalFileName: string; documentTypeId: number; documentTypeName: string; sortOrder: number; fileSize: number; uploadDate: string; viewUrl: string }
+
+// Mirrors QCS.Domain.DTOs.Portal.UpdatePortalDocumentsDto.
+export interface UpdatePortalDocuments { documents: PortalDocumentUpdate[] }
+
+// Mirrors QCS.Domain.DTOs.Portal.PortalDocumentUpdateDto.
+export interface PortalDocumentUpdate { id: number; documentTypeId: number }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalApprovalActionDto.
 export interface PortalApprovalAction { comment: string; returnToStepSequence?: number }
@@ -75,7 +81,7 @@ export interface PortalRequestPermissions {
 // fileSize was missing here while the DTO has always sent it. It is always present in the
 // response — WhenWritingNull omits nulls, not zeros — but it is 0 on the generated FinalPdf row,
 // which is built without one. Callers must treat 0 as "unknown", not as an empty file.
-export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; fileSize: number; viewUrl: string }
+export interface PortalDocument { id: number; fileName: string; documentTypeId: number; documentTypeName: string; sortOrder: number; fileSize: number; viewUrl: string }
 
 // Mirrors QCS.Domain.DTOs.Portal.PortalWorkflowStepDto.
 export interface PortalWorkflowStep { id: number; sequenceNo: number; stepName: string; status?: number; statusName?: string; actionDate?: string; isCurrentStep: boolean; approverNId?: string; approverName?: string; comment?: string; assignments: PortalAssignment[] }

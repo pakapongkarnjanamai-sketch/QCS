@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { PortalApprovalAction, PortalAttachment, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest } from './types'
+import type { PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, UpdatePortalDocuments } from './types'
 
 function resolveDocumentUrls(request: PortalRequestDetail): PortalRequestDetail {
   return {
@@ -48,6 +48,13 @@ export async function uploadPortalAttachment(id: number, file: File, documentTyp
 
 export async function deletePortalAttachment(id: number, attachmentId: number): Promise<void> {
   await apiClient.delete(`/Portal/Requests/${id}/attachments/${attachmentId}`)
+}
+
+export async function updatePortalDocuments(id: number, documents: PortalDocument[]): Promise<void> {
+  const input: UpdatePortalDocuments = {
+    documents: documents.map((document) => ({ id: document.id, documentTypeId: document.documentTypeId })),
+  }
+  await apiClient.put(`/Portal/Requests/${id}/attachments`, input)
 }
 
 export async function previewPortalRequest(id: number): Promise<Blob> {

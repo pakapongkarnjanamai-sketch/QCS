@@ -142,6 +142,8 @@ namespace QCS.Application.Services
                 ReferenceCode = request.Code,
                 PdfFiles = request.Quotations
                     .Where(q => q.AttachmentFile != null)
+                    .OrderBy(q => q.SortOrder)
+                    .ThenBy(q => q.Id)
                     .Select(q => new PdfFileDto
                     {
                         Name = q.FileName,

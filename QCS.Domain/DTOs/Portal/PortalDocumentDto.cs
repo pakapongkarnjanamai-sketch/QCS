@@ -6,6 +6,7 @@ namespace QCS.Domain.DTOs.Portal
         public string FileName { get; set; } = string.Empty;
         public int DocumentTypeId { get; set; }
         public string DocumentTypeName { get; set; } = string.Empty;
+        public int SortOrder { get; set; }
         public long FileSize { get; set; }
         public string ViewUrl { get; set; } = string.Empty;
     }

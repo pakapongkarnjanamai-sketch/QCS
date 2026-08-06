@@ -14,6 +14,7 @@ namespace QCS.Domain.Models
         public long FileSize { get; set; }
 
         public int DocumentTypeId { get; set; } // 10, 20, 30
+        public int SortOrder { get; set; }
 
         public int? AttachmentFileId { get; set; }
 

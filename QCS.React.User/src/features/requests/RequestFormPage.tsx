@@ -13,11 +13,11 @@ import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
-import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, submitPortalRequest, updatePortalDraft, uploadPortalAttachment } from './requestApi'
+import { createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
 import type { PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest } from './types'
 
-type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove'
+type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove' | 'documents'
 function fromDetail(detail: PortalRequestDetail): SavePortalRequest {
   return {
     title: detail.title ?? '',
@@ -138,17 +138,31 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
-  const upload = async (file: File, documentTypeId: number) => {
+  const upload = async (files: File[], documentTypeId: number) => {
     if (!requestId) {
       toast.warning('Save the draft before uploading attachments.')
       return
     }
     setBusy('upload')
     try {
-      await uploadPortalAttachment(requestId, file, documentTypeId)
+      for (const file of files) await uploadPortalAttachment(requestId, file, documentTypeId)
       const detail = await getPortalRequestById(requestId)
       setRequest(detail)
-      toast.success('Attachment uploaded.')
+      toast.success(files.length === 1 ? 'Document uploaded.' : `${files.length} documents uploaded.`)
+    } catch (reason) {
+      setRequest(await getPortalRequestById(requestId).catch(() => request))
+      setError(toApiError(reason))
+    } finally {
+      setBusy(undefined)
+    }
+  }
+  const updateDocuments = async (nextDocuments: PortalDocument[]) => {
+    if (!requestId) return
+    setBusy('documents')
+    try {
+      await updatePortalDocuments(requestId, nextDocuments)
+      setRequest(await getPortalRequestById(requestId))
+      toast.success('Documents updated.')
     } catch (reason) {
       setError(toApiError(reason))
     } finally {
@@ -196,7 +210,7 @@ export function RequestFormPage() {
         <Field label="Remark" error={errors.remark}>
           <textarea value={form.remark} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
         </Field>
-        <TypedDocumentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
+        <TypedDocumentEditor documents={documents} disabled={disabled} error={errors.attachments} onUpload={upload} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
         <WorkflowRoutePreview
           preview={routePreview}
           loading={routeLoading}

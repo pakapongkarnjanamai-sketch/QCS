@@ -746,6 +746,194 @@ namespace QCS.Api.IntegrationTests
             response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         }
 
+        [Fact]
+        public async Task UploadPortalAttachment_WhenFileIsNotPdf_Returns400BadRequest()
+        {
+            const int requestId = 922;
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = "QC-20260804-922",
+                    Title = "Draft for PDF validation",
+                    VendorCode = "V000",
+                    VendorName = "Initial Vendor",
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var file = new ByteArrayContent("not a PDF"u8.ToArray());
+            file.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
+            using var form = new MultipartFormDataContent
+            {
+                { file, "file", "notes.txt" },
+                { new StringContent("10"), "documentTypeId" }
+            };
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsync($"/api/Portal/Requests/{requestId}/attachments", form);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task UploadPortalAttachment_WhenPdfContentIsInvalid_Returns400BadRequest()
+        {
+            const int requestId = 927;
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = "QC-20260804-927",
+                    Title = "Draft for PDF content validation",
+                    VendorCode = "V000",
+                    VendorName = "Initial Vendor",
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var file = new ByteArrayContent("not a PDF"u8.ToArray());
+            file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            using var form = new MultipartFormDataContent
+            {
+                { file, "file", "disguised.pdf" },
+                { new StringContent("10"), "documentTypeId" }
+            };
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsync($"/api/Portal/Requests/{requestId}/attachments", form);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task UpdatePortalAttachments_WhenOwnerDraft_PersistsOrderAndTypes()
+        {
+            const int requestId = 923;
+            const int firstDocumentId = 92301;
+            const int secondDocumentId = 92302;
+            SeedRequestWithDocuments(requestId, RequestStatus.Draft, "USER01", firstDocumentId, secondDocumentId);
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PutAsJsonAsync(
+                $"/api/Portal/Requests/{requestId}/attachments",
+                new UpdatePortalDocumentsDto
+                {
+                    Documents =
+                    {
+                        new PortalDocumentUpdateDto { Id = secondDocumentId, DocumentTypeId = (int)DocumentType.ExpiredQuotation },
+                        new PortalDocumentUpdateDto { Id = firstDocumentId, DocumentTypeId = (int)DocumentType.Specifications }
+                    }
+                });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var detail = await client.GetFromJsonAsync<PortalRequestDetailDto>($"/api/Portal/Requests/{requestId}");
+            detail.ShouldNotBeNull();
+            detail.Documents.Select(document => document.Id).ShouldBe(new[] { secondDocumentId, firstDocumentId });
+            detail.Documents.Select(document => document.DocumentTypeId).ShouldBe(new[]
+            {
+                (int)DocumentType.ExpiredQuotation,
+                (int)DocumentType.Specifications
+            });
+            detail.Documents.Select(document => document.SortOrder).ShouldBe(new[] { 1, 2 });
+        }
+
+        [Fact]
+        public async Task UpdatePortalAttachments_WhenDocumentSetIsIncomplete_Returns400BadRequest()
+        {
+            const int requestId = 924;
+            const int firstDocumentId = 92401;
+            SeedRequestWithDocuments(requestId, RequestStatus.Draft, "USER01", firstDocumentId, 92402);
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PutAsJsonAsync(
+                $"/api/Portal/Requests/{requestId}/attachments",
+                new UpdatePortalDocumentsDto
+                {
+                    Documents =
+                    {
+                        new PortalDocumentUpdateDto { Id = firstDocumentId, DocumentTypeId = (int)DocumentType.OriginalQuotation }
+                    }
+                });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task UpdatePortalAttachments_WhenNotOwner_Returns403Forbidden()
+        {
+            const int requestId = 925;
+            SeedRequestWithDocuments(requestId, RequestStatus.Draft, "OWNER01", 92501, 92502);
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PutAsJsonAsync(
+                $"/api/Portal/Requests/{requestId}/attachments",
+                new UpdatePortalDocumentsDto());
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
+        [Fact]
+        public async Task UpdatePortalAttachments_WhenRequestIsNotDraft_Returns400BadRequest()
+        {
+            const int requestId = 926;
+            SeedRequestWithDocuments(requestId, RequestStatus.InProcess, "USER01", 92601, 92602);
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PutAsJsonAsync(
+                $"/api/Portal/Requests/{requestId}/attachments",
+                new UpdatePortalDocumentsDto());
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        private void SeedRequestWithDocuments(int requestId, RequestStatus status, string owner, int firstDocumentId, int secondDocumentId)
+        {
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+                var request = new Request
+                {
+                    Id = requestId,
+                    Code = $"QC-20260804-{requestId}",
+                    Title = "Draft for document update",
+                    VendorCode = "V000",
+                    VendorName = "Initial Vendor",
+                    Status = (int)status,
+                    CreatedBy = owner,
+                    IsActive = true
+                };
+                request.Quotations.Add(new Quotation
+                {
+                    Id = firstDocumentId,
+                    FileName = "first.pdf",
+                    FilePath = "Database",
+                    ContentType = "application/pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    SortOrder = 1
+                });
+                request.Quotations.Add(new Quotation
+                {
+                    Id = secondDocumentId,
+                    FileName = "second.pdf",
+                    FilePath = "Database",
+                    ContentType = "application/pdf",
+                    DocumentTypeId = (int)DocumentType.Comparison,
+                    SortOrder = 2
+                });
+                db.Requests.Add(request);
+            });
+        }
+
         private async Task<HttpResponseMessage> UploadAttachmentAsync(int requestId, string code, string? documentTypeId)
         {
             _factory.SeedDatabase(db =>
@@ -765,7 +953,7 @@ namespace QCS.Api.IntegrationTests
                 });
             });
 
-            var file = new ByteArrayContent(new byte[] { 0x25, 0x50, 0x44, 0x46 });
+            var file = new ByteArrayContent("%PDF-1.4"u8.ToArray());
             file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
 
             using var form = new MultipartFormDataContent { { file, "file", "spec.pdf" } };

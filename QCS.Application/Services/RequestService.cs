@@ -40,6 +40,7 @@ namespace QCS.Application.Services
         Task SubmitPortalRequestAsync(int id, CancellationToken cancellationToken = default);
         Task DeletePortalDraftAsync(int id, CancellationToken cancellationToken = default);
         Task<PortalAttachmentDto> AddPortalAttachmentAsync(int requestId, UploadPortalAttachmentDto input, CancellationToken cancellationToken = default);
+        Task UpdatePortalDocumentsAsync(int requestId, UpdatePortalDocumentsDto input, CancellationToken cancellationToken = default);
         Task DeletePortalAttachmentAsync(int requestId, int attachmentId, CancellationToken cancellationToken = default);
         Task ApprovePortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default);
         Task RejectPortalRequestAsync(int id, PortalApprovalActionDto input, CancellationToken cancellationToken = default);
@@ -282,7 +283,8 @@ namespace QCS.Application.Services
                     ValidUntil = r.ValidUntil,
                     Remark = r.Remark,
                     Documents = r.Quotations
-                        .OrderBy(q => q.DocumentTypeId)
+                        .OrderBy(q => q.SortOrder)
+                        .ThenBy(q => q.Id)
                         .Select(q => new SourcedDocumentDto
                         {
                             Id = q.Id,
@@ -476,13 +478,16 @@ namespace QCS.Application.Services
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
                 Remark = request.Remark,
-                Quotations = request.Quotations.Select(q => new QuotationItemDto
-                {
-                    Id = q.Id,
-                    DocumentTypeId = q.DocumentTypeId,
-                    OriginalFileName = q.FileName,
-                    FilePath = q.FilePath
-                }).OrderBy(d => d.DocumentTypeId).ToList(),
+                Quotations = request.Quotations
+                    .OrderBy(q => q.SortOrder)
+                    .ThenBy(q => q.Id)
+                    .Select(q => new QuotationItemDto
+                    {
+                        Id = q.Id,
+                        DocumentTypeId = q.DocumentTypeId,
+                        OriginalFileName = q.FileName,
+                        FilePath = q.FilePath
+                    }).ToList(),
                 Permissions = permissions,
                 WorkflowRoute = workflowRoute
             };
@@ -795,7 +800,8 @@ namespace QCS.Application.Services
             }
 
             var documents = request.Quotations
-                .OrderBy(q => q.DocumentTypeId)
+                .OrderBy(q => q.SortOrder)
+                .ThenBy(q => q.Id)
                 .Select(q => new PortalDocumentDto
                 {
                     Id = q.Id,
@@ -807,6 +813,7 @@ namespace QCS.Application.Services
                         : q.DocumentTypeId == (int)DocumentType.Attachment ? nameof(DocumentType.Attachment)
                         : q.DocumentTypeId == (int)DocumentType.ExpiredQuotation ? nameof(DocumentType.ExpiredQuotation)
                         : "Unknown",
+                    SortOrder = q.SortOrder,
                     FileSize = q.FileSize,
                     ViewUrl = $"/api/Request/ViewFile/{q.Id}"
                 }).ToList();
@@ -1082,6 +1089,29 @@ namespace QCS.Application.Services
                 throw new ArgumentException("Attachment file is required.");
             }
 
+            if (!string.Equals(Path.GetExtension(input.File.FileName), ".pdf", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(input.File.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("Only PDF attachments are allowed.");
+            }
+
+            var header = new byte[5];
+            var bytesRead = 0;
+            await using (var stream = input.File.OpenReadStream())
+            {
+                while (bytesRead < header.Length)
+                {
+                    var read = await stream.ReadAsync(header.AsMemory(bytesRead), cancellationToken);
+                    if (read == 0) break;
+                    bytesRead += read;
+                }
+            }
+
+            if (bytesRead != header.Length || !header.AsSpan().SequenceEqual("%PDF-"u8))
+            {
+                throw new ArgumentException("The attachment content is not a valid PDF file.");
+            }
+
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations)
                 .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
@@ -1121,6 +1151,9 @@ namespace QCS.Application.Services
 
             var newQuotations = await _fileService.PrepareFilesForUploadAsync(files, quotationJson);
             var quotation = newQuotations.First();
+            quotation.SortOrder = request.Quotations.Count == 0
+                ? 1
+                : request.Quotations.Max(q => q.SortOrder) + 1;
 
             request.Quotations.Add(quotation);
             await _unitOfWork.Repository<Request>().UpdateAsync(request);
@@ -1144,10 +1177,59 @@ namespace QCS.Application.Services
                 OriginalFileName = quotation.FileName,
                 DocumentTypeId = quotation.DocumentTypeId,
                 DocumentTypeName = docTypeName,
+                SortOrder = quotation.SortOrder,
                 FileSize = input.File.Length,
                 UploadDate = _dateTime.Now,
                 ViewUrl = $"/api/Request/ViewFile/{quotation.Id}"
             };
+        }
+
+        public async Task UpdatePortalDocumentsAsync(int requestId, UpdatePortalDocumentsDto input, CancellationToken cancellationToken = default)
+        {
+            var request = await _unitOfWork.Repository<Request>().GetAll()
+                .Include(r => r.Quotations)
+                .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+            if (request == null)
+            {
+                throw new KeyNotFoundException($"Request {requestId} not found.");
+            }
+
+            if (!string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("You do not have permission to modify attachments on this request.");
+            }
+
+            if (request.Status != (int)RequestStatus.Draft)
+            {
+                throw new InvalidOperationException("Attachments can only be updated on draft requests.");
+            }
+
+            if (input.Documents == null ||
+                input.Documents.Count != request.Quotations.Count ||
+                input.Documents.Select(document => document.Id).Distinct().Count() != input.Documents.Count ||
+                input.Documents.Any(document => !request.Quotations.Any(quotation => quotation.Id == document.Id)))
+            {
+                throw new ArgumentException("Documents must contain every current attachment exactly once.");
+            }
+
+            if (input.Documents.Any(document => !Enum.IsDefined(typeof(DocumentType), document.DocumentTypeId)))
+            {
+                throw new ArgumentException("Every document must use a recognised document type.");
+            }
+
+            var quotationsById = request.Quotations.ToDictionary(quotation => quotation.Id);
+            for (var index = 0; index < input.Documents.Count; index++)
+            {
+                var update = input.Documents[index];
+                var quotation = quotationsById[update.Id];
+                quotation.DocumentTypeId = update.DocumentTypeId;
+                quotation.SortOrder = index + 1;
+            }
+
+            await _unitOfWork.Repository<Request>().UpdateAsync(request);
+            await _unitOfWork.CommitAsync();
+            await NotifyUpdatesAsync($"แก้ไขลำดับไฟล์แนบในเอกสาร {request.Code}");
         }
 
         public async Task DeletePortalAttachmentAsync(int requestId, int attachmentId, CancellationToken cancellationToken = default)
