@@ -1,11 +1,11 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
 namespace QCS.Domain.Enum
 {
     /// <summary>
-    /// สถานะของเอกสาร Request ทั้งใบ
+    /// สถานะของเอกสาร Request ทั้งใบ (ตรงตามสัญญา GPCS Document Service)
     /// </summary>
     public enum RequestStatus
     {
@@ -13,24 +13,32 @@ namespace QCS.Domain.Enum
         [Description("แบบร่าง")]
         Draft = 0,
 
-        [Display(Name = "รออนุมัติ")]
-        [Description("รออนุมัติ")]
-        Pending = 1,
+        [Display(Name = "อยู่ระหว่างอนุมัติ")]
+        [Description("อยู่ระหว่างอนุมัติ")]
+        InProcess = 1,
 
-        [Display(Name = "อนุมัติครบถ้วน")]
-        [Description("อนุมัติครบถ้วน")]
-        Approved = 2,
+        [Display(Name = "ส่งกลับแก้ไข")]
+        [Description("ส่งกลับแก้ไข")]
+        Returned = 2,
 
         [Display(Name = "ไม่อนุมัติ")]
         [Description("ไม่อนุมัติ")]
-        Rejected = 9,
+        Rejected = 3,
 
-        //[Display(Name = "ยกเลิก")]
-        //[Description("ยกเลิก")]
-        //Cancelled = 99
+        [Display(Name = "รอวันที่มีผล")]
+        [Description("รอวันที่มีผล")]
+        WaitingEffective = 4,
+
+        [Display(Name = "เสร็จสมบูรณ์")]
+        [Description("เสร็จสมบูรณ์")]
+        Completed = 5,
+
+        [Display(Name = "ยกเลิก")]
+        [Description("ยกเลิก")]
+        Cancelled = 6
     }
 
-  
+
 
     ///// <summary>
     ///// Extension methods สำหรับ Enum Status ต่างๆ

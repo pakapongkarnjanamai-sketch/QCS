@@ -235,41 +235,12 @@ namespace QCS.API.Controllers
             if (result == null) return NotFound("ไม่พบข้อมูลเอกสาร");
             return Ok(result);
         }
-        [HttpPost("Save")] // บันทึกเป็น Draft
-        public async Task<IActionResult> Save([FromForm] CreateRequestDto input)
-        {
-            // ส่ง flag isSubmit = false ไปให้ Service
-            var result = await _service.CreateAsync(input, isSubmit: false);
-            return Ok(new { success = true, id = result.Id, docNo = result.Code });
-        }
-        [HttpPost("Submit")]
-        public async Task<IActionResult> Submit([FromForm] CreateRequestDto input)
-        {
-         
-            await _service.CreateAsync(input,  isSubmit: true);
-            return Ok(new { success = true });
-        }
-
-        [HttpPost("Update")]
-        public async Task<IActionResult> Update([FromForm] UpdateRequestDto input)
-        {
-            await _service.UpdateAsync(input, isSubmit: false);
-            return Ok(new { success = true });
-        }
-
-        [HttpPost("SubmitUpdate")]
-        public async Task<IActionResult> SubmitUpdate([FromForm] UpdateRequestDto input)
-        {
-            await _service.UpdateAsync(input, isSubmit: true);
-            return Ok(new { success = true });
-        }
-
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             try
             {
-                await _service.DeleteAsync(id);
+                await _service.DeletePortalDraftAsync(id);
                 return Ok(new { message = "Deleted successfully" });
             }
             catch (KeyNotFoundException ex)

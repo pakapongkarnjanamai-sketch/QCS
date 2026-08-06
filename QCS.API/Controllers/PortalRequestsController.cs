@@ -171,7 +171,7 @@ namespace QCS.API.Controllers
                     title: "Access denied",
                     detail: ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 return Problem(
                     statusCode: StatusCodes.Status400BadRequest,
@@ -214,7 +214,7 @@ namespace QCS.API.Controllers
                     title: "Access denied",
                     detail: ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 return Problem(
                     statusCode: StatusCodes.Status400BadRequest,
@@ -257,7 +257,7 @@ namespace QCS.API.Controllers
                     title: "Access denied",
                     detail: ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 return Problem(
                     statusCode: StatusCodes.Status400BadRequest,
@@ -408,12 +408,14 @@ namespace QCS.API.Controllers
                         detail: "No valid attachment files found for preview.");
                 }
 
-                var approvalSteps = detail.WorkflowSteps.Select(s => new StepDto
-                {
-                    StepName = s.StepName ?? "Step",
-                    Approver = s.ApproverName ?? "Pending Approver",
-                    ApprovalDate = s.ActionDate ?? DateTime.Now
-                }).ToList();
+                var approvalSteps = detail.WorkflowSteps
+                    .Where(step => step.ActionDate.HasValue && !string.IsNullOrWhiteSpace(step.ApproverName))
+                    .Select(step => new StepDto
+                    {
+                        StepName = step.StepName ?? "Step",
+                        Approver = step.ApproverName!,
+                        ApprovalDate = step.ActionDate!.Value
+                    }).ToList();
 
                 var previewRequest = new MergeAndStampRequestDto
                 {
@@ -542,11 +544,116 @@ namespace QCS.API.Controllers
                     title: "Access denied",
                     detail: ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 return Problem(
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Invalid operation",
+                    detail: ex.Message);
+            }
+        }
+
+        [HttpPost("{id:int}/return")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Return([FromRoute] int id, [FromBody] PortalApprovalActionDto input, CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'id' must be greater than 0.");
+            }
+
+            try
+            {
+                await _requestService.ReturnPortalRequestAsync(id, input, cancellationToken);
+                return Ok(new { success = true, message = "Returned successfully" });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Access denied",
+                    detail: ex.Message);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid operation",
+                    detail: ex.Message);
+            }
+        }
+
+        [HttpPost("{id:int}/cancel")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Cancel([FromRoute] int id, [FromBody] PortalApprovalActionDto input, CancellationToken cancellationToken)
+        {
+            if (id <= 0)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: "Route parameter 'id' must be greater than 0.");
+            }
+
+            try
+            {
+                await _requestService.CancelPortalRequestAsync(id, input, cancellationToken);
+                return Ok(new { success = true, message = "Cancelled successfully" });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Access denied",
+                    detail: ex.Message);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid operation",
+                    detail: ex.Message);
+            }
+        }
+
+        [HttpPost("route-preview")]
+        [ProducesResponseType(typeof(QCS.Application.Abstractions.ApprovalPreviewResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> RoutePreview([FromBody] SavePortalRequestDto input, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _requestService.GetRoutePreviewAsync(input, cancellationToken);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Route preview failed",
                     detail: ex.Message);
             }
         }

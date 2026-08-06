@@ -29,7 +29,7 @@ namespace QCS.Api.Controllers
         {
             try
             {
-                await _requestService.DeleteAsync(key);
+                await _requestService.DeletePortalDraftAsync(key);
                 return NoContent();
             }
             catch (KeyNotFoundException)

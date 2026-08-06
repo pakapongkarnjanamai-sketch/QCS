@@ -31,7 +31,7 @@ namespace QCS.Application.Services
 
         public async Task<PaperSavedDto> GetSummaryAsync()
         {
-            var approved = (int)RequestStatus.Approved;
+            var approved = (int)RequestStatus.Completed;
 
             var quotationRepo = _unitOfWork.Repository<Quotation>();
 
@@ -53,7 +53,7 @@ namespace QCS.Application.Services
 
         public async Task<List<PaperSavedTrendPointDto>> GetTrendAsync(string timeframe, string aggregation)
         {
-            var approved = (int)RequestStatus.Approved;
+            var approved = (int)RequestStatus.Completed;
             var buckets = TrendBuckets.Build(timeframe, aggregation);
             var startOfRange = buckets[0].Start;
 

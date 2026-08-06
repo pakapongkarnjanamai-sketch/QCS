@@ -1,6 +1,5 @@
-﻿using QCS.Domain.Enum;
+using QCS.Domain.Enum;
 using System;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QCS.Domain.Models
 {
@@ -10,7 +9,12 @@ namespace QCS.Domain.Models
         public string Title { get; set; }
         public DateTime RequestDate { get; set; }
         public int Status { get; set; }
-        public int CurrentStepId { get; set; }
+        public int? CurrentStepSequence { get; set; }
+
+        public Guid? ApprovalDocumentId { get; set; }
+        public string? ApprovalDocumentNumber { get; set; }
+        public string? CurrentStepName { get; set; }
+        public DateTime? StatusSyncedAt { get; set; }
 
         public string VendorCode { get; set; }
         public string VendorName { get; set; }

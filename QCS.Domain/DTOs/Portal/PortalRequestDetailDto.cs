@@ -20,6 +20,9 @@ namespace QCS.Domain.DTOs.Portal
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
         public string? Remark { get; set; }
+        public Guid? ApprovalDocumentId { get; set; }
+        public string? ApprovalDocumentNumber { get; set; }
+        public int? CurrentStepSequence { get; set; }
         public int CurrentStepId { get; set; }
         public string? CurrentStepName { get; set; }
         public PermissionDto Permissions { get; set; } = new();

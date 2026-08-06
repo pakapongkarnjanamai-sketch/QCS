@@ -60,6 +60,14 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $script:Results = New-Object System.Collections.ArrayList
+$baseUri = $null
+if (-not [Uri]::TryCreate($BaseUrl, [UriKind]::Absolute, [ref]$baseUri)) {
+    throw "BaseUrl must be an absolute local or QA URL. Resolved value: '$BaseUrl'."
+}
+$allowedHosts = @('ap-ntc2138-qawb', 'localhost', '127.0.0.1')
+if ($allowedHosts -notcontains $baseUri.Host.ToLowerInvariant()) {
+    throw "Smoke tests are restricted to local hosts and ap-ntc2138-qawb. Resolved host: '$($baseUri.Host)'."
+}
 $base = $BaseUrl.TrimEnd('/')
 
 function Write-Step {
@@ -76,6 +84,7 @@ function Invoke-RawRequest {
         [string]$Url,
         [string]$Method = 'GET',
         [hashtable]$Headers = @{},
+        [string]$JsonBody,
         [switch]$Anonymous
     )
 
@@ -91,6 +100,10 @@ function Invoke-RawRequest {
 
         foreach ($key in $Headers.Keys) {
             $curlArgs += @('-H', ("{0}: {1}" -f $key, $Headers[$key]))
+        }
+
+        if ($null -ne $JsonBody) {
+            $curlArgs += @('-H', 'Content-Type: application/json', '--data-binary', $JsonBody)
         }
 
         $curlArgs += $Url
@@ -203,6 +216,8 @@ function Invoke-SmokeCheck {
         [int[]]$ExpectStatus = @(200),
         [string[]]$ExpectJsonPath = @(),
         [string]$ExpectContentType = 'application/json',
+        [string]$Method = 'GET',
+        [string]$JsonBody,
         [hashtable]$Headers = @{},
         [switch]$Anonymous,
         [switch]$PassThru
@@ -210,7 +225,7 @@ function Invoke-SmokeCheck {
 
     $response = $null
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-        $response = Invoke-RawRequest -Url $Url -Headers $Headers -Anonymous:$Anonymous
+        $response = Invoke-RawRequest -Url $Url -Method $Method -Headers $Headers -JsonBody $JsonBody -Anonymous:$Anonymous
 
         # Only retry the codes that a warming app pool actually produces. Retrying a 500 just
         # takes three times as long to report the same failure.
@@ -323,7 +338,7 @@ Invoke-SmokeCheck -Label 'Admin requesters' `
 Write-Step 'Portal lists (PortalRequestListItemDto)'
 
 $portalList = Invoke-SmokeCheck -Label 'Portal requests' `
-    -Url "$base/api/Portal/Requests?view=MyRequests&page=1&pageSize=1" `
+    -Url "$base/api/Portal/Requests?view=MyRequests&page=1&pageSize=50" `
     -ExpectJsonPath @('items', 'totalCount', 'page') `
     -PassThru
 
@@ -343,6 +358,46 @@ Invoke-SmokeCheck -Label 'Portal requests (AllApproved view)' `
 Invoke-SmokeCheck -Label 'Portal requests rejects an unknown view' `
     -Url "$base/api/Portal/Requests?view=NotAView&page=1&pageSize=1" `
     -ExpectStatus @(400)
+
+if ($null -ne $portalList) {
+    $unknownStatuses = @($portalList.items | Where-Object { $_.status -notin @(0, 1, 2, 3, 4, 5, 6) })
+    if ($unknownStatuses.Count -gt 0) {
+        Add-Result -Label 'Portal status contract uses only central values' -Outcome 'FAIL' `
+            -Detail ("unknown status value(s): {0}" -f (($unknownStatuses | ForEach-Object { $_.status } | Sort-Object -Unique) -join ', ')) `
+            -Url "$base/api/Portal/Requests?view=MyRequests"
+    }
+    else {
+        Add-Result -Label 'Portal status contract uses only central values' -Outcome 'PASS' `
+            -Detail 'all sampled statuses are in 0..6' `
+            -Url "$base/api/Portal/Requests?view=MyRequests"
+    }
+}
+
+$previewBody = @{
+    title = 'QCS smoke route preview'
+    vendorCode = 'SMOKE'
+    vendorName = 'Smoke Test'
+} | ConvertTo-Json -Compress
+
+Invoke-SmokeCheck -Label 'Central approval route preview' `
+    -Url "$base/api/Portal/Requests/route-preview" `
+    -Method 'POST' `
+    -JsonBody $previewBody `
+    -ExpectJsonPath @('steps')
+
+$missingRequestId = 2147483647
+$actionBody = @{ comment = 'Route existence smoke check' } | ConvertTo-Json -Compress
+Invoke-SmokeCheck -Label 'Return route exists without mutating data' `
+    -Url "$base/api/Portal/Requests/$missingRequestId/return" `
+    -Method 'POST' `
+    -JsonBody $actionBody `
+    -ExpectStatus @(404)
+
+Invoke-SmokeCheck -Label 'Cancel route exists without mutating data' `
+    -Url "$base/api/Portal/Requests/$missingRequestId/cancel" `
+    -Method 'POST' `
+    -JsonBody $actionBody `
+    -ExpectStatus @(404)
 
 # ---------------------------------------------------------------------------------------------
 # The section that would have caught the 2026-08-06 outage. Everything below reads a request

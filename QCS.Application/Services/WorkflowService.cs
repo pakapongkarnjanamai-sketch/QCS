@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Memory;
 using QCS.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -39,9 +39,9 @@ namespace QCS.Application.Services
             bool canEdit = request.Status == (int)QCS.Domain.Enum.RequestStatus.Draft;
             bool canDelete = canEdit && string.Equals(request.CreatedBy, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase);
 
-            if (request.Status == (int)QCS.Domain.Enum.RequestStatus.Pending && workflowRoute?.Steps != null)
+            if (request.Status == (int)QCS.Domain.Enum.RequestStatus.InProcess && workflowRoute?.Steps != null)
             {
-                var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepId);
+                var currentStepConfig = workflowRoute.Steps.FirstOrDefault(s => s.SequenceNo == request.CurrentStepSequence);
                 if (currentStepConfig?.Assignments != null &&
                     currentStepConfig.Assignments.Any(a => string.Equals(a.NId, _currentUserService.UserId, StringComparison.OrdinalIgnoreCase)))
                 {

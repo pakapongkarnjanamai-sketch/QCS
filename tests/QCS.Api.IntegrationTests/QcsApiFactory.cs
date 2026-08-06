@@ -11,6 +11,9 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using QCS.Application.Abstractions;
+using QCS.API.Services;
 using QCS.Infrastructure.Data;
 
 namespace QCS.Api.IntegrationTests
@@ -19,8 +22,15 @@ namespace QCS.Api.IntegrationTests
     {
         private readonly string _databaseName = $"qcs-tests-{Guid.NewGuid()}";
 
+        public FakeApprovalService ApprovalService { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting(
+                "ConnectionStrings:DefaultConnection",
+                "Server=fake;Database=fake;Trusted_Connection=True;");
+
             builder.ConfigureAppConfiguration((context, configBuilder) =>
             {
                 configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
@@ -30,7 +40,13 @@ namespace QCS.Api.IntegrationTests
                     ["ExternalServices:VendorApi"] = "https://vendor.invalid/api/",
                     ["ExternalServices:EmployeeLookupDepartmentApi"] = "https://lookup.invalid/GetDepartment",
                     ["ExternalServices:EmployeeLookupFullApi"] = "https://lookup.invalid/GetFull",
-                    ["ExternalServices:WorkflowApi"] = "https://workflow.invalid/"
+                    ["ExternalServices:WorkflowApi"] = "https://workflow.invalid/",
+                    ["ExternalServices:Approval:DocumentBaseUrl"] = "https://approval.invalid/Document",
+                    ["ExternalServices:Approval:WorkflowBaseUrl"] = "https://approval.invalid/Workflow",
+                    ["ExternalServices:Approval:SourceSystem"] = "QCS",
+                    ["ExternalServices:Approval:DocumentTypeCode"] = "QC",
+                    ["ExternalServices:Approval:RequestUrlTemplate"] = "https://approval.invalid/QCS/User/requests/{id}",
+                    ["ExternalServices:Approval:ForwardedUserSecret"] = "integration-test-secret"
                 });
             });
 
@@ -65,6 +81,13 @@ namespace QCS.Api.IntegrationTests
                     // needs a relational provider.
                     options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
                 });
+
+                services.RemoveAll<IApprovalService>();
+                services.AddSingleton<IApprovalService>(ApprovalService);
+                services.RemoveAll<IEmployeeDirectory>();
+                services.AddSingleton<IEmployeeDirectory, FakeEmployeeDirectory>();
+                services.RemoveAll<IEmployeeLookupService>();
+                services.AddSingleton<IEmployeeLookupService, FakeEmployeeLookupService>();
 
                 services.AddAuthentication(TestAuthHandler.SchemeName)
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(

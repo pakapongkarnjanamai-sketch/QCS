@@ -37,12 +37,12 @@ namespace QCS.Api.IntegrationTests
                     VendorName = "Acme Corp",
                     RequestDate = new DateTime(2026, 8, 1, 10, 0, 0),
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true,
                     Remark = "Need urgently"
                 };
-                r1.ApprovalSteps.Add(new ApprovalStep { Id = 10, Sequence = 1, StepName = "Submitter", Status = (int)RequestStatus.Draft, ApproverNId = null, ApproverName = null });
+                r1.ApprovalSteps.Add(new ApprovalStep { Id = 10, Sequence = 1, StepName = "Submitter", Status = (int)LegacyApprovalStepStatus.Draft, ApproverNId = null, ApproverName = null });
                 r1.Quotations.Add(new Quotation { Id = 101, FileName = "widget_quote.pdf", FilePath = "/files/101.pdf", DocumentTypeId = 10, ContentType = "application/pdf" });
                 db.Requests.Add(r1);
 
@@ -54,14 +54,14 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V002",
                     VendorName = "Beta Industries",
                     RequestDate = new DateTime(2026, 8, 2, 10, 0, 0),
-                    Status = (int)RequestStatus.Approved,
-                    CurrentStepId = 99,
+                    Status = (int)RequestStatus.Completed,
+                    CurrentStepSequence = 99,
                     CreatedBy = "USER01",
                     IsActive = true,
                     Remark = "Completed order"
                 };
-                r2.ApprovalSteps.Add(new ApprovalStep { Id = 20, Sequence = 1, StepName = "Submitter", Status = (int)RequestStatus.Approved, ApproverNId = "USER01", ApproverName = "User One", ActionDate = new DateTime(2026, 8, 2, 10, 5, 0) });
-                r2.ApprovalSteps.Add(new ApprovalStep { Id = 21, Sequence = 2, StepName = "Manager Approval", Status = (int)RequestStatus.Approved, ApproverNId = "MGR01", ApproverName = "Manager One", ActionDate = new DateTime(2026, 8, 2, 11, 0, 0), Comment = "LGTM" });
+                r2.ApprovalSteps.Add(new ApprovalStep { Id = 20, Sequence = 1, StepName = "Submitter", Status = (int)LegacyApprovalStepStatus.Approved, ApproverNId = "USER01", ApproverName = "User One", ActionDate = new DateTime(2026, 8, 2, 10, 5, 0) });
+                r2.ApprovalSteps.Add(new ApprovalStep { Id = 21, Sequence = 2, StepName = "Manager Approval", Status = (int)LegacyApprovalStepStatus.Approved, ApproverNId = "MGR01", ApproverName = "Manager One", ActionDate = new DateTime(2026, 8, 2, 11, 0, 0), Comment = "LGTM" });
                 r2.Quotations.Add(new Quotation { Id = 102, FileName = "gadget_spec.pdf", FilePath = "/files/102.pdf", DocumentTypeId = 30, ContentType = "application/pdf" });
                 db.Requests.Add(r2);
 
@@ -74,7 +74,7 @@ namespace QCS.Api.IntegrationTests
                     VendorName = "Acme Corp",
                     RequestDate = new DateTime(2026, 8, 3, 10, 0, 0),
                     Status = (int)RequestStatus.Rejected,
-                    CurrentStepId = -1,
+                    CurrentStepSequence = -1,
                     CreatedBy = "USER01",
                     IsActive = false,
                     Remark = "Out of budget"
@@ -89,14 +89,14 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V003",
                     VendorName = "Gamma Logistics",
                     RequestDate = new DateTime(2026, 8, 4, 10, 0, 0),
-                    Status = (int)RequestStatus.Pending,
-                    CurrentStepId = 2,
+                    Status = (int)RequestStatus.InProcess,
+                    CurrentStepSequence = 2,
                     CreatedBy = "USER02",
                     IsActive = true,
                     Remark = "Office supplies"
                 };
-                r4.ApprovalSteps.Add(new ApprovalStep { Id = 40, Sequence = 1, StepName = "Submitter", Status = (int)RequestStatus.Approved, ApproverNId = "USER02", ApproverName = "User Two", ActionDate = new DateTime(2026, 8, 4, 10, 1, 0) });
-                r4.ApprovalSteps.Add(new ApprovalStep { Id = 41, Sequence = 2, StepName = "Manager Approval", Status = (int)RequestStatus.Pending, ApproverNId = "USER01", ApproverName = "User One" });
+                r4.ApprovalSteps.Add(new ApprovalStep { Id = 40, Sequence = 1, StepName = "Submitter", Status = (int)LegacyApprovalStepStatus.Approved, ApproverNId = "USER02", ApproverName = "User Two", ActionDate = new DateTime(2026, 8, 4, 10, 1, 0) });
+                r4.ApprovalSteps.Add(new ApprovalStep { Id = 41, Sequence = 2, StepName = "Manager Approval", Status = (int)LegacyApprovalStepStatus.Pending, ApproverNId = "USER01", ApproverName = "User One" });
                 db.Requests.Add(r4);
 
                 db.Requests.Add(new Request
@@ -107,8 +107,8 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V002",
                     VendorName = "Beta Industries",
                     RequestDate = new DateTime(2026, 8, 4, 11, 0, 0),
-                    Status = (int)RequestStatus.Approved,
-                    CurrentStepId = 99,
+                    Status = (int)RequestStatus.Completed,
+                    CurrentStepSequence = 99,
                     CreatedBy = "USER02",
                     IsActive = true,
                     Remark = "Heavy duty printer"
@@ -296,7 +296,7 @@ namespace QCS.Api.IntegrationTests
 
             result.ShouldNotBeNull();
             result.Id.ShouldBe(2);
-            result.StatusName.ShouldBe("Approved");
+            result.StatusName.ShouldBe("Completed");
             result.Documents.ShouldContain(d => d.DocumentTypeName == "FinalPdf" && d.ViewUrl == "/api/Quotation/ViewFile/2");
             result.Histories.Count.ShouldBeGreaterThan(0);
         }

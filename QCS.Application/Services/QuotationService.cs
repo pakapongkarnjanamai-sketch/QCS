@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QCS.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -50,6 +50,8 @@ namespace QCS.Application.Services
         private readonly IConfiguration _configuration;
         private readonly ILogger<QuotationService> _logger;
 
+        private readonly IApprovalService _approvalService;
+
         private const int PdfServiceTimeoutSeconds = 30;
         private static readonly TimeSpan[] RetryDelays =
         {
@@ -63,13 +65,15 @@ namespace QCS.Application.Services
             IDateTime dateTime,
             HttpClient httpClient,
             IConfiguration configuration,
-            ILogger<QuotationService> logger)
+            ILogger<QuotationService> logger,
+            IApprovalService approvalService)
         {
             _unitOfWork = unitOfWork;
             _dateTime = dateTime;
             _httpClient = httpClient;
             _configuration = configuration;
             _logger = logger;
+            _approvalService = approvalService;
         }
 
         public async Task<AttachmentResultDto> GenerateStampedPdfAsync(int requestId, CancellationToken cancellationToken = default)
@@ -83,7 +87,54 @@ namespace QCS.Application.Services
 
             if (request == null) throw new KeyNotFoundException("Request not found");
 
-            var fallbackApprovalDate = _dateTime.Now;
+            List<StepDto> stampSteps = new();
+
+            if (request.ApprovalDocumentId.HasValue)
+            {
+                var detail = await _approvalService.GetDocumentAsync(
+                    request.ApprovalDocumentId.Value,
+                    request.CreatedBy ?? "SYSTEM",
+                    cancellationToken)
+                    ?? throw new InvalidOperationException(
+                        $"Central approval document {request.ApprovalDocumentId.Value} was not found.");
+
+                foreach (var step in detail.Steps)
+                {
+                    foreach (var assignee in step.Assignees.Where(assignee => assignee.ActedAt.HasValue))
+                    {
+                        stampSteps.Add(new StepDto
+                        {
+                            StepName = step.StepName,
+                            Approver = assignee.EmployeeName ?? assignee.Username,
+                            ApprovalDate = assignee.ActedAt!.Value
+                        });
+                    }
+                }
+
+                if (stampSteps.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        "The central Approval Service returned no completed approval actions to stamp.");
+                }
+            }
+            else
+            {
+                stampSteps = request.ApprovalSteps
+                    .Where(s => s.Status == (int)LegacyApprovalStepStatus.Approved && s.ActionDate.HasValue)
+                    .OrderBy(s => s.Sequence)
+                    .Select(s => new StepDto
+                    {
+                        StepName = s.StepName,
+                        Approver = s.ApproverName ?? s.ApproverNId ?? "Unknown",
+                        ApprovalDate = s.ActionDate!.Value
+                    }).ToList();
+
+                if (stampSteps.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        "The legacy request has no completed approval actions to stamp.");
+                }
+            }
 
             var pdfRequest = new MergeAndStampRequestDto
             {
@@ -102,15 +153,7 @@ namespace QCS.Application.Services
                 ApprovalData = new ApprovalDataDto
                 {
                     Name = request.VendorName,
-                    Step = request.ApprovalSteps
-                        .Where(s => s.Status == (int)QCS.Domain.Enum.RequestStatus.Approved)
-                        .OrderBy(s => s.Sequence)
-                        .Select(s => new StepDto
-                        {
-                            StepName = s.StepName,
-                            Approver = s.ApproverName ?? s.ApproverNId ?? "Unknown",
-                            ApprovalDate = s.ActionDate ?? fallbackApprovalDate
-                        }).ToList()
+                    Step = stampSteps
                 },
                 DrawSetting = new DrawSettingDto
                 {
@@ -281,7 +324,7 @@ namespace QCS.Application.Services
             VendorCode = r.VendorCode ?? string.Empty,
             VendorName = r.VendorName ?? string.Empty,
             RequestDate = r.RequestDate,
-            CurrentStepId = r.CurrentStepId,
+            CurrentStepId = r.CurrentStepSequence ?? 0,
             RequesterName = r.ApprovalSteps
                 .Where(s => s.Sequence == 1)
                 .Select(s => s.ApproverName)
@@ -294,14 +337,14 @@ namespace QCS.Application.Services
 
         /// <summary>
         /// Base query for "effective" quotations: approved documents whose validity has not yet lapsed.
-        /// Matches the existing IntegrationController semantics (Status = Approved &amp; ValidUntil &gt;= now).
+        /// Matches the existing IntegrationController semantics (Status = Completed &amp; ValidUntil &gt;= now).
         /// </summary>
         private IQueryable<Request> GetEffectiveRequestsQuery()
         {
             var now = _dateTime.Now;
             return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
-                .Where(r => r.Status == (int)RequestStatus.Approved
+                .Where(r => r.Status == (int)RequestStatus.Completed
                          && r.ValidUntil != null
                          && r.ValidUntil >= now);
         }
@@ -391,7 +434,7 @@ namespace QCS.Application.Services
             if (query.CurrentStepId.HasValue)
             {
                 var step = query.CurrentStepId.Value;
-                source = source.Where(r => r.CurrentStepId == step);
+                source = source.Where(r => r.CurrentStepSequence == step);
             }
 
             return source;
@@ -424,8 +467,8 @@ namespace QCS.Application.Services
                     ? source.OrderByDescending(r => r.ValidUntil).ThenByDescending(r => r.Id)
                     : source.OrderBy(r => r.ValidUntil).ThenBy(r => r.Id),
                 "currentstepid" => descending
-                    ? source.OrderByDescending(r => r.CurrentStepId).ThenByDescending(r => r.Id)
-                    : source.OrderBy(r => r.CurrentStepId).ThenBy(r => r.Id),
+                    ? source.OrderByDescending(r => r.CurrentStepSequence).ThenByDescending(r => r.Id)
+                    : source.OrderBy(r => r.CurrentStepSequence).ThenBy(r => r.Id),
                 // Default: most recently requested first.
                 _ => source.OrderByDescending(r => r.RequestDate).ThenByDescending(r => r.Id),
             };

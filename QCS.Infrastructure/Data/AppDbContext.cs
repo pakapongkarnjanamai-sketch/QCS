@@ -57,6 +57,17 @@ namespace QCS.Infrastructure.Data
 
                 entity.HasIndex(r => new { r.SourceSystem, r.SourceCode })
                     .HasDatabaseName("IX_Requests_Source");
+
+                entity.Property(r => r.ApprovalDocumentNumber)
+                    .HasMaxLength(50);
+
+                entity.Property(r => r.CurrentStepName)
+                    .HasMaxLength(200);
+
+                entity.HasIndex(r => r.ApprovalDocumentId)
+                    .IsUnique()
+                    .HasFilter("[ApprovalDocumentId] IS NOT NULL")
+                    .HasDatabaseName("IX_Requests_ApprovalDocumentId");
             });
 
             modelBuilder.Entity<AdminUserAccess>(entity =>

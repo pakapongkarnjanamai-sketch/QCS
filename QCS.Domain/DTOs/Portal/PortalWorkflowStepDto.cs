@@ -11,6 +11,7 @@ namespace QCS.Domain.DTOs.Portal
         public int? Status { get; set; }
         public string? StatusName { get; set; }
         public DateTime? ActionDate { get; set; }
+        public bool IsCurrentStep { get; set; }
         public string? ApproverNId { get; set; }
         public string? ApproverName { get; set; }
         public string? Comment { get; set; }

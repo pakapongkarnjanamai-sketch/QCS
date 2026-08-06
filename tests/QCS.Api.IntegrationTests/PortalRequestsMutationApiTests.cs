@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using QCS.Application.Abstractions;
+using QCS.Domain.DTOs;
 using QCS.Domain.DTOs.Portal;
 using QCS.Domain.Enum;
 using QCS.Domain.Models;
@@ -45,6 +47,13 @@ namespace QCS.Api.IntegrationTests
             result.ShouldNotBeNull();
             result.Id.ShouldBeGreaterThan(0);
             result.Code.ShouldStartWith("QC-");
+            _factory.SeedDatabase(db =>
+            {
+                var request = db.Requests.Find(result.Id);
+                request.ShouldNotBeNull();
+                request.CurrentStepSequence.ShouldBeNull();
+                db.ApprovalSteps.ShouldNotContain(step => step.RequestId == result.Id);
+            });
         }
 
         [Fact]
@@ -62,7 +71,7 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V000",
                     VendorName = "Initial Vendor",
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 });
@@ -102,7 +111,7 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V000",
                     VendorName = "Initial Vendor",
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER02",
                     IsActive = true
                 });
@@ -133,7 +142,7 @@ namespace QCS.Api.IntegrationTests
                     ValidFrom = DateTime.Now,
                     ValidUntil = DateTime.Now.AddDays(10),
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 });
@@ -148,6 +157,7 @@ namespace QCS.Api.IntegrationTests
         [Fact]
         public async Task SubmitPortalRequest_WhenValidAndOriginalQuotationPresent_SubmitsSuccessfully()
         {
+            _factory.ApprovalService.Reset();
             int requestId = 904;
             _factory.SeedDatabase(db =>
             {
@@ -162,7 +172,7 @@ namespace QCS.Api.IntegrationTests
                     ValidFrom = DateTime.Now,
                     ValidUntil = DateTime.Now.AddDays(10),
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 };
@@ -180,12 +190,124 @@ namespace QCS.Api.IntegrationTests
             var detailResponse = await client.GetAsync($"/api/Portal/Requests/{requestId}");
             var detail = await detailResponse.Content.ReadFromJsonAsync<PortalRequestDetailDto>();
             detail.ShouldNotBeNull();
-            detail.Status.ShouldBe((int)RequestStatus.Pending);
+            detail.Status.ShouldBe((int)RequestStatus.InProcess);
+        }
+
+        [Fact]
+        public async Task SubmitPortalRequest_WhenApprovalServiceFails_LeavesLocalDraft()
+        {
+            _factory.ApprovalService.Reset();
+            _factory.ApprovalService.CreateException = new HttpRequestException("Approval Service unavailable");
+            int requestId = 909;
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+
+                var request = new Request
+                {
+                    Id = requestId,
+                    Code = "QC-20260804-909",
+                    Title = "Submission must fail closed",
+                    VendorCode = "V001",
+                    VendorName = "Acme Corp",
+                    ValidFrom = DateTime.Now,
+                    ValidUntil = DateTime.Now.AddDays(10),
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                };
+                request.Quotations.Add(new Quotation
+                {
+                    Id = 90901,
+                    FileName = "orig_quote.pdf",
+                    FilePath = "/files/90901.pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    ContentType = "application/pdf"
+                });
+                db.Requests.Add(request);
+            });
+
+            try
+            {
+                var client = CreateAuthenticatedClient("USER01");
+                var response = await client.PostAsync($"/api/Portal/Requests/{requestId}/submit", null);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+
+                _factory.SeedDatabase(db =>
+                {
+                    var request = db.Requests.Find(requestId);
+                    request.ShouldNotBeNull();
+                    request.Status.ShouldBe((int)RequestStatus.Draft);
+                    request.ApprovalDocumentId.ShouldBeNull();
+                });
+            }
+            finally
+            {
+                _factory.ApprovalService.Reset();
+            }
+        }
+
+        [Theory]
+        [InlineData(RequestStatus.Draft, 1)]
+        [InlineData(RequestStatus.InProcess, 0)]
+        public async Task SubmitPortalRequest_WithExistingRemoteDocument_AdoptsWithoutDuplicateCreate(
+            RequestStatus remoteStatus,
+            int expectedSubmitCalls)
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 950 + (int)remoteStatus;
+            var documentId = Guid.NewGuid();
+            var code = $"QC-20260804-{requestId}";
+            _factory.ApprovalService.SeedDocument(code, documentId, "USER01", remoteStatus);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                var request = new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Adopt remote document",
+                    VendorCode = "V001",
+                    VendorName = "Vendor",
+                    ValidFrom = DateTime.Now,
+                    ValidUntil = DateTime.Now.AddDays(10),
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                };
+                request.Quotations.Add(new Quotation
+                {
+                    Id = requestId * 100,
+                    FileName = "original.pdf",
+                    FilePath = $"/files/{requestId}.pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    ContentType = "application/pdf"
+                });
+                db.Requests.Add(request);
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsync($"/api/Portal/Requests/{requestId}/submit", null);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            _factory.ApprovalService.CreateCallCount.ShouldBe(0);
+            _factory.ApprovalService.SubmittedDocumentIds.Count.ShouldBe(expectedSubmitCalls);
+            _factory.SeedDatabase(db =>
+            {
+                var request = db.Requests.Find(requestId);
+                request.ShouldNotBeNull();
+                request.ApprovalDocumentId.ShouldBe(documentId);
+                request.Status.ShouldBe((int)RequestStatus.InProcess);
+            });
         }
 
         [Fact]
         public async Task DeletePortalDraft_WhenOwner_DeletesSuccessfully()
         {
+            _factory.ApprovalService.Reset();
             int requestId = 905;
             _factory.SeedDatabase(db =>
             {
@@ -198,7 +320,7 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V000",
                     VendorName = "Initial Vendor",
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 });
@@ -208,6 +330,40 @@ namespace QCS.Api.IntegrationTests
             var response = await client.DeleteAsync($"/api/Portal/Requests/{requestId}");
 
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        [Fact]
+        public async Task DeletePortalDraft_WithCentralDraft_DeletesRemoteBeforeLocal()
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 910;
+            var documentId = Guid.NewGuid();
+            const string code = "QC-20260804-910";
+            _factory.ApprovalService.SeedDocument(code, documentId, "USER01");
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Central draft to delete",
+                    VendorCode = "V000",
+                    VendorName = "Initial Vendor",
+                    Status = (int)RequestStatus.Draft,
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.DeleteAsync($"/api/Portal/Requests/{requestId}");
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            _factory.ApprovalService.DeletedDraftIds.ShouldContain(documentId);
+            _factory.SeedDatabase(db => db.Requests.Find(requestId).ShouldBeNull());
         }
 
         [Fact]
@@ -226,7 +382,7 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V000",
                     VendorName = "Initial Vendor",
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 };
@@ -274,7 +430,7 @@ namespace QCS.Api.IntegrationTests
                         VendorCode = "V000",
                         VendorName = "Vendor 2",
                         Status = (int)RequestStatus.Draft,
-                        CreatedBy = "USER01",
+                        CurrentStepSequence = 1,
                         IsActive = true
                     };
                     req2.Quotations.Add(new Quotation { Id = quotationId2, FileName = "req2_doc.pdf", FilePath = "/files/90801.pdf", DocumentTypeId = 10, ContentType = "application/pdf" });
@@ -289,9 +445,160 @@ namespace QCS.Api.IntegrationTests
         }
 
         [Fact]
+        public async Task GetPortalRequest_WithCentralDocument_WhenCallerIsNotParticipant_Returns403Forbidden()
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 911;
+            var documentId = Guid.NewGuid();
+            const string code = "QC-20260804-911";
+            _factory.ApprovalService.SeedDocument(
+                code,
+                documentId,
+                "USER01",
+                permissions: ApprovalPermissions.None);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Private central request",
+                    VendorCode = "V000",
+                    VendorName = "Vendor",
+                    Status = (int)RequestStatus.InProcess,
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER02");
+            var response = await client.GetAsync($"/api/Portal/Requests/{requestId}");
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
+        [Fact]
+        public async Task GetPortalRequest_WithStaleMirror_PersistsCentralStatusAndStep()
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 912;
+            var documentId = Guid.NewGuid();
+            const string code = "QC-20260804-912";
+            _factory.ApprovalService.SeedDocument(
+                code,
+                documentId,
+                "USER01",
+                RequestStatus.Completed,
+                currentStepSequence: null,
+                currentStepName: null);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Stale central mirror",
+                    VendorCode = "V000",
+                    VendorName = "Vendor",
+                    Status = (int)RequestStatus.InProcess,
+                    CurrentStepSequence = 1,
+                    CurrentStepName = "Old step",
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.GetAsync($"/api/Portal/Requests/{requestId}");
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var detail = await response.Content.ReadFromJsonAsync<PortalRequestDetailDto>();
+            detail.ShouldNotBeNull();
+            detail.Status.ShouldBe((int)RequestStatus.Completed);
+            detail.CurrentStepSequence.ShouldBeNull();
+
+            _factory.SeedDatabase(db =>
+            {
+                var request = db.Requests.Find(requestId);
+                request.ShouldNotBeNull();
+                request.Status.ShouldBe((int)RequestStatus.Completed);
+                request.CurrentStepSequence.ShouldBeNull();
+                request.CurrentStepName.ShouldBeNull();
+                request.StatusSyncedAt.ShouldNotBeNull();
+            });
+        }
+
+        [Fact]
+        public async Task GetAdminRequestDetail_WithFourCentralSteps_PreservesAllStepsAndAssignees()
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 913;
+            var documentId = Guid.NewGuid();
+            const string code = "QC-20260804-913";
+            var steps = Enumerable.Range(1, 4)
+                .Select(sequence => new ApprovalStepView(
+                    sequence,
+                    $"Step {sequence}",
+                    sequence == 1 ? "Completed" : "Pending",
+                    IsFinalStep: sequence == 4,
+                    Assignees: sequence == 2
+                        ? new[]
+                        {
+                            new ApprovalAssigneeView("USER01", "User One", "Pending", null, null),
+                            new ApprovalAssigneeView("USER02", "User Two", "Pending", null, null)
+                        }
+                        : Array.Empty<ApprovalAssigneeView>()))
+                .ToArray();
+            _factory.ApprovalService.SeedDocument(
+                code,
+                documentId,
+                "USER01",
+                RequestStatus.InProcess,
+                steps: steps);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = "Dynamic central route",
+                    VendorCode = "V000",
+                    VendorName = "Vendor",
+                    Status = (int)RequestStatus.InProcess,
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.GetAsync($"/api/Request/Detail/{requestId}");
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var detail = await response.Content.ReadFromJsonAsync<RequestDetailDto>();
+            detail.ShouldNotBeNull();
+            detail.WorkflowRoute.ShouldNotBeNull();
+            detail.WorkflowRoute.Steps.Count.ShouldBe(4);
+            detail.WorkflowRoute.Steps[1].Assignments.Count.ShouldBe(2);
+        }
+
+        [Fact]
         public async Task ApprovePortalRequest_WhenNotAssignedApprover_Returns403Forbidden()
         {
+            _factory.ApprovalService.Reset();
             int requestId = 999;
+            var documentId = Guid.NewGuid();
+            const string code = "QC-20260804-999";
+            _factory.ApprovalService.SeedDocument(code, documentId, "USER02", RequestStatus.InProcess);
+            _factory.ApprovalService.ActionException = new UnauthorizedAccessException("Not an assignee");
             _factory.SeedDatabase(db =>
             {
                 var existing = db.Requests.Find(requestId);
@@ -300,25 +607,118 @@ namespace QCS.Api.IntegrationTests
                 var req = new Request
                 {
                     Id = requestId,
-                    Code = "QC-20260804-999",
+                    Code = code,
                     Title = "Pending Request",
                     VendorCode = "V000",
                     VendorName = "Vendor 999",
-                    Status = (int)RequestStatus.Pending,
-                    CurrentStepId = 2,
+                    Status = (int)RequestStatus.InProcess,
+                    CurrentStepSequence = 2,
+                    ApprovalDocumentId = documentId,
                     CreatedBy = "USER02",
                     IsActive = true
                 };
-                req.ApprovalSteps.Add(new ApprovalStep { Id = 9991, Sequence = 1, StepName = "Submitter", Status = (int)RequestStatus.Approved, ApproverNId = "USER02" });
-                req.ApprovalSteps.Add(new ApprovalStep { Id = 9992, Sequence = 2, StepName = "Manager", Status = (int)RequestStatus.Pending, ApproverNId = "OTHER_USER" });
                 db.Requests.Add(req);
             });
 
-            var client = CreateAuthenticatedClient("USER01");
-            var actionDto = new PortalApprovalActionDto { Comment = "Approving" };
-            var response = await client.PostAsJsonAsync($"/api/Portal/Requests/{requestId}/approve", actionDto);
+            try
+            {
+                var client = CreateAuthenticatedClient("USER01");
+                var actionDto = new PortalApprovalActionDto { Comment = "Approving" };
+                var response = await client.PostAsJsonAsync($"/api/Portal/Requests/{requestId}/approve", actionDto);
 
-            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+                response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            }
+            finally
+            {
+                _factory.ApprovalService.Reset();
+            }
+        }
+
+        [Theory]
+        [InlineData("approve", RequestStatus.Completed)]
+        [InlineData("reject", RequestStatus.Rejected)]
+        [InlineData("return", RequestStatus.Returned)]
+        [InlineData("cancel", RequestStatus.Cancelled)]
+        public async Task CentralAction_RefreshesLocalMirror(string action, RequestStatus expectedStatus)
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 930 + (int)expectedStatus;
+            var documentId = Guid.NewGuid();
+            var code = $"QC-20260804-{requestId}";
+            _factory.ApprovalService.SeedDocument(code, documentId, "USER01", RequestStatus.InProcess);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = $"Central {action}",
+                    VendorCode = "V000",
+                    VendorName = "Vendor",
+                    Status = (int)RequestStatus.InProcess,
+                    CurrentStepSequence = 2,
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var payload = new PortalApprovalActionDto
+            {
+                Comment = "Test central action",
+                ReturnToStepSequence = action == "return" ? 1 : null
+            };
+            var response = await client.PostAsJsonAsync($"/api/Portal/Requests/{requestId}/{action}", payload);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            _factory.SeedDatabase(db =>
+            {
+                var request = db.Requests.Find(requestId);
+                request.ShouldNotBeNull();
+                request.Status.ShouldBe((int)expectedStatus);
+                request.CurrentStepSequence.ShouldBeNull();
+                request.StatusSyncedAt.ShouldNotBeNull();
+            });
+        }
+
+        [Theory]
+        [InlineData("reject")]
+        [InlineData("return")]
+        [InlineData("cancel")]
+        public async Task CentralAction_WhenRequiredCommentIsMissing_Returns400BadRequest(string action)
+        {
+            _factory.ApprovalService.Reset();
+            int requestId = 970 + action.Length;
+            var documentId = Guid.NewGuid();
+            var code = $"QC-20260804-{requestId}";
+            _factory.ApprovalService.SeedDocument(code, documentId, "USER01", RequestStatus.InProcess);
+            _factory.SeedDatabase(db =>
+            {
+                var existing = db.Requests.Find(requestId);
+                if (existing != null) db.Requests.Remove(existing);
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = code,
+                    Title = $"Missing {action} comment",
+                    VendorCode = "V000",
+                    VendorName = "Vendor",
+                    Status = (int)RequestStatus.InProcess,
+                    ApprovalDocumentId = documentId,
+                    CreatedBy = "USER01",
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient("USER01");
+            var response = await client.PostAsJsonAsync(
+                $"/api/Portal/Requests/{requestId}/{action}",
+                new PortalApprovalActionDto { Comment = " " });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         }
 
         /// <summary>
@@ -359,7 +759,7 @@ namespace QCS.Api.IntegrationTests
                     VendorCode = "V000",
                     VendorName = "Initial Vendor",
                     Status = (int)RequestStatus.Draft,
-                    CurrentStepId = 1,
+                    CurrentStepSequence = 1,
                     CreatedBy = "USER01",
                     IsActive = true
                 });
