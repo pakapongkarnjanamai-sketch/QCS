@@ -15,5 +15,6 @@ namespace QCS.Domain.DTOs.Portal
         public string? SourceCode { get; set; }
         public DateTime RequestDate { get; set; }
         public int OriginalQuotationCount { get; set; }
+        public string RenewalWindowStatus { get; set; } = string.Empty;
     }
 }

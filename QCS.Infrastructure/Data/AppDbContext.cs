@@ -75,6 +75,8 @@ namespace QCS.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(r => r.RenewedFromRequestId)
+                    .IsUnique()
+                    .HasFilter("[RenewedFromRequestId] IS NOT NULL")
                     .HasDatabaseName("IX_Requests_RenewedFromRequestId");
             });
 

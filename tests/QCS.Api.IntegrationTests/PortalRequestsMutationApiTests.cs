@@ -179,7 +179,15 @@ namespace QCS.Api.IntegrationTests
                 };
                 req.ApprovalSteps.Add(new ApprovalStep { Id = 9041, Sequence = 1, StepName = "Submitter", Status = (int)RequestStatus.Draft });
                 req.ApprovalSteps.Add(new ApprovalStep { Id = 9042, Sequence = 2, StepName = "Manager", Status = (int)RequestStatus.Draft });
-                req.Quotations.Add(new Quotation { Id = 90401, FileName = "orig_quote.pdf", FilePath = "/files/90401.pdf", DocumentTypeId = 10, ContentType = "application/pdf" });
+                req.Quotations.Add(new Quotation
+                {
+                    Id = 90401,
+                    FileName = "orig_quote.pdf",
+                    FilePath = "/files/90401.pdf",
+                    DocumentTypeId = 10,
+                    ContentType = "application/pdf",
+                    AttachmentFile = CreateUploadedPdf()
+                });
                 db.Requests.Add(req);
             });
 
@@ -281,7 +289,8 @@ namespace QCS.Api.IntegrationTests
                     FileName = "orig_quote.pdf",
                     FilePath = "/files/90901.pdf",
                     DocumentTypeId = (int)DocumentType.OriginalQuotation,
-                    ContentType = "application/pdf"
+                    ContentType = "application/pdf",
+                    AttachmentFile = CreateUploadedPdf()
                 });
                 db.Requests.Add(request);
             });
@@ -342,7 +351,8 @@ namespace QCS.Api.IntegrationTests
                     FileName = "original.pdf",
                     FilePath = $"/files/{requestId}.pdf",
                     DocumentTypeId = (int)DocumentType.OriginalQuotation,
-                    ContentType = "application/pdf"
+                    ContentType = "application/pdf",
+                    AttachmentFile = CreateUploadedPdf()
                 });
                 db.Requests.Add(request);
             });
@@ -361,6 +371,13 @@ namespace QCS.Api.IntegrationTests
                 request.Status.ShouldBe((int)RequestStatus.InProcess);
             });
         }
+
+        private static AttachmentFile CreateUploadedPdf() => new()
+        {
+            ContentType = "application/pdf",
+            FileSize = 8,
+            Data = "%PDF-1.4"u8.ToArray()
+        };
 
         [Fact]
         public async Task DeletePortalDraft_WhenOwner_DeletesSuccessfully()
@@ -1257,35 +1274,75 @@ namespace QCS.Api.IntegrationTests
         {
             const string user = "PLAN057_USER1";
             int predecessorId = 5701;
+            int predecessorId2 = 5709;
 
             _factory.SeedDatabase(db =>
             {
-                if (db.Requests.Find(predecessorId) != null) return;
-                var sourceReq = new Request
+                if (db.Requests.Find(predecessorId) == null)
                 {
-                    Id = predecessorId,
-                    Code = "QC-20260806-571",
-                    Title = "Expired Predecessor",
-                    VendorCode = "VEND_5701",
-                    VendorName = "Vendor 5701 Name",
-                    Status = (int)RequestStatus.Completed,
-                    ValidUntil = DateTime.Now.AddDays(-5),
-                    CreatedBy = user,
-                    IsActive = true
-                };
-                var file = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
-                db.AttachmentFiles.Add(file);
-                db.SaveChanges();
-                sourceReq.Quotations.Add(new Quotation
+                    var sourceReq = new Request
+                    {
+                        Id = predecessorId,
+                        Code = "QC-20260806-571",
+                        Title = "Expired Predecessor",
+                        VendorCode = "VEND_5701",
+                        VendorName = "Vendor 5701 Name",
+                        Status = (int)RequestStatus.Completed,
+                        ValidUntil = DateTime.Now.AddDays(-5),
+                        CreatedBy = user,
+                        IsActive = true
+                    };
+                    var file = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
+                    db.AttachmentFiles.Add(file);
+                    db.SaveChanges();
+                    sourceReq.Quotations.Add(new Quotation
+                    {
+                        FileName = "orig.pdf",
+                        FilePath = "test",
+                        ContentType = "application/pdf",
+                        DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                        AttachmentFileId = file.Id,
+                        SortOrder = 1
+                    });
+                    db.Requests.Add(sourceReq);
+                }
+
+                if (db.Requests.Find(predecessorId2) == null)
                 {
-                    FileName = "orig.pdf",
-                    FilePath = "test",
-                    ContentType = "application/pdf",
-                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
-                    AttachmentFileId = file.Id,
-                    SortOrder = 1
-                });
-                db.Requests.Add(sourceReq);
+                    var sourceReq2 = new Request
+                    {
+                        Id = predecessorId2,
+                        Code = "QC-20260806-579",
+                        Title = "Expired Predecessor 2",
+                        VendorCode = "VEND_5702",
+                        VendorName = "Vendor 5702 Name",
+                        Status = (int)RequestStatus.Completed,
+                        ValidUntil = DateTime.Now.AddDays(-5),
+                        CreatedBy = user,
+                        IsActive = true
+                    };
+                    var file2 = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
+                    db.AttachmentFiles.Add(file2);
+                    db.SaveChanges();
+                    sourceReq2.Quotations.Add(new Quotation
+                    {
+                        FileName = "orig2.pdf",
+                        FilePath = "test2",
+                        ContentType = "application/pdf",
+                        DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                        AttachmentFileId = file2.Id,
+                        SortOrder = 1
+                    });
+                    db.Requests.Add(sourceReq2);
+                }
+            });
+
+            _factory.QrsSourcingService.SetDetail("QRS-2026-002", new QrsSourcingDetailDto
+            {
+                Code = "QRS-2026-002",
+                Title = "Sourcing Renewal Request",
+                Intent = 1,
+                PreviousQcCode = "QC-20260806-579"
             });
 
             var client = CreateAuthenticatedClient(user);
@@ -1334,7 +1391,6 @@ namespace QCS.Api.IntegrationTests
             var renewalQrsRes = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
             {
                 Intent = RequestIntent.Renewal,
-                RenewedFromRequestId = predecessorId,
                 SourceSystem = "QRS",
                 SourceCode = "QRS-2026-002",
                 Title = "Renewal QRS"
@@ -1398,31 +1454,28 @@ namespace QCS.Api.IntegrationTests
         }
 
         [Fact]
-        public async Task CreatePortalDraft_WhenRenewalPredecessorBelongsToAnotherUser_Returns403()
+        public async Task CreatePortalDraft_WhenRenewalPredecessorBelongsToAnotherUser_Succeeds()
         {
             const int predecessorId = 5792;
+            _factory.ApprovalService.Reset();
+
             _factory.SeedDatabase(db =>
             {
                 if (db.Requests.Find(predecessorId) != null) return;
-
-                var attachment = new AttachmentFile
-                {
-                    ContentType = "application/pdf",
-                    Data = "%PDF-1.4"u8.ToArray()
-                };
+                var attachment = new AttachmentFile { Id = 57920, FileSize = 100, ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
                 db.AttachmentFiles.Add(attachment);
-                db.SaveChanges();
 
                 var predecessor = new Request
                 {
                     Id = predecessorId,
-                    Code = "QC-20260807-792",
-                    Title = "Another user's request",
-                    VendorCode = "V792",
-                    VendorName = "Vendor 792",
+                    Code = "QC5792",
+                    Title = "Completed predecessor by someone else",
+                    VendorCode = "V5792",
+                    VendorName = "Vendor 5792",
+                    ValidFrom = DateTime.Now.AddDays(-60),
+                    ValidUntil = DateTime.Now.AddDays(-1),
                     Status = (int)RequestStatus.Completed,
-                    ValidUntil = DateTime.Now.AddDays(-10),
-                    CreatedBy = "PLAN057_OWNER",
+                    CreatedBy = "ORIGINAL_OWNER",
                     IsActive = true
                 };
                 predecessor.Quotations.Add(new Quotation
@@ -1442,10 +1495,33 @@ namespace QCS.Api.IntegrationTests
             {
                 Intent = RequestIntent.Renewal,
                 RenewedFromRequestId = predecessorId,
-                Title = "Forbidden renewal"
+                Title = "Cross owner renewal"
             });
 
-            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var result = await response.Content.ReadFromJsonAsync<PortalSaveResultDto>();
+            result.ShouldNotBeNull();
+
+            _factory.SeedDatabase(db =>
+            {
+                var draft = db.Requests.Include(request => request.Quotations)
+                    .Single(request => request.Id == result.Id);
+                draft.ValidFrom = DateTime.Now;
+                draft.ValidUntil = DateTime.Now.AddDays(30);
+                draft.Quotations.Add(new Quotation
+                {
+                    FileName = "new-original.pdf",
+                    FilePath = "/files/57921.pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    ContentType = "application/pdf",
+                    AttachmentFile = CreateUploadedPdf()
+                });
+            });
+
+            var submitResponse = await client.PostAsync(
+                $"/api/Portal/Requests/{result.Id}/submit", null);
+            submitResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+            _factory.ApprovalService.CreateCallCount.ShouldBe(1);
         }
 
         [Fact]

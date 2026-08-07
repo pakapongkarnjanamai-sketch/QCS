@@ -1,4 +1,4 @@
-namespace QCS.API.Integration
+namespace QCS.Infrastructure.Integration
 {
     public sealed class QrsIntegrationOptions
     {

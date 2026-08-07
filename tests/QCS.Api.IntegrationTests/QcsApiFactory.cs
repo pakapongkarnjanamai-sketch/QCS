@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 using Microsoft.AspNetCore.Authentication;
@@ -23,6 +24,8 @@ namespace QCS.Api.IntegrationTests
         private readonly string _databaseName = $"qcs-tests-{Guid.NewGuid()}";
 
         public FakeApprovalService ApprovalService { get; } = new();
+        public FakeQrsSourcingService QrsSourcingService { get; } = new();
+        public FakeDateTime DateTime { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -46,7 +49,8 @@ namespace QCS.Api.IntegrationTests
                     ["ExternalServices:Approval:SourceSystem"] = "QCS",
                     ["ExternalServices:Approval:DocumentTypeCode"] = "QC",
                     ["ExternalServices:Approval:RequestUrlTemplate"] = "https://approval.invalid/QCS/User/requests/{id}",
-                    ["ExternalServices:Approval:ForwardedUserSecret"] = "integration-test-secret"
+                    ["ExternalServices:Approval:ForwardedUserSecret"] = "integration-test-secret",
+                    ["Integration:ApiKeys:0"] = "test-api-key"
                 });
             });
 
@@ -84,6 +88,10 @@ namespace QCS.Api.IntegrationTests
 
                 services.RemoveAll<IApprovalService>();
                 services.AddSingleton<IApprovalService>(ApprovalService);
+                services.RemoveAll<IDateTime>();
+                services.AddSingleton<IDateTime>(DateTime);
+                services.RemoveAll<IQrsSourcingService>();
+                services.AddSingleton<IQrsSourcingService>(QrsSourcingService);
                 services.RemoveAll<IEmployeeDirectory>();
                 services.AddSingleton<IEmployeeDirectory, FakeEmployeeDirectory>();
                 services.RemoveAll<IEmployeeLookupService>();
@@ -118,6 +126,58 @@ namespace QCS.Api.IntegrationTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             seed(db);
             db.SaveChanges();
+        }
+    }
+
+    public sealed class FakeDateTime : IDateTime
+    {
+        public DateTime Now { get; set; } = DateTime.Now;
+        public CultureInfo CultureInfo => CultureInfo.InvariantCulture;
+        public DateTime UnixTime => DateTime.UnixEpoch;
+    }
+
+    public class FakeQrsSourcingService : IQrsSourcingService
+    {
+        private readonly Dictionary<string, QrsSourcingDetailDto> _details = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Exception> _failures = new(StringComparer.OrdinalIgnoreCase);
+
+        public void SetDetail(string code, QrsSourcingDetailDto detail)
+        {
+            _details[code] = detail;
+        }
+
+        public void SetFailure(string code, Exception exception)
+        {
+            _failures[code] = exception;
+        }
+
+        public Task<QrsSourcingPagedResultDto> GetRequestsAsync(string? search, int page, int pageSize, string? intent, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new QrsSourcingPagedResultDto());
+        }
+
+        public Task<QrsSourcingDetailDto?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
+        {
+            if (_failures.TryGetValue(code, out var failure))
+            {
+                throw failure;
+            }
+
+            if (_details.TryGetValue(code, out var detail))
+            {
+                return Task.FromResult<QrsSourcingDetailDto?>(detail);
+            }
+            if (!string.IsNullOrEmpty(code) && code.StartsWith("QRS-", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<QrsSourcingDetailDto?>(new QrsSourcingDetailDto
+                {
+                    Code = code,
+                    Title = $"Mock {code}",
+                    Intent = 1,
+                    PreviousQcCode = "QC-20260806-579"
+                });
+            }
+            return Task.FromResult<QrsSourcingDetailDto?>(null);
         }
     }
 }

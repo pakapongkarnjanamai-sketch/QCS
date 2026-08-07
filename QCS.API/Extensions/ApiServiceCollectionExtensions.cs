@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using QCS.API.Authentication;
-using QCS.API.Integration;
 using QCS.API.Security;
 using QCS.API.Services;
 
@@ -41,16 +40,6 @@ namespace QCS.API.Extensions
             });
 
             services.AddProblemDetails();
-
-            services.Configure<QrsIntegrationOptions>(configuration.GetSection(QrsIntegrationOptions.SectionName));
-            services.AddHttpClient<IQrsSourcingClient, QrsSourcingClient>((serviceProvider, client) =>
-            {
-                var options = serviceProvider.GetRequiredService<IOptionsMonitor<QrsIntegrationOptions>>().CurrentValue;
-                client.BaseAddress = Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseAddress)
-                    ? new Uri(baseAddress.ToString().TrimEnd('/') + "/")
-                    : null;
-                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-            });
 
             services.AddApiAuthentication(configuration);
             services.AddApiAuthorization(configuration);

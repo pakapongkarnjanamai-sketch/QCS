@@ -5,7 +5,7 @@ using QCS.Application.Hubs;
 using QCS.Infrastructure;
 using Microsoft.Extensions.Options;
 using QCS.API.Authentication;
-using QCS.API.Integration;
+using QCS.Infrastructure.Integration;
 
 var builder = WebApplication.CreateBuilder(args);
 

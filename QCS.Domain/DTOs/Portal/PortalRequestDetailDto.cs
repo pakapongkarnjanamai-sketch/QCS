@@ -31,6 +31,7 @@ namespace QCS.Domain.DTOs.Portal
         public int? CurrentStepSequence { get; set; }
         public int CurrentStepId { get; set; }
         public string? CurrentStepName { get; set; }
+        public bool CanRenew { get; set; }
         public PermissionDto Permissions { get; set; } = new();
         public List<PortalWorkflowStepDto> WorkflowSteps { get; set; } = new();
         public List<PortalDocumentDto> Documents { get; set; } = new();

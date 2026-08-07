@@ -117,6 +117,16 @@ namespace QCS.Infrastructure
 
             services.AddScoped<IApprovalRequestFactory, ApprovalRequestFactory>();
 
+            services.Configure<QCS.Infrastructure.Integration.QrsIntegrationOptions>(configuration.GetSection(QCS.Infrastructure.Integration.QrsIntegrationOptions.SectionName));
+            services.AddHttpClient<IQrsSourcingService, QCS.Infrastructure.Integration.QrsSourcingService>((serviceProvider, client) =>
+            {
+                var options = serviceProvider.GetRequiredService<IOptionsMonitor<QCS.Infrastructure.Integration.QrsIntegrationOptions>>().CurrentValue;
+                client.BaseAddress = Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseAddress)
+                    ? new Uri(baseAddress.ToString().TrimEnd('/') + "/")
+                    : null;
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            });
+
             return services;
         }
     }

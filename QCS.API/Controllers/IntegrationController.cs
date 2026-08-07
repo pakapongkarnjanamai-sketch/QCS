@@ -1,11 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using QCS.Application.Abstractions;
 using QCS.API.Authentication;
 using Microsoft.EntityFrameworkCore;
 using QCS.Application.Services;
 using QCS.Domain.DTOs;
-using QCS.Infrastructure.Services;
+using QCS.Domain.DTOs.Integration;
+using QCS.Domain.DTOs.Portal;
 
 namespace QCS.API.Controllers
 {
@@ -92,6 +93,38 @@ namespace QCS.API.Controllers
             var result = await _requestService
                 .GetBySourceQuery(system.Trim(), number.Trim())
                 .ToListAsync();
+
+            return Ok(result);
+        }
+
+        [HttpGet("RenewalCandidates")]
+        [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
+        public async Task<ActionResult<PortalPage<IntegrationRenewalCandidateDto>>> GetRenewalCandidates(
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _requestService.GetIntegrationRenewalCandidatesAsync(search, page, pageSize, cancellationToken);
+            return Ok(result);
+        }
+
+        [HttpGet("RenewalCandidates/{code}")]
+        [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
+        public async Task<ActionResult<IntegrationRenewalCandidateDto>> GetRenewalCandidateByCode(
+            [FromRoute] string code,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return BadRequest("Code is required.");
+            }
+
+            var result = await _requestService.GetIntegrationRenewalCandidateByCodeAsync(code, cancellationToken);
+            if (result == null)
+            {
+                return NotFound();
+            }
 
             return Ok(result);
         }

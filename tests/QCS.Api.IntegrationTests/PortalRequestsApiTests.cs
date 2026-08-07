@@ -387,8 +387,8 @@ namespace QCS.Api.IntegrationTests
 
             page.ShouldNotBeNull();
             page.Items.ShouldContain(x => x.Id == reqUser1);
-            page.Items.ShouldNotContain(x => x.Id == reqUser2OtherUser);
-            page.Items.ShouldNotContain(x => x.Id == reqNotExpired);
+            page.Items.ShouldContain(x => x.Id == reqUser2OtherUser);
+            page.Items.ShouldContain(x => x.Id == reqNotExpired);
             page.Items.ShouldNotContain(x => x.Id == reqNoOriginalQuotation);
         }
     }

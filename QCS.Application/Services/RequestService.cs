@@ -11,8 +11,23 @@ using QCS.Domain.Models;
 using System.Linq.Expressions;
 using System.Text.Json;
 
+using QCS.Domain.DTOs.Integration;
+
 namespace QCS.Application.Services
 {
+    public class PredecessorAlreadyRenewedException : Exception
+    {
+        public string QrsCode { get; }
+        public string PreviousQcCode { get; }
+
+        public PredecessorAlreadyRenewedException(string qrsCode, string previousQcCode)
+            : base($"Quotation '{previousQcCode}' referenced by QRS request '{qrsCode}' has already been renewed.")
+        {
+            QrsCode = qrsCode;
+            PreviousQcCode = previousQcCode;
+        }
+    }
+
     public interface IRequestService
     {
         IQueryable<RequestGridDto> GetMyRequestsQuery();
@@ -34,6 +49,10 @@ namespace QCS.Application.Services
         Task<int> GetMyPendingTaskCountAsync();
         Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(PortalRequestQuery query, CancellationToken cancellationToken = default);
         Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default);
+        Task<PortalPage<IntegrationRenewalCandidateDto>> GetIntegrationRenewalCandidatesAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default);
+        Task<IntegrationRenewalCandidateDto?> GetIntegrationRenewalCandidateByCodeAsync(string code, CancellationToken cancellationToken = default);
+        Task<PortalSetupResolutionDto> ResolveSetupFromQrsAsync(string qrsCode, CancellationToken cancellationToken = default);
+        Task<PortalSetupResolutionDto> ResolveSetupFromQcsAsync(string qcCode, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default);
@@ -62,10 +81,12 @@ namespace QCS.Application.Services
         private readonly IApprovalService _approvalService;
         private readonly IApprovalRequestFactory _approvalRequestFactory;
         private readonly IEmployeeDirectory _employeeDirectory;
+        private readonly IQrsSourcingService _qrsSourcingService;
 
         private const string SignalREventName = "ReceiveUpdate";
         private const int GenerateDocNoRetryLimit = 3;
         private const string RequestCodeUniqueIndexName = "IX_Requests_Code";
+        private const string RenewedFromRequestIdUniqueIndexName = "IX_Requests_RenewedFromRequestId";
 
         private static readonly Expression<Func<Request, RequestGridDto>> RequestGridProjection = r => new RequestGridDto
         {
@@ -104,7 +125,8 @@ namespace QCS.Application.Services
             ILogger<RequestService> logger,
             IApprovalService approvalService,
             IApprovalRequestFactory approvalRequestFactory,
-            IEmployeeDirectory employeeDirectory)
+            IEmployeeDirectory employeeDirectory,
+            IQrsSourcingService qrsSourcingService)
         {
             _unitOfWork = unitOfWork;
             _currentUserService = currentUserService;
@@ -115,6 +137,7 @@ namespace QCS.Application.Services
             _approvalService = approvalService;
             _approvalRequestFactory = approvalRequestFactory;
             _employeeDirectory = employeeDirectory;
+            _qrsSourcingService = qrsSourcingService;
         }
 
         private async Task DeleteLocalDraftAsync(int id)
@@ -836,6 +859,9 @@ namespace QCS.Application.Services
                 });
             }
 
+            var canRenew = await GetEligibleRenewalCandidatesQuery()
+                .AnyAsync(candidate => candidate.Id == request.Id, cancellationToken);
+
             return new PortalRequestDetailDto
             {
                 Id = request.Id,
@@ -863,6 +889,7 @@ namespace QCS.Application.Services
                 CurrentStepSequence = request.CurrentStepSequence,
                 CurrentStepId = request.CurrentStepSequence ?? 0,
                 CurrentStepName = centralDetail?.Summary.CurrentStepName ?? request.CurrentStepName,
+                CanRenew = canRenew,
                 Permissions = permissions,
                 WorkflowSteps = portalWorkflowSteps,
                 Documents = documents,
@@ -881,20 +908,45 @@ namespace QCS.Application.Services
             return id == 0 ? null : await GetPortalRequestByIdAsync(id, cancellationToken);
         }
 
-        public async Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default)
+        private IQueryable<Request> GetEligibleRenewalCandidatesQuery()
         {
-            var currentUserId = _currentUserService.UserId;
-            var normalizedCurrentUserId = currentUserId.ToUpper();
-            var now = _dateTime.Now;
+            var maxValidUntil = _dateTime.Now.AddDays(30);
 
-            var baseQuery = _unitOfWork.Repository<Request>().GetAll()
+            return _unitOfWork.Repository<Request>().GetAll()
                 .AsNoTracking()
                 .Where(r => r.Status == (int)RequestStatus.Completed
                     && r.ValidUntil.HasValue
-                    && r.ValidUntil < now
-                    && r.CreatedBy != null
-                    && r.CreatedBy.ToUpper() == normalizedCurrentUserId
-                    && r.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue));
+                    && r.ValidUntil <= maxValidUntil
+                    && r.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue)
+                    && !_unitOfWork.Repository<Request>().GetAll().Any(child => child.RenewedFromRequestId == r.Id));
+        }
+
+        // The adapter already rejects unknown enum values, so this is the second belt.
+        // It throws the same contract-violation exception rather than a plain
+        // InvalidOperationException: contract C says an invalid upstream type/intent is a
+        // 502, and a 400 here would blame the caller for QRS sending us something we
+        // cannot read.
+        private static void ValidateQrsSourcingContract(QrsSourcingDetailDto detail)
+        {
+            if (!Enum.IsDefined(typeof(QrsRequestType), detail.RequestType))
+            {
+                throw new QrsSourcingException(
+                    $"QRS request '{detail.Code}' has unrecognized request type '{detail.RequestType}'.",
+                    isContractViolation: true);
+            }
+
+            if (!Enum.IsDefined(typeof(QrsRequestIntent), detail.Intent))
+            {
+                throw new QrsSourcingException(
+                    $"QRS request '{detail.Code}' has unrecognized intent '{detail.Intent}'.",
+                    isContractViolation: true);
+            }
+        }
+
+        public async Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default)
+        {
+            var now = _dateTime.Now;
+            var baseQuery = GetEligibleRenewalCandidatesQuery();
 
             if (!string.IsNullOrWhiteSpace(query.Search))
             {
@@ -911,7 +963,8 @@ namespace QCS.Application.Services
             var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
             var items = await baseQuery
-                .OrderByDescending(r => r.Id)
+                .OrderBy(r => r.ValidUntil)
+                .ThenByDescending(r => r.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(r => new RenewalCandidateDto
@@ -926,11 +979,193 @@ namespace QCS.Application.Services
                     SourceSystem = r.SourceSystem,
                     SourceCode = r.SourceCode,
                     RequestDate = r.RequestDate,
-                    OriginalQuotationCount = r.Quotations.Count(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue)
+                    OriginalQuotationCount = r.Quotations.Count(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue),
+                    RenewalWindowStatus = r.ValidUntil < now ? "Expired" : "ExpiringSoon"
                 })
                 .ToListAsync(cancellationToken);
 
             return new PortalPage<RenewalCandidateDto>(items, totalCount, page, pageSize);
+        }
+
+        public async Task<PortalPage<IntegrationRenewalCandidateDto>> GetIntegrationRenewalCandidatesAsync(
+            string? search,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var now = _dateTime.Now;
+            var baseQuery = GetEligibleRenewalCandidatesQuery();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var trimmedSearch = search.Trim();
+                baseQuery = baseQuery.Where(r => EF.Functions.Like(r.Code, $"%{trimmedSearch}%")
+                    || EF.Functions.Like(r.Title, $"%{trimmedSearch}%")
+                    || EF.Functions.Like(r.VendorCode, $"%{trimmedSearch}%")
+                    || EF.Functions.Like(r.VendorName, $"%{trimmedSearch}%"));
+            }
+
+            var totalCount = await baseQuery.CountAsync(cancellationToken);
+            var validPage = Math.Max(1, page);
+            var validPageSize = Math.Clamp(pageSize <= 0 ? 10 : pageSize, 1, 100);
+
+            var items = await baseQuery
+                .OrderBy(r => r.ValidUntil)
+                .ThenByDescending(r => r.Id)
+                .Skip((validPage - 1) * validPageSize)
+                .Take(validPageSize)
+                .Select(r => new IntegrationRenewalCandidateDto
+                {
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    ValidUntil = r.ValidUntil,
+                    RenewalWindowStatus = r.ValidUntil < now ? "Expired" : "ExpiringSoon"
+                })
+                .ToListAsync(cancellationToken);
+
+            return new PortalPage<IntegrationRenewalCandidateDto>(items, totalCount, validPage, validPageSize);
+        }
+
+        public async Task<IntegrationRenewalCandidateDto?> GetIntegrationRenewalCandidateByCodeAsync(
+            string code,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return null;
+            }
+
+            var now = _dateTime.Now;
+            var trimmedCode = code.Trim();
+
+            return await GetEligibleRenewalCandidatesQuery()
+                .Where(r => r.Code == trimmedCode)
+                .Select(r => new IntegrationRenewalCandidateDto
+                {
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    ValidUntil = r.ValidUntil,
+                    RenewalWindowStatus = r.ValidUntil < now ? "Expired" : "ExpiringSoon"
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<PortalSetupResolutionDto> ResolveSetupFromQrsAsync(string qrsCode, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(qrsCode))
+            {
+                throw new KeyNotFoundException("QRS source code is required.");
+            }
+
+            var trimmedCode = qrsCode.Trim();
+            var qrsDetail = await _qrsSourcingService.GetByCodeAsync(trimmedCode, cancellationToken);
+            if (qrsDetail == null)
+            {
+                throw new KeyNotFoundException($"QRS request '{trimmedCode}' was not found.");
+            }
+
+            ValidateQrsSourcingContract(qrsDetail);
+
+            if (qrsDetail.Intent == (int)QrsRequestIntent.New)
+            {
+                return new PortalSetupResolutionDto
+                {
+                    Flow = "NewQrs",
+                    Intent = 0,
+                    Origin = "QRS",
+                    SourceCode = qrsDetail.Code,
+                    SourceTitle = qrsDetail.Title,
+                    RenewedFromRequestId = null,
+                    RenewedFromCode = null,
+                    VendorCode = string.Empty,
+                    VendorName = string.Empty
+                };
+            }
+
+            if (qrsDetail.Intent == (int)QrsRequestIntent.Renewal)
+            {
+                if (string.IsNullOrWhiteSpace(qrsDetail.PreviousQcCode))
+                {
+                    throw new KeyNotFoundException($"QRS renewal request '{trimmedCode}' is missing PreviousQcCode.");
+                }
+
+                var previousQcCode = qrsDetail.PreviousQcCode.Trim();
+                var predecessor = await _unitOfWork.Repository<Request>().GetAll()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.Code == previousQcCode, cancellationToken);
+
+                if (predecessor == null)
+                {
+                    throw new KeyNotFoundException($"Previous quotation '{previousQcCode}' referenced by QRS request '{trimmedCode}' is not found or not eligible for renewal.");
+                }
+
+                var hasSuccessor = await _unitOfWork.Repository<Request>().GetAll()
+                    .AsNoTracking()
+                    .AnyAsync(child => child.RenewedFromRequestId == predecessor.Id, cancellationToken);
+
+                if (hasSuccessor)
+                {
+                    throw new PredecessorAlreadyRenewedException(trimmedCode, previousQcCode);
+                }
+
+                var isEligible = await GetEligibleRenewalCandidatesQuery()
+                    .AnyAsync(candidate => candidate.Id == predecessor.Id, cancellationToken);
+                if (!isEligible)
+                {
+                    throw new KeyNotFoundException($"Previous quotation '{previousQcCode}' referenced by QRS request '{trimmedCode}' is not found or not eligible for renewal.");
+                }
+
+                return new PortalSetupResolutionDto
+                {
+                    Flow = "RenewalQrs",
+                    Intent = 1,
+                    Origin = "QRS",
+                    SourceCode = qrsDetail.Code,
+                    SourceTitle = qrsDetail.Title,
+                    RenewedFromRequestId = predecessor.Id,
+                    RenewedFromCode = predecessor.Code,
+                    VendorCode = predecessor.VendorCode,
+                    VendorName = predecessor.VendorName
+                };
+            }
+
+            throw new QrsSourcingException(
+                $"QRS request '{trimmedCode}' has unrecognized intent '{qrsDetail.Intent}'.",
+                isContractViolation: true);
+        }
+
+        public async Task<PortalSetupResolutionDto> ResolveSetupFromQcsAsync(string qcCode, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(qcCode))
+            {
+                throw new KeyNotFoundException("Quotation code is required.");
+            }
+
+            var trimmedCode = qcCode.Trim();
+            var candidate = await GetEligibleRenewalCandidatesQuery()
+                .FirstOrDefaultAsync(r => r.Code == trimmedCode, cancellationToken);
+
+            if (candidate == null)
+            {
+                throw new KeyNotFoundException($"Quotation '{trimmedCode}' is not found or not eligible for renewal.");
+            }
+
+            return new PortalSetupResolutionDto
+            {
+                Flow = "RenewalQcs",
+                Intent = 1,
+                Origin = "QCS",
+                SourceCode = null,
+                SourceTitle = null,
+                RenewedFromRequestId = candidate.Id,
+                RenewedFromCode = candidate.Code,
+                VendorCode = candidate.VendorCode,
+                VendorName = candidate.VendorName
+            };
         }
 
         private static void ValidateSetupMatrix(SavePortalRequestDto input)
@@ -968,14 +1203,20 @@ namespace QCS.Application.Services
             }
             else if (input.Intent == RequestIntent.Renewal)
             {
-                if (!input.RenewedFromRequestId.HasValue)
+                if (!isQrs && !input.RenewedFromRequestId.HasValue)
                 {
-                    throw new ArgumentException("RenewedFromRequestId is required when Intent is Renewal.");
+                    throw new ArgumentException("RenewedFromRequestId is required when Intent is Renewal for QCS origin.");
                 }
             }
         }
 
-        private static void ValidatePersistedSetupForSubmission(Request request)
+        private static bool IsPredecessorUniqueConflict(DbUpdateException exception)
+        {
+            return exception.InnerException?.Message.Contains(RenewedFromRequestIdUniqueIndexName, StringComparison.OrdinalIgnoreCase) == true
+                || exception.Message.Contains(RenewedFromRequestIdUniqueIndexName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ValidatePersistedSetupForSubmission(Request request)
         {
             if (!Enum.IsDefined(typeof(RequestIntent), request.Intent))
             {
@@ -1007,8 +1248,7 @@ namespace QCS.Application.Services
                 throw new InvalidOperationException("The renewal predecessor no longer exists or is invalid.");
             }
 
-            if (predecessor.Status != (int)RequestStatus.Completed ||
-                !string.Equals(predecessor.CreatedBy, request.CreatedBy, StringComparison.OrdinalIgnoreCase))
+            if (predecessor.Status != (int)RequestStatus.Completed)
             {
                 throw new InvalidOperationException("The renewal predecessor no longer satisfies the request setup.");
             }
@@ -1018,6 +1258,13 @@ namespace QCS.Application.Services
             {
                 throw new InvalidOperationException("The renewal vendor no longer matches its predecessor.");
             }
+
+            var consumedByOther = _unitOfWork.Repository<Request>().GetAll().AsNoTracking()
+                .Any(r => r.RenewedFromRequestId == predecessor.Id && r.Id != request.Id);
+            if (consumedByOther)
+            {
+                throw new InvalidOperationException("The previous quotation was already renewed by another request.");
+            }
         }
 
         public async Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default)
@@ -1026,42 +1273,63 @@ namespace QCS.Application.Services
             var creatorUserId = _currentUserService.UserId;
 
             Request? predecessor = null;
+            int? renewedFromRequestId = input.RenewedFromRequestId;
+
             if (input.Intent == RequestIntent.Renewal)
             {
-                var predecessorId = input.RenewedFromRequestId!.Value;
-                predecessor = await _unitOfWork.Repository<Request>().GetAll()
-                    .Include(r => r.Quotations)
-                    .FirstOrDefaultAsync(r => r.Id == predecessorId, cancellationToken);
-
-                if (predecessor == null)
+                var isQrs = string.Equals(input.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase);
+                if (isQrs)
                 {
-                    throw new KeyNotFoundException($"Referenced renewal request {predecessorId} not found.");
+                    var qrsDetail = await _qrsSourcingService.GetByCodeAsync(input.SourceCode!, cancellationToken);
+                    if (qrsDetail == null)
+                    {
+                        throw new KeyNotFoundException($"Referenced QRS request {input.SourceCode} not found.");
+                    }
+
+                    ValidateQrsSourcingContract(qrsDetail);
+                    if (qrsDetail.Intent != (int)QrsRequestIntent.Renewal || string.IsNullOrWhiteSpace(qrsDetail.PreviousQcCode))
+                    {
+                        throw new InvalidOperationException("Referenced QRS request is not a valid renewal request.");
+                    }
+
+                    var previousQcCode = qrsDetail.PreviousQcCode.Trim();
+                    predecessor = await _unitOfWork.Repository<Request>().GetAll()
+                        .Include(r => r.Quotations)
+                        .FirstOrDefaultAsync(r => r.Code == previousQcCode, cancellationToken);
+
+                    if (predecessor == null)
+                    {
+                        throw new KeyNotFoundException($"Referenced renewal request {previousQcCode} not found.");
+                    }
+                }
+                else
+                {
+                    var predecessorId = input.RenewedFromRequestId!.Value;
+                    predecessor = await _unitOfWork.Repository<Request>().GetAll()
+                        .Include(r => r.Quotations)
+                        .FirstOrDefaultAsync(r => r.Id == predecessorId, cancellationToken);
+
+                    if (predecessor == null)
+                    {
+                        throw new KeyNotFoundException($"Referenced renewal request {predecessorId} not found.");
+                    }
                 }
 
-                if (predecessor.Status != (int)RequestStatus.Completed)
+                var hasSuccessor = await _unitOfWork.Repository<Request>().GetAll().AsNoTracking()
+                    .AnyAsync(r => r.RenewedFromRequestId == predecessor.Id, cancellationToken);
+                if (hasSuccessor)
                 {
-                    throw new InvalidOperationException("The referenced renewal request must be Completed.");
+                    throw new PredecessorAlreadyRenewedException(input.SourceCode ?? string.Empty, predecessor.Code);
                 }
 
-                if (!predecessor.ValidUntil.HasValue || predecessor.ValidUntil.Value >= _dateTime.Now)
+                var isEligible = await GetEligibleRenewalCandidatesQuery()
+                    .AnyAsync(candidate => candidate.Id == predecessor.Id, cancellationToken);
+                if (!isEligible)
                 {
-                    throw new InvalidOperationException("The referenced renewal request has not expired.");
+                    throw new InvalidOperationException("The referenced renewal request is not eligible for renewal.");
                 }
 
-                if (!string.Equals(predecessor.CreatedBy, creatorUserId, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new UnauthorizedAccessException("You do not have permission to renew this request.");
-                }
-
-                var hasMatchingOriginal = predecessor.Quotations.Any(q =>
-                    q.DocumentTypeId == (int)DocumentType.OriginalQuotation &&
-                    q.SourceQuotationId == null &&
-                    q.AttachmentFileId.HasValue);
-
-                if (!hasMatchingOriginal)
-                {
-                    throw new InvalidOperationException("The referenced renewal request has no Original Quotation PDF.");
-                }
+                renewedFromRequestId = predecessor.Id;
             }
 
             var vendorCode = input.Intent == RequestIntent.Renewal
@@ -1087,7 +1355,7 @@ namespace QCS.Application.Services
                         CreatedBy = creatorUserId,
                         IsActive = true,
                         Intent = input.Intent,
-                        RenewedFromRequestId = input.RenewedFromRequestId,
+                        RenewedFromRequestId = renewedFromRequestId,
                         VendorCode = vendorCode,
                         VendorName = vendorName,
                         SourceSystem = string.Equals(input.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase) ? "QRS" : null,
@@ -1112,6 +1380,12 @@ namespace QCS.Application.Services
                         Id = request.Id,
                         Code = request.Code
                     };
+                }
+                catch (DbUpdateException ex) when (IsPredecessorUniqueConflict(ex))
+                {
+                    await transaction.RollbackAsync();
+                    _unitOfWork.ClearTrackedChanges();
+                    throw new PredecessorAlreadyRenewedException(input.SourceCode ?? string.Empty, predecessor?.Code ?? string.Empty);
                 }
                 catch (DbUpdateException ex) when (IsRequestCodeConflict(ex))
                 {
@@ -1213,7 +1487,7 @@ namespace QCS.Application.Services
             if (request.ValidUntil == null) errors.Add("ValidUntil date is required.");
             if (request.ValidFrom != null && request.ValidUntil != null && request.ValidFrom > request.ValidUntil)
                 errors.Add("ValidFrom date cannot be after ValidUntil date.");
-            if (!request.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation))
+            if (!request.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue))
                 errors.Add("At least one Original Quotation attachment (DocumentTypeId 10) is required before submit.");
 
             if (errors.Count > 0)
@@ -1417,11 +1691,6 @@ namespace QCS.Application.Services
                 throw new InvalidOperationException("The referenced request must be Completed.");
             }
 
-            if (!sourceRequest.ValidUntil.HasValue || sourceRequest.ValidUntil.Value >= _dateTime.Now)
-            {
-                throw new InvalidOperationException("The referenced request has not expired.");
-            }
-
             if (string.IsNullOrWhiteSpace(targetRequest.VendorCode) ||
                 !string.Equals(targetRequest.VendorCode.Trim(), sourceRequest.VendorCode?.Trim(), StringComparison.OrdinalIgnoreCase))
             {
@@ -1502,6 +1771,11 @@ namespace QCS.Application.Services
             if (sourceRequest == null)
             {
                 throw new KeyNotFoundException($"Request {normalizedCode} not found.");
+            }
+
+            if (!sourceRequest.ValidUntil.HasValue || sourceRequest.ValidUntil.Value >= _dateTime.Now)
+            {
+                throw new InvalidOperationException("The referenced request has not expired.");
             }
 
             AddExpiredQuotationReferencesFromSource(request, sourceRequest);

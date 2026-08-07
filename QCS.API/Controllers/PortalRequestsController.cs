@@ -54,6 +54,69 @@ namespace QCS.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("setup/from-qrs/{qrsCode}")]
+        [ProducesResponseType(typeof(PortalSetupResolutionDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> ResolveSetupFromQrs([FromRoute] string qrsCode, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _requestService.ResolveSetupFromQrsAsync(qrsCode, cancellationToken);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Source not found",
+                    detail: ex.Message);
+            }
+            catch (PredecessorAlreadyRenewedException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Predecessor already renewed",
+                    detail: ex.Message,
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["qrsCode"] = ex.QrsCode,
+                        ["previousQcCode"] = ex.PreviousQcCode
+                    });
+            }
+            catch (QCS.Application.Abstractions.QrsSourcingException ex)
+            {
+                return MapQrsSourcingException(ex);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid request",
+                    detail: ex.Message);
+            }
+        }
+
+        [HttpGet("setup/from-qcs/{qcCode}")]
+        [ProducesResponseType(typeof(PortalSetupResolutionDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ResolveSetupFromQcs([FromRoute] string qcCode, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _requestService.ResolveSetupFromQcsAsync(qcCode, cancellationToken);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Quotation not found",
+                    detail: ex.Message);
+            }
+        }
+
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(PortalRequestDetailDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -133,12 +196,27 @@ namespace QCS.API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status502BadGateway)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> CreateDraft([FromBody] SavePortalRequestDto input, CancellationToken cancellationToken)
         {
             try
             {
                 var result = await _requestService.CreatePortalDraftAsync(input, cancellationToken);
                 return Ok(result);
+            }
+            catch (PredecessorAlreadyRenewedException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Predecessor already renewed",
+                    detail: ex.Message,
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["qrsCode"] = ex.QrsCode,
+                        ["previousQcCode"] = ex.PreviousQcCode
+                    });
             }
             catch (KeyNotFoundException ex)
             {
@@ -154,6 +232,10 @@ namespace QCS.API.Controllers
                     title: "Access denied",
                     detail: ex.Message);
             }
+            catch (QCS.Application.Abstractions.QrsSourcingException ex)
+            {
+                return MapQrsSourcingException(ex);
+            }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 return Problem(
@@ -161,6 +243,22 @@ namespace QCS.API.Controllers
                     title: "Invalid request",
                     detail: ex.Message);
             }
+        }
+
+        private IActionResult MapQrsSourcingException(QCS.Application.Abstractions.QrsSourcingException exception)
+        {
+            var statusCode = exception.IsContractViolation
+                ? StatusCodes.Status502BadGateway
+                : exception.StatusCode is StatusCodes.Status503ServiceUnavailable or StatusCodes.Status504GatewayTimeout
+                    || exception.StatusCode == null
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status502BadGateway;
+
+            return Problem(
+                statusCode: statusCode,
+                title: statusCode == StatusCodes.Status502BadGateway
+                    ? "QRS sourcing response is invalid."
+                    : "QRS sourcing lookup is unavailable.");
         }
 
         [HttpPut("{id:int}")]
