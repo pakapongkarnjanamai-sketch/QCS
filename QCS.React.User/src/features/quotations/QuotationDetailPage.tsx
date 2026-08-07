@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { qrsRequestUrl } from '@/config/appConfig'
 import { DocumentList } from '@/features/requests/DocumentList'
+import { RenewQuotationLink } from '@/features/requests/RenewQuotationLink'
 import { getPortalRequestByCode } from '@/features/requests/requestApi'
 import type {
   PortalDocument,
@@ -91,6 +92,7 @@ export function QuotationDetailPage() {
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
+        {request.canRenew && <RenewQuotationLink code={request.code} />}
       </header>
       <section className="rounded-sm border border-border-subtle bg-white">
         <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">

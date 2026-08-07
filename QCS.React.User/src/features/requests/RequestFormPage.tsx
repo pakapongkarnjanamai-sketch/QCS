@@ -13,13 +13,15 @@ import { toast } from '@/lib/toast'
 import { ApprovalActionDialog, type ApprovalActionKind } from './ApprovalActionDialog'
 import { ApprovalSteps } from './ApprovalSteps'
 import { RequestSetupPanel } from './RequestSetupPanel'
+import { RenewQuotationLink } from './RenewQuotationLink'
 import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
-import { addExpiredQuotationReference, approvePortalRequest, cancelPortalRequest, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, rejectPortalRequest, returnPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
+import { addExpiredQuotationReference, approvePortalRequest, cancelPortalRequest, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, rejectPortalRequest, resolveSetupFromQcs, resolveSetupFromQrs, returnPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
 import { createEmptyRequest, mapServerFieldErrors, validateRequest, validateSetup, type RequestFormErrors } from './requestFormValidation'
-import type { DiscriminatedSetupState, PortalApprovalAction, PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest, SetupFlow } from './types'
+import { setupErrorMessage } from './setupErrors'
+import type { DiscriminatedSetupState, PortalApprovalAction, PortalDocument, PortalRequestDetail, PortalSetupResolution, RoutePreview, SavePortalRequest, SetupFlow } from './types'
 
 type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove' | 'documents' | 'reference'
 const defaultUploadDocumentTypeId = 40
@@ -91,6 +93,32 @@ function getSetupFlow(searchParams: URLSearchParams): SetupFlow | undefined {
   return undefined
 }
 
+// A field the resolver's own contract guarantees for this flow. Missing means the
+// response is malformed, which belongs on the error surface — not half-applied to
+// the form, where it would show up later as a create rejected for reasons the user
+// cannot see.
+function required<T>(value: T | undefined | null, field: string, flow: string): T {
+  if (value === undefined || value === null) throw new Error(`The setup response for ${flow} is missing ${field}.`)
+  return value
+}
+
+function fromResolution(resolution: PortalSetupResolution): DiscriminatedSetupState {
+  const { flow } = resolution
+  if (flow === 'NewQrs') {
+    return { intent: 'New', origin: 'QRS', qrsSourceCode: required(resolution.sourceCode, 'sourceCode', flow), qrsTitle: resolution.sourceTitle }
+  }
+  const predecessor = {
+    renewedFromRequestId: required(resolution.renewedFromRequestId, 'renewedFromRequestId', flow),
+    renewedFromCode: required(resolution.renewedFromCode, 'renewedFromCode', flow),
+    vendorCode: required(resolution.vendorCode, 'vendorCode', flow),
+    vendorName: required(resolution.vendorName, 'vendorName', flow),
+  }
+  if (flow === 'RenewalQcs') {
+    return { intent: 'Renewal', origin: 'QCS', ...predecessor, title: resolution.sourceTitle ?? '' }
+  }
+  return { intent: 'Renewal', origin: 'QRS', ...predecessor, qrsSourceCode: required(resolution.sourceCode, 'sourceCode', flow), qrsTitle: resolution.sourceTitle }
+}
+
 function focusFirstInvalid() {
   requestAnimationFrame(() => {
     const target = document.querySelector<HTMLElement>('[data-invalid="true"]')
@@ -104,6 +132,8 @@ export function RequestFormPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestId = id ? Number(id) : undefined
+  const qrsCode = requestId ? undefined : searchParams.get('qrsCode')?.trim()
+  const directRenewedFromCode = requestId ? undefined : searchParams.get('renewedFromCode')?.trim()
   const selectedFlow = requestId ? undefined : getSetupFlow(searchParams)
   const [form, setForm] = useState(createEmptyRequest)
   const [request, setRequest] = useState<PortalRequestDetail>()
@@ -116,6 +146,8 @@ export function RequestFormPage() {
   const [setupSummary, setSetupSummary] = useState<DiscriminatedSetupState>()
   const [confirmSetupChange, setConfirmSetupChange] = useState(false)
   const [retryToken, setRetryToken] = useState(0)
+  const [setupResolving, setSetupResolving] = useState(Boolean(qrsCode || directRenewedFromCode))
+  const [setupResolutionError, setSetupResolutionError] = useState<ApiError>()
 
   const [preview, setPreview] = useState<PdfPreview>()
   const [routePreview, setRoutePreview] = useState<RoutePreview>()
@@ -156,6 +188,19 @@ export function RequestFormPage() {
     [preview],
   )
 
+  useEffect(() => {
+    if (requestId || (!qrsCode && !directRenewedFromCode)) return undefined
+    const controller = new AbortController()
+    setSetupResolving(true)
+    setSetupResolutionError(undefined)
+    const resolve = qrsCode ? resolveSetupFromQrs(qrsCode, controller.signal) : resolveSetupFromQcs(directRenewedFromCode!, controller.signal)
+    void resolve
+      .then((resolution) => completeSetup(fromResolution(resolution)))
+      .catch((reason: unknown) => { if (!controller.signal.aborted) setSetupResolutionError(toApiError(reason)) })
+      .finally(() => { if (!controller.signal.aborted) setSetupResolving(false) })
+    return () => controller.abort()
+  }, [directRenewedFromCode, qrsCode, requestId, retryToken])
+
   const patch = (next: Partial<SavePortalRequest>) => {
     setForm((current) => ({ ...current, ...next }))
     setDirty(true)
@@ -169,13 +214,20 @@ export function RequestFormPage() {
     setDirty(true)
   }
 
-  const selectFlow = (flow: SetupFlow) => {
+  const selectFlow = (flow?: SetupFlow) => {
+    if (!flow) {
+      setSearchParams(new URLSearchParams(), { replace: true })
+      return
+    }
     const [intent, origin] = flow.split('-')
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.set('intent', intent)
     nextSearchParams.set('origin', origin)
     setSearchParams(nextSearchParams)
   }
+
+  const resolveQrsSetup = async (code: string) => completeSetup(fromResolution(await resolveSetupFromQrs(code)))
+  const resolveQcsSetup = async (code: string) => completeSetup(fromResolution(await resolveSetupFromQcs(code)))
 
   const changeSetup = () => {
     setForm((current) => ({
@@ -386,6 +438,8 @@ export function RequestFormPage() {
   }
 
   if (loading) return <LoadingSurface />
+  if (setupResolving) return <LoadingSurface />
+  if (setupResolutionError) return <ErrorSurface><div className="space-y-3"><p>{setupErrorMessage(setupResolutionError)}</p><AppButton variant="secondary" onClick={() => { const next = new URLSearchParams(searchParams); next.delete('qrsCode'); next.delete('renewedFromCode'); setSearchParams(next, { replace: true }); setSetupResolutionError(undefined) }}>Back</AppButton>{setupResolutionError.status !== 409 && <AppButton variant="secondary" onClick={() => setRetryToken((token) => token + 1)}>Try again</AppButton>}</div></ErrorSurface>
   if (error && !request && requestId) {
     return (
       <ErrorSurface>
@@ -436,6 +490,7 @@ export function RequestFormPage() {
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
+        {request?.canRenew && <RenewQuotationLink code={request.code} />}
       </header>
 
       {error && <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>}
@@ -467,6 +522,8 @@ export function RequestFormPage() {
           selectedFlow={selectedFlow}
           onFlowChange={selectFlow}
           onComplete={completeSetup}
+          onResolveQrs={resolveQrsSetup}
+          onResolveQcs={resolveQcsSetup}
         />
       ) : (
         <>

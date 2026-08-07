@@ -8,16 +8,19 @@ import type { QrsSourcingPage, QrsSourcingRequest } from './types'
 
 interface QrsSourceTableProps {
   selectedCode?: string
+  intent: 'New' | 'Renewal'
+  allowManualCode?: boolean
   onSelect: (row: { code: string; title?: string }) => void
 }
 
-export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) {
+export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, onSelect }: QrsSourceTableProps) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
   const [data, setData] = useState<QrsSourcingPage<QrsSourcingRequest>>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
+  const [retryToken, setRetryToken] = useState(0)
   const [manualCode, setManualCode] = useState('')
 
   useEffect(() => {
@@ -26,7 +29,7 @@ export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) 
     setError(undefined)
 
     const timer = setTimeout(() => {
-      getQrsSourcingRequests({ search: search.trim(), page, pageSize }, controller.signal)
+      getQrsSourcingRequests({ search: search.trim(), page, pageSize, intent }, controller.signal)
         .then(setData)
         .catch((reason: unknown) => {
           if (!controller.signal.aborted) {
@@ -44,7 +47,7 @@ export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) 
       clearTimeout(timer)
       controller.abort()
     }
-  }, [search, page, pageSize])
+  }, [intent, search, page, pageSize, retryToken])
 
   const handleSearchChange = (value: string) => {
     setSearch(value)
@@ -82,9 +85,8 @@ export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) 
             <AlertCircle className="h-4 w-4 text-warning" />
             <span>QRS lookup unavailable</span>
           </div>
-          <p className="text-ink-muted">
-            Could not retrieve QRS list ({error}). You can enter a QRS code manually below.
-          </p>
+          <p className="text-ink-muted">Could not retrieve QRS list ({error}).</p>
+          <button type="button" onClick={() => setRetryToken((token) => token + 1)} className="w-fit rounded-sm text-accent underline underline-offset-2">Try again</button>
         </div>
       )}
 
@@ -178,7 +180,7 @@ export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) 
         </>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+      {allowManualCode && <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
         <span className="text-caption text-ink-muted">Manual QRS Code entry:</span>
         <input
           type="text"
@@ -195,7 +197,7 @@ export function QrsSourceTable({ selectedCode, onSelect }: QrsSourceTableProps) 
         >
           Use Code
         </button>
-      </div>
+      </div>}
     </div>
   )
 }

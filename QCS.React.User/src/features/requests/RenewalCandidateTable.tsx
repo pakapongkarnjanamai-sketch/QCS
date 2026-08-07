@@ -18,6 +18,7 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
   const [data, setData] = useState<PortalPage<RenewalCandidate>>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
+  const [retryToken, setRetryToken] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -45,7 +46,7 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
       clearTimeout(timer)
       controller.abort()
     }
-  }, [search, page, pageSize])
+  }, [search, page, pageSize, retryToken])
 
   const handleSearchChange = (value: string) => {
     setSearch(value)
@@ -71,13 +72,13 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
       </div>
 
       {loading && <LoadingSurface />}
-      {error && <ErrorSurface>{error}</ErrorSurface>}
+      {error && <ErrorSurface><div className="flex flex-wrap items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => setRetryToken((token) => token + 1)} className="rounded-sm text-accent underline underline-offset-2">Try again</button></div></ErrorSurface>}
 
       {!loading && !error && data && (
         <>
           {data.items.length === 0 ? (
             <div className="p-4 text-center text-body text-ink-muted">
-              No eligible expired requests found for renewal.
+              No eligible quotations found for renewal.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -89,6 +90,7 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
                     <th className="px-3 py-2">Title</th>
                     <th className="px-3 py-2">Vendor</th>
                     <th className="px-3 py-2">Valid Until</th>
+                    <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">QRS Source</th>
                     <th className="px-3 py-2 text-right">PDFs</th>
                   </tr>
@@ -119,6 +121,7 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
                         <td className="px-3 py-2 text-caption text-ink-muted">
                           {item.validUntil ? item.validUntil.slice(0, 10) : '-'}
                         </td>
+                        <td className="px-3 py-2 text-caption text-ink-muted">{item.renewalWindowStatus === 'Expired' ? 'Expired' : 'Expiring soon'}</td>
                         <td className="px-3 py-2 font-mono text-caption">{item.sourceCode || '-'}</td>
                         <td className="px-3 py-2 text-right text-caption font-medium">
                           {item.originalQuotationCount}

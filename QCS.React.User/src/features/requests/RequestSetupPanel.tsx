@@ -1,14 +1,18 @@
-import { ArrowRight, Building2, CheckCircle2, FilePlus2, RefreshCw, Waypoints } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, FilePlus2, Loader2, RefreshCw, Waypoints } from 'lucide-react'
 import { useState } from 'react'
 import { AppButton } from '@/components/ui/AppButton'
+import { toApiError } from '@/lib/apiClient'
 import { QrsSourceTable } from './QrsSourceTable'
 import { RenewalCandidateTable } from './RenewalCandidateTable'
+import { setupErrorMessage } from './setupErrors'
 import type { DiscriminatedSetupState, RenewalCandidate, SetupFlow } from './types'
 
 interface RequestSetupPanelProps {
   selectedFlow?: SetupFlow
-  onFlowChange: (flow: SetupFlow) => void
+  onFlowChange: (flow?: SetupFlow) => void
   onComplete: (setup: DiscriminatedSetupState) => void
+  onResolveQrs: (code: string) => Promise<void>
+  onResolveQcs: (code: string) => Promise<void>
 }
 
 const setupFlows = [
@@ -48,153 +52,48 @@ const setupFlows = [
   icon: typeof FilePlus2
 }>
 
-export function RequestSetupPanel({ selectedFlow, onFlowChange, onComplete }: RequestSetupPanelProps) {
-  const [selectedCandidate, setSelectedCandidate] = useState<RenewalCandidate>()
+export function RequestSetupPanel({ selectedFlow, onFlowChange, onComplete, onResolveQrs, onResolveQcs }: RequestSetupPanelProps) {
   const [selectedQrsSource, setSelectedQrsSource] = useState<{ code: string; title?: string }>()
+  const [selectedQcCandidate, setSelectedQcCandidate] = useState<RenewalCandidate>()
+  const [resolving, setResolving] = useState(false)
+  const [error, setError] = useState<string>()
 
   const handleFlowChange = (flow: SetupFlow) => {
-    setSelectedCandidate(undefined)
     setSelectedQrsSource(undefined)
+    setSelectedQcCandidate(undefined)
+    setError(undefined)
     onFlowChange(flow)
   }
 
-  const handleSelectCandidate = (candidate: RenewalCandidate) => {
-    setSelectedCandidate(candidate)
+
+  const complete = async () => {
+    const code = selectedFlow === 'renewal-qcs' ? selectedQcCandidate?.code : selectedQrsSource?.code
+    if (!code) return
+    setResolving(true)
+    setError(undefined)
+    try {
+      if (selectedFlow === 'renewal-qcs') await onResolveQcs(code)
+      else await onResolveQrs(code)
+    } catch (reason) {
+      // A predecessor can be consumed between loading this table and pressing
+      // Continue. Without toApiError that surfaces as axios's "Request failed with
+      // status code 409", which tells the user nothing about what to do next.
+      setError(setupErrorMessage(toApiError(reason)))
+    } finally {
+      setResolving(false)
+    }
   }
 
-  const handleSelectQrsSource = (row: { code: string; title?: string }) => {
-    setSelectedQrsSource(row)
+  if (!selectedFlow) {
+    return <section className="space-y-6"><div><h2 className="text-heading font-semibold text-ink-strong">Choose request flow</h2><p className="text-body text-ink-muted">Select how this quotation should begin.</p></div><div className="grid gap-3 sm:grid-cols-2">{setupFlows.map((flow) => { const Icon = flow.icon; return <button key={flow.value} type="button" onClick={() => flow.value === 'new-qcs' ? onComplete({ intent: 'New', origin: 'QCS' }) : handleFlowChange(flow.value)} className="flex min-h-32 gap-3 rounded-sm border border-border-subtle bg-surface-panel p-4 text-left hover:border-ink-soft hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><span className="grid size-9 shrink-0 place-items-center rounded-sm bg-surface-muted text-ink-muted"><Icon className="size-4.5" aria-hidden /></span><span className="min-w-0"><span className="block text-heading font-semibold text-ink-strong">{flow.title}</span><span className="mt-0.5 block text-caption font-medium text-accent">{flow.origin}</span><span className="mt-2 block text-body text-ink-muted">{flow.description}</span></span></button> })}</div></section>
   }
 
-  const setup = (() => {
-    if (selectedFlow === 'new-qcs') {
-      return { intent: 'New', origin: 'QCS' } satisfies DiscriminatedSetupState
-    }
-    if (selectedFlow === 'new-qrs' && selectedQrsSource) {
-      return {
-        intent: 'New',
-        origin: 'QRS',
-        qrsSourceCode: selectedQrsSource.code,
-        qrsTitle: selectedQrsSource.title,
-      } satisfies DiscriminatedSetupState
-    }
-    if (selectedFlow === 'renewal-qcs' && selectedCandidate) {
-      return {
-        intent: 'Renewal',
-        origin: 'QCS',
-        renewedFromRequestId: selectedCandidate.id,
-        renewedFromCode: selectedCandidate.code,
-        vendorCode: selectedCandidate.vendorCode,
-        vendorName: selectedCandidate.vendorName,
-        title: selectedCandidate.title,
-      } satisfies DiscriminatedSetupState
-    }
-    if (selectedFlow === 'renewal-qrs' && selectedCandidate && selectedQrsSource) {
-      return {
-        intent: 'Renewal',
-        origin: 'QRS',
-        renewedFromRequestId: selectedCandidate.id,
-        renewedFromCode: selectedCandidate.code,
-        vendorCode: selectedCandidate.vendorCode,
-        vendorName: selectedCandidate.vendorName,
-        qrsSourceCode: selectedQrsSource.code,
-        qrsTitle: selectedQrsSource.title,
-      } satisfies DiscriminatedSetupState
-    }
-    return undefined
-  })()
-
-  const requiresRenewal = selectedFlow === 'renewal-qcs' || selectedFlow === 'renewal-qrs'
-  const requiresQrs = selectedFlow === 'new-qrs' || selectedFlow === 'renewal-qrs'
-  const selectionRequirement = selectedFlow === 'new-qcs'
-    ? 'No source record is required. Continue to enter the request.'
-    : selectedFlow === 'new-qrs'
-      ? 'Select one completed QRS sourcing request or enter its Code.'
-      : selectedFlow === 'renewal-qcs'
-        ? 'Select one expired completed QCS quotation.'
-        : selectedFlow === 'renewal-qrs'
-          ? 'Select one QRS source and one expired completed QCS quotation.'
-          : 'Choose the request flow that matches the work you need to do.'
+  const isRenewalQcs = selectedFlow === 'renewal-qcs'
+  const isRenewalQrs = selectedFlow === 'renewal-qrs'
+  const canContinue = isRenewalQcs ? Boolean(selectedQcCandidate) : Boolean(selectedQrsSource)
+  const title = isRenewalQcs ? 'Select eligible quotation' : isRenewalQrs ? 'Select renewal QRS request' : 'Select QRS request'
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h2 className="text-heading font-semibold text-ink-strong">Choose request flow</h2>
-        <p className="text-body text-ink-muted">
-          Select one option before entering request details.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Request flow">
-        {setupFlows.map((flow) => {
-          const selected = selectedFlow === flow.value
-          const Icon = flow.icon
-          return (
-            <label
-              key={flow.value}
-              className={`relative flex min-h-32 cursor-pointer gap-3 rounded-sm border p-4 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
-                selected
-                  ? 'border-accent bg-accent-subtle/30'
-                  : 'border-border-subtle bg-surface-panel hover:border-ink-soft hover:bg-surface-muted'
-              }`}
-            >
-              <input
-                type="radio"
-                name="requestSetupFlow"
-                value={flow.value}
-                checked={selected}
-                onChange={() => handleFlowChange(flow.value)}
-                className="sr-only"
-              />
-              <span className={`grid size-9 shrink-0 place-items-center rounded-sm ${selected ? 'bg-accent text-white' : 'bg-surface-muted text-ink-muted'}`}>
-                <Icon className="size-4.5" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-heading font-semibold text-ink-strong">{flow.title}</span>
-                <span className="mt-0.5 block text-caption font-medium text-accent">{flow.origin}</span>
-                <span className="mt-2 block text-body text-ink-muted">{flow.description}</span>
-              </span>
-              {selected && <CheckCircle2 className="size-4 shrink-0 text-accent" aria-label="Selected" />}
-            </label>
-          )
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border-subtle bg-surface-muted px-4 py-3 text-caption">
-        <p className="text-ink-muted">{selectionRequirement}</p>
-        {setup && (
-          <div className="flex items-center gap-1 font-medium text-positive">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Ready to continue</span>
-          </div>
-        )}
-      </div>
-
-      {requiresRenewal && (
-        <RenewalCandidateTable
-          selectedId={selectedCandidate?.id}
-          onSelect={handleSelectCandidate}
-        />
-      )}
-
-      {requiresQrs && (
-        <QrsSourceTable
-          selectedCode={selectedQrsSource?.code}
-          onSelect={handleSelectQrsSource}
-        />
-      )}
-
-      <div className="flex justify-end border-t border-border-subtle pt-4">
-        <AppButton
-          type="button"
-          onClick={() => setup && onComplete(setup)}
-          disabled={!setup}
-          className="gap-2"
-        >
-          <span>Continue to Form</span>
-          <ArrowRight className="h-4 w-4" />
-        </AppButton>
-      </div>
-    </section>
+    <section className="space-y-6"><div className="flex items-start justify-between gap-3"><div><h2 className="text-heading font-semibold text-ink-strong">{title}</h2><p className="text-body text-ink-muted">{isRenewalQcs ? 'Choose one eligible completed QCS quotation.' : isRenewalQrs ? 'Choose one completed QRS request marked Renewal.' : 'Choose one completed QRS request marked New.'}</p></div><AppButton variant="ghost" size="sm" onClick={() => onFlowChange(undefined)}><ArrowLeft className="size-4" aria-hidden />Back</AppButton></div>{isRenewalQcs ? <RenewalCandidateTable selectedId={selectedQcCandidate?.id} onSelect={setSelectedQcCandidate} /> : <QrsSourceTable selectedCode={selectedQrsSource?.code} intent={isRenewalQrs ? 'Renewal' : 'New'} allowManualCode={!isRenewalQrs} onSelect={setSelectedQrsSource} />}{error && <p className="rounded-sm bg-red-50 p-3 text-body text-danger">{error}</p>}<div className="flex justify-end border-t border-border-subtle pt-4"><AppButton type="button" onClick={() => void complete()} disabled={!canContinue || resolving} className="gap-2">{resolving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <ArrowRight className="size-4" aria-hidden />}<span>Continue to form</span></AppButton></div></section>
   )
 }

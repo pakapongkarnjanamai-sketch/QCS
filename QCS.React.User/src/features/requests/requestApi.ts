@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalPage, PortalRequestDetail, PortalSaveResult, QrsSourcingPage, QrsSourcingRequest, RenewalCandidate, RoutePreview, SavePortalRequest, SavePortalRequestPayload, UpdatePortalDocuments } from './types'
+import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalPage, PortalRequestDetail, PortalSaveResult, PortalSetupResolution, QrsSourcingPage, QrsSourcingRequest, RenewalCandidate, RoutePreview, SavePortalRequest, SavePortalRequestPayload, UpdatePortalDocuments } from './types'
 
 function toSavePortalRequestPayload(input: SavePortalRequest): SavePortalRequestPayload {
   return {
@@ -96,8 +96,18 @@ export async function getRenewalCandidates(
   return data
 }
 
+export async function resolveSetupFromQrs(code: string, signal?: AbortSignal): Promise<PortalSetupResolution> {
+  const { data } = await apiClient.get<PortalSetupResolution>(`/Portal/Requests/setup/from-qrs/${encodeURIComponent(code)}`, { signal })
+  return data
+}
+
+export async function resolveSetupFromQcs(code: string, signal?: AbortSignal): Promise<PortalSetupResolution> {
+  const { data } = await apiClient.get<PortalSetupResolution>(`/Portal/Requests/setup/from-qcs/${encodeURIComponent(code)}`, { signal })
+  return data
+}
+
 export async function getQrsSourcingRequests(
-  params: { search?: string; page: number; pageSize: number },
+  params: { search?: string; page: number; pageSize: number; intent?: 'New' | 'Renewal' },
   signal?: AbortSignal,
 ): Promise<QrsSourcingPage<QrsSourcingRequest>> {
   const { data } = await apiClient.get<QrsSourcingPage<QrsSourcingRequest>>('/QrsSourcing/Requests', {

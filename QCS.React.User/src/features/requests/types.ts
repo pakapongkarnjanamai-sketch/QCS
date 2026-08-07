@@ -25,6 +25,7 @@ export interface RenewalCandidate {
   sourceCode?: string
   requestDate: string
   originalQuotationCount: number
+  renewalWindowStatus: 'Expired' | 'ExpiringSoon'
 }
 
 // Mirrors QRS.Application.Quotations.Dtos.SourcingRequestDto.
@@ -33,6 +34,8 @@ export interface QrsSourcingRequest {
   title: string
   requestType: number
   requestTypeName: string
+  intent: RequestIntent
+  intentName: string
   requesterNId: string
   requesterName: string
   requesterDepartment?: string
@@ -63,6 +66,20 @@ export type DiscriminatedSetupState =
   | { intent: 'Renewal'; origin: 'QCS'; renewedFromRequestId: number; renewedFromCode: string; vendorCode: string; vendorName: string; title: string }
   | { intent: 'Renewal'; origin: 'QRS'; renewedFromRequestId: number; renewedFromCode: string; vendorCode: string; vendorName: string; qrsSourceCode: string; qrsTitle?: string }
 
+// Mirrors QCS.Domain.DTOs.Portal.PortalSetupResolutionDto.
+export interface PortalSetupResolution {
+  flow: 'NewQrs' | 'RenewalQcs' | 'RenewalQrs'
+  intent: RequestIntent
+  origin: SetupOrigin
+  /** Null for RenewalQcs — that flow renews a QC directly and has no QRS source. */
+  sourceCode?: string
+  sourceTitle?: string
+  renewedFromRequestId?: number
+  renewedFromCode?: string
+  vendorCode?: string
+  vendorName?: string
+}
+
 // Mirrors QCS.Domain.DTOs.Portal.PortalRequestDetailDto.
 export interface PortalRequestDetail {
   id: number
@@ -81,6 +98,7 @@ export interface PortalRequestDetail {
   intentName: string
   renewedFromRequestId?: number
   renewedFromCode?: string
+  canRenew: boolean
   originName: string
   validFrom?: string
   validUntil?: string
