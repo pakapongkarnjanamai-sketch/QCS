@@ -57,7 +57,7 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
     <div className="flex flex-col gap-3 rounded-md border border-border-subtle bg-surface-panel p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-subheading font-medium text-ink-strong">
-          Select Expired QCS Request to Renew
+          Select QCS Quotation to Renew
         </h4>
         <div className="relative min-w-[240px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-ink-muted" />

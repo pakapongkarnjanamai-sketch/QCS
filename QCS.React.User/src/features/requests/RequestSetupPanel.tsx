@@ -34,14 +34,14 @@ const setupFlows = [
     value: 'renewal-qcs',
     title: 'Renew quotation',
     origin: 'Start in QCS',
-    description: 'Renew one expired completed QCS quotation.',
+    description: 'Renew one completed QCS quotation that has expired or expires within 30 days.',
     icon: RefreshCw,
   },
   {
     value: 'renewal-qrs',
     title: 'Renew quotation',
     origin: 'From QRS',
-    description: 'Link a new QRS request to one expired QCS quotation.',
+    description: 'Start from one completed QRS request marked Renewal; QCS resolves its previous quotation.',
     icon: Building2,
   },
 ] as const satisfies ReadonlyArray<{
