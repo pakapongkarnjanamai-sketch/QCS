@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using QCS.Application.Abstractions;
 using QCS.Domain.DTOs;
 using QCS.Domain.DTOs.Portal;
@@ -191,6 +192,63 @@ namespace QCS.Api.IntegrationTests
             var detail = await detailResponse.Content.ReadFromJsonAsync<PortalRequestDetailDto>();
             detail.ShouldNotBeNull();
             detail.Status.ShouldBe((int)RequestStatus.InProcess);
+        }
+
+        [Fact]
+        public async Task SubmitPortalRequest_WhenRenewalPredecessorIsNoLongerCompleted_Returns400WithoutCallingApproval()
+        {
+            _factory.ApprovalService.Reset();
+            const int predecessorId = 5790;
+            const int requestId = 5791;
+
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+
+                db.Requests.Add(new Request
+                {
+                    Id = predecessorId,
+                    Code = "QC-20260807-790",
+                    Title = "Changed predecessor",
+                    VendorCode = "V790",
+                    VendorName = "Vendor 790",
+                    Status = (int)RequestStatus.Returned,
+                    ValidUntil = DateTime.Now.AddDays(-10),
+                    CreatedBy = "PLAN057_SUBMIT",
+                    IsActive = true
+                });
+
+                var renewal = new Request
+                {
+                    Id = requestId,
+                    Code = "QC-20260807-791",
+                    Title = "Renewal with stale setup",
+                    Intent = RequestIntent.Renewal,
+                    RenewedFromRequestId = predecessorId,
+                    VendorCode = "V790",
+                    VendorName = "Vendor 790",
+                    ValidFrom = DateTime.Now,
+                    ValidUntil = DateTime.Now.AddDays(10),
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = "PLAN057_SUBMIT",
+                    IsActive = true
+                };
+                renewal.Quotations.Add(new Quotation
+                {
+                    Id = 57910,
+                    FileName = "new-original.pdf",
+                    FilePath = "/files/57910.pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    ContentType = "application/pdf"
+                });
+                db.Requests.Add(renewal);
+            });
+
+            var client = CreateAuthenticatedClient("PLAN057_SUBMIT");
+            var response = await client.PostAsync($"/api/Portal/Requests/{requestId}/submit", null);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+            _factory.ApprovalService.CreateCallCount.ShouldBe(0);
         }
 
         [Fact]
@@ -1192,6 +1250,237 @@ namespace QCS.Api.IntegrationTests
 
             var client = CreateAuthenticatedClient("USER01");
             return await client.PostAsync($"/api/Portal/Requests/{requestId}/attachments", form);
+        }
+
+        [Fact]
+        public async Task CreatePortalDraft_FourValidCombinations_Succeeds()
+        {
+            const string user = "PLAN057_USER1";
+            int predecessorId = 5701;
+
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(predecessorId) != null) return;
+                var sourceReq = new Request
+                {
+                    Id = predecessorId,
+                    Code = "QC-20260806-571",
+                    Title = "Expired Predecessor",
+                    VendorCode = "VEND_5701",
+                    VendorName = "Vendor 5701 Name",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(-5),
+                    CreatedBy = user,
+                    IsActive = true
+                };
+                var file = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
+                db.AttachmentFiles.Add(file);
+                db.SaveChanges();
+                sourceReq.Quotations.Add(new Quotation
+                {
+                    FileName = "orig.pdf",
+                    FilePath = "test",
+                    ContentType = "application/pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    AttachmentFileId = file.Id,
+                    SortOrder = 1
+                });
+                db.Requests.Add(sourceReq);
+            });
+
+            var client = CreateAuthenticatedClient(user);
+
+            // 1. New + QCS
+            var newQcsRes = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.New,
+                Title = "New QCS"
+            });
+            newQcsRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            // 2. New + QRS
+            var newQrsRes = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.New,
+                SourceSystem = "QRS",
+                SourceCode = "QRS-2026-001",
+                Title = "New QRS"
+            });
+            newQrsRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            // 3. Renewal + QCS
+            var renewalQcsRes = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal,
+                RenewedFromRequestId = predecessorId,
+                Title = "Renewal QCS"
+            });
+            renewalQcsRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var renewalQcsResult = await renewalQcsRes.Content.ReadFromJsonAsync<PortalSaveResultDto>();
+            renewalQcsResult.ShouldNotBeNull();
+
+            // Check vendor was copied and expired reference added
+            _factory.SeedDatabase(db =>
+            {
+                var req = db.Requests.Include(r => r.Quotations).FirstOrDefault(r => r.Id == renewalQcsResult.Id);
+                req.ShouldNotBeNull();
+                req.VendorCode.ShouldBe("VEND_5701");
+                req.VendorName.ShouldBe("Vendor 5701 Name");
+                req.Quotations.Count.ShouldBe(1);
+                req.Quotations.First().DocumentTypeId.ShouldBe((int)DocumentType.ExpiredQuotation);
+            });
+
+            // 4. Renewal + QRS
+            var renewalQrsRes = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal,
+                RenewedFromRequestId = predecessorId,
+                SourceSystem = "QRS",
+                SourceCode = "QRS-2026-002",
+                Title = "Renewal QRS"
+            });
+            renewalQrsRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        [Fact]
+        public async Task CreatePortalDraft_InvalidMatrixCombinations_ReturnsBadRequestOrError()
+        {
+            var client = CreateAuthenticatedClient("USER01");
+
+            // New + RenewedFromRequestId != null
+            var res1 = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.New,
+                RenewedFromRequestId = 123
+            });
+            res1.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+            // Renewal + RenewedFromRequestId == null
+            var res2 = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal
+            });
+            res2.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+            // QRS without SourceCode
+            var res3 = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.New,
+                SourceSystem = "QRS"
+            });
+            res3.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task CreatePortalDraft_OutOfRangeIntent_IsRejected()
+        {
+            var client = CreateAuthenticatedClient("USER01");
+            var json = @"{ ""Intent"": 7, ""Title"": ""Invalid Intent"" }";
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync("/api/Portal/Requests", content);
+            response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        }
+
+        [Fact]
+        public async Task CreatePortalDraft_WhenRenewalPredecessorDoesNotExist_Returns404()
+        {
+            var client = CreateAuthenticatedClient("PLAN057_MISSING");
+
+            var response = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal,
+                RenewedFromRequestId = 579299,
+                Title = "Missing predecessor"
+            });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        }
+
+        [Fact]
+        public async Task CreatePortalDraft_WhenRenewalPredecessorBelongsToAnotherUser_Returns403()
+        {
+            const int predecessorId = 5792;
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(predecessorId) != null) return;
+
+                var attachment = new AttachmentFile
+                {
+                    ContentType = "application/pdf",
+                    Data = "%PDF-1.4"u8.ToArray()
+                };
+                db.AttachmentFiles.Add(attachment);
+                db.SaveChanges();
+
+                var predecessor = new Request
+                {
+                    Id = predecessorId,
+                    Code = "QC-20260807-792",
+                    Title = "Another user's request",
+                    VendorCode = "V792",
+                    VendorName = "Vendor 792",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(-10),
+                    CreatedBy = "PLAN057_OWNER",
+                    IsActive = true
+                };
+                predecessor.Quotations.Add(new Quotation
+                {
+                    Id = 57920,
+                    FileName = "original.pdf",
+                    FilePath = "/files/57920.pdf",
+                    DocumentTypeId = (int)DocumentType.OriginalQuotation,
+                    ContentType = "application/pdf",
+                    AttachmentFileId = attachment.Id
+                });
+                db.Requests.Add(predecessor);
+            });
+
+            var client = CreateAuthenticatedClient("PLAN057_OTHER");
+            var response = await client.PostAsJsonAsync("/api/Portal/Requests", new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal,
+                RenewedFromRequestId = predecessorId,
+                Title = "Forbidden renewal"
+            });
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
+        [Fact]
+        public async Task UpdatePortalDraft_WhenSetupContextChanges_IsRejected()
+        {
+            const string user = "PLAN057_USER2";
+            int requestId = 5702;
+
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(requestId) != null) return;
+                db.Requests.Add(new Request
+                {
+                    Id = requestId,
+                    Code = "QC-20260806-572",
+                    Title = "Draft Setup Test",
+                    VendorCode = "V001",
+                    VendorName = "Test Vendor",
+                    Intent = RequestIntent.New,
+                    Status = (int)RequestStatus.Draft,
+                    CreatedBy = user,
+                    IsActive = true
+                });
+            });
+
+            var client = CreateAuthenticatedClient(user);
+            var updateDto = new SavePortalRequestDto
+            {
+                Intent = RequestIntent.Renewal,
+                RenewedFromRequestId = 999,
+                Title = "Attempted Intent Change"
+            };
+
+            var response = await client.PutAsJsonAsync($"/api/Portal/Requests/{requestId}", updateDto);
+            response.IsSuccessStatusCode.ShouldBeFalse();
         }
     }
 }

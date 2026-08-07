@@ -1,3 +1,4 @@
+using QCS.Domain.Enum;
 using System;
 using System.Collections.Generic;
 
@@ -17,6 +18,11 @@ namespace QCS.Domain.DTOs.Portal
         public string VendorName { get; set; } = string.Empty;
         public string? SourceSystem { get; set; }
         public string? SourceCode { get; set; }
+        public RequestIntent Intent { get; set; }
+        public string IntentName { get; set; } = string.Empty;
+        public int? RenewedFromRequestId { get; set; }
+        public string? RenewedFromCode { get; set; }
+        public string OriginName { get; set; } = string.Empty;
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }
         public string? Remark { get; set; }

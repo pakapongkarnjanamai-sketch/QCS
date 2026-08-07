@@ -33,6 +33,7 @@ namespace QCS.Application.Services
         Task<AttachmentResultDto?> GetAttachmentAsync(int id);
         Task<int> GetMyPendingTaskCountAsync();
         Task<PortalPage<PortalRequestListItemDto>> GetPortalRequestsAsync(PortalRequestQuery query, CancellationToken cancellationToken = default);
+        Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default);
@@ -662,6 +663,7 @@ namespace QCS.Application.Services
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations).ThenInclude(q => q.SourceQuotation).ThenInclude(source => source!.Request)
                 .Include(r => r.ApprovalSteps)
+                .Include(r => r.RenewedFromRequest)
                 .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
             if (request == null) return null;
@@ -848,6 +850,11 @@ namespace QCS.Application.Services
                 VendorName = request.VendorName,
                 SourceSystem = request.SourceSystem,
                 SourceCode = request.SourceCode,
+                Intent = request.Intent,
+                IntentName = request.Intent.ToString(),
+                RenewedFromRequestId = request.RenewedFromRequestId,
+                RenewedFromCode = request.RenewedFromRequest?.Code,
+                OriginName = string.Equals(request.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase) ? "QRS" : "QCS",
                 ValidFrom = request.ValidFrom,
                 ValidUntil = request.ValidUntil,
                 Remark = request.Remark,
@@ -874,9 +881,195 @@ namespace QCS.Application.Services
             return id == 0 ? null : await GetPortalRequestByIdAsync(id, cancellationToken);
         }
 
+        public async Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default)
+        {
+            var currentUserId = _currentUserService.UserId;
+            var normalizedCurrentUserId = currentUserId.ToUpper();
+            var now = _dateTime.Now;
+
+            var baseQuery = _unitOfWork.Repository<Request>().GetAll()
+                .AsNoTracking()
+                .Where(r => r.Status == (int)RequestStatus.Completed
+                    && r.ValidUntil.HasValue
+                    && r.ValidUntil < now
+                    && r.CreatedBy != null
+                    && r.CreatedBy.ToUpper() == normalizedCurrentUserId
+                    && r.Quotations.Any(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue));
+
+            if (!string.IsNullOrWhiteSpace(query.Search))
+            {
+                var search = query.Search.Trim();
+                baseQuery = baseQuery.Where(r => EF.Functions.Like(r.Code, $"%{search}%")
+                    || EF.Functions.Like(r.Title, $"%{search}%")
+                    || EF.Functions.Like(r.VendorCode, $"%{search}%")
+                    || EF.Functions.Like(r.VendorName, $"%{search}%")
+                    || (r.SourceCode != null && EF.Functions.Like(r.SourceCode, $"%{search}%")));
+            }
+
+            var totalCount = await baseQuery.CountAsync(cancellationToken);
+            var page = Math.Max(1, query.Page);
+            var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+            var items = await baseQuery
+                .OrderByDescending(r => r.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RenewalCandidateDto
+                {
+                    Id = r.Id,
+                    Code = r.Code,
+                    Title = r.Title,
+                    VendorCode = r.VendorCode,
+                    VendorName = r.VendorName,
+                    ValidFrom = r.ValidFrom,
+                    ValidUntil = r.ValidUntil,
+                    SourceSystem = r.SourceSystem,
+                    SourceCode = r.SourceCode,
+                    RequestDate = r.RequestDate,
+                    OriginalQuotationCount = r.Quotations.Count(q => q.DocumentTypeId == (int)DocumentType.OriginalQuotation && q.SourceQuotationId == null && q.AttachmentFileId.HasValue)
+                })
+                .ToListAsync(cancellationToken);
+
+            return new PortalPage<RenewalCandidateDto>(items, totalCount, page, pageSize);
+        }
+
+        private static void ValidateSetupMatrix(SavePortalRequestDto input)
+        {
+            if (!Enum.IsDefined(typeof(RequestIntent), input.Intent))
+            {
+                throw new ArgumentException($"Invalid RequestIntent '{input.Intent}'.");
+            }
+
+            var isQrs = string.Equals(input.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase);
+            var hasSourceSystem = !string.IsNullOrWhiteSpace(input.SourceSystem);
+            var hasSourceCode = !string.IsNullOrWhiteSpace(input.SourceCode);
+
+            if (hasSourceSystem && !isQrs)
+            {
+                throw new ArgumentException($"Invalid SourceSystem '{input.SourceSystem}'.");
+            }
+
+            if (isQrs && !hasSourceCode)
+            {
+                throw new ArgumentException("SourceCode is required when SourceSystem is 'QRS'.");
+            }
+
+            if (!isQrs && (hasSourceSystem || hasSourceCode))
+            {
+                throw new ArgumentException("SourceSystem and SourceCode must both be null/blank for QCS origin.");
+            }
+
+            if (input.Intent == RequestIntent.New)
+            {
+                if (input.RenewedFromRequestId.HasValue)
+                {
+                    throw new ArgumentException("RenewedFromRequestId must be null when Intent is New.");
+                }
+            }
+            else if (input.Intent == RequestIntent.Renewal)
+            {
+                if (!input.RenewedFromRequestId.HasValue)
+                {
+                    throw new ArgumentException("RenewedFromRequestId is required when Intent is Renewal.");
+                }
+            }
+        }
+
+        private static void ValidatePersistedSetupForSubmission(Request request)
+        {
+            if (!Enum.IsDefined(typeof(RequestIntent), request.Intent))
+            {
+                throw new InvalidOperationException($"Request setup has an invalid intent '{request.Intent}'.");
+            }
+
+            var isQrs = string.Equals(request.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase);
+            var hasSourceSystem = !string.IsNullOrWhiteSpace(request.SourceSystem);
+            var hasSourceCode = !string.IsNullOrWhiteSpace(request.SourceCode);
+
+            if ((hasSourceSystem && !isQrs) || (isQrs && !hasSourceCode) || (!isQrs && (hasSourceSystem || hasSourceCode)))
+            {
+                throw new InvalidOperationException("Request setup origin is no longer coherent.");
+            }
+
+            if (request.Intent == RequestIntent.New)
+            {
+                if (request.RenewedFromRequestId.HasValue)
+                {
+                    throw new InvalidOperationException("A new request cannot have a renewal predecessor.");
+                }
+
+                return;
+            }
+
+            var predecessor = request.RenewedFromRequest;
+            if (!request.RenewedFromRequestId.HasValue || predecessor == null || predecessor.Id == request.Id)
+            {
+                throw new InvalidOperationException("The renewal predecessor no longer exists or is invalid.");
+            }
+
+            if (predecessor.Status != (int)RequestStatus.Completed ||
+                !string.Equals(predecessor.CreatedBy, request.CreatedBy, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("The renewal predecessor no longer satisfies the request setup.");
+            }
+
+            if (!string.Equals(request.VendorCode, predecessor.VendorCode, StringComparison.Ordinal) ||
+                !string.Equals(request.VendorName, predecessor.VendorName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The renewal vendor no longer matches its predecessor.");
+            }
+        }
+
         public async Task<PortalSaveResultDto> CreatePortalDraftAsync(SavePortalRequestDto input, CancellationToken cancellationToken = default)
         {
+            ValidateSetupMatrix(input);
             var creatorUserId = _currentUserService.UserId;
+
+            Request? predecessor = null;
+            if (input.Intent == RequestIntent.Renewal)
+            {
+                var predecessorId = input.RenewedFromRequestId!.Value;
+                predecessor = await _unitOfWork.Repository<Request>().GetAll()
+                    .Include(r => r.Quotations)
+                    .FirstOrDefaultAsync(r => r.Id == predecessorId, cancellationToken);
+
+                if (predecessor == null)
+                {
+                    throw new KeyNotFoundException($"Referenced renewal request {predecessorId} not found.");
+                }
+
+                if (predecessor.Status != (int)RequestStatus.Completed)
+                {
+                    throw new InvalidOperationException("The referenced renewal request must be Completed.");
+                }
+
+                if (!predecessor.ValidUntil.HasValue || predecessor.ValidUntil.Value >= _dateTime.Now)
+                {
+                    throw new InvalidOperationException("The referenced renewal request has not expired.");
+                }
+
+                if (!string.Equals(predecessor.CreatedBy, creatorUserId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UnauthorizedAccessException("You do not have permission to renew this request.");
+                }
+
+                var hasMatchingOriginal = predecessor.Quotations.Any(q =>
+                    q.DocumentTypeId == (int)DocumentType.OriginalQuotation &&
+                    q.SourceQuotationId == null &&
+                    q.AttachmentFileId.HasValue);
+
+                if (!hasMatchingOriginal)
+                {
+                    throw new InvalidOperationException("The referenced renewal request has no Original Quotation PDF.");
+                }
+            }
+
+            var vendorCode = input.Intent == RequestIntent.Renewal
+                ? (predecessor!.VendorCode ?? string.Empty)
+                : (input.VendorCode ?? string.Empty);
+            var vendorName = input.Intent == RequestIntent.Renewal
+                ? (predecessor!.VendorName ?? string.Empty)
+                : (input.VendorName ?? string.Empty);
 
             for (var attempt = 1; attempt <= GenerateDocNoRetryLimit; attempt++)
             {
@@ -893,14 +1086,21 @@ namespace QCS.Application.Services
                         CurrentStepSequence = null,
                         CreatedBy = creatorUserId,
                         IsActive = true,
-                        VendorCode = input.VendorCode ?? string.Empty,
-                        VendorName = input.VendorName ?? string.Empty,
-                        SourceSystem = input.SourceSystem,
-                        SourceCode = input.SourceCode,
+                        Intent = input.Intent,
+                        RenewedFromRequestId = input.RenewedFromRequestId,
+                        VendorCode = vendorCode,
+                        VendorName = vendorName,
+                        SourceSystem = string.Equals(input.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase) ? "QRS" : null,
+                        SourceCode = string.Equals(input.SourceSystem, "QRS", StringComparison.OrdinalIgnoreCase) ? input.SourceCode?.Trim() : null,
                         ValidFrom = input.ValidFrom,
                         ValidUntil = input.ValidUntil,
                         Remark = input.Remark
                     };
+
+                    if (input.Intent == RequestIntent.Renewal && predecessor != null)
+                    {
+                        AddExpiredQuotationReferencesFromSource(request, predecessor);
+                    }
 
                     await _unitOfWork.Repository<Request>().AddAsync(request);
                     await _unitOfWork.CommitAsync();
@@ -955,11 +1155,25 @@ namespace QCS.Application.Services
                 throw new InvalidOperationException("Only draft requests can be updated.");
             }
 
+            var requestSourceSys = request.SourceSystem ?? string.Empty;
+            var inputSourceSys = input.SourceSystem ?? string.Empty;
+            var requestSourceCode = request.SourceCode ?? string.Empty;
+            var inputSourceCode = input.SourceCode ?? string.Empty;
+
+            if (request.Intent != input.Intent ||
+                request.RenewedFromRequestId != input.RenewedFromRequestId ||
+                !string.Equals(requestSourceSys, inputSourceSys, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(requestSourceCode, inputSourceCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Request setup context (Intent, Origin, RenewedFromRequestId) cannot be modified after creation.");
+            }
+
             request.Title = string.IsNullOrWhiteSpace(input.Title) ? string.Empty : input.Title.Trim();
-            request.VendorCode = input.VendorCode ?? string.Empty;
-            request.VendorName = input.VendorName ?? string.Empty;
-            request.SourceSystem = input.SourceSystem;
-            request.SourceCode = input.SourceCode;
+            if (request.Intent == RequestIntent.New)
+            {
+                request.VendorCode = input.VendorCode ?? string.Empty;
+                request.VendorName = input.VendorName ?? string.Empty;
+            }
             request.ValidFrom = input.ValidFrom;
             request.ValidUntil = input.ValidUntil;
             request.Remark = input.Remark;
@@ -980,6 +1194,7 @@ namespace QCS.Application.Services
             var request = await _unitOfWork.Repository<Request>().GetAll()
                 .Include(r => r.Quotations)
                 .Include(r => r.ApprovalSteps)
+                .Include(r => r.RenewedFromRequest)
                 .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
             if (request == null) throw new KeyNotFoundException($"Request {id} not found.");
@@ -987,6 +1202,8 @@ namespace QCS.Application.Services
                 throw new UnauthorizedAccessException("You do not have permission to submit this request.");
             if (request.Status != (int)RequestStatus.Draft && request.Status != (int)RequestStatus.Returned)
                 throw new InvalidOperationException("Only draft or returned requests can be submitted.");
+
+            ValidatePersistedSetupForSubmission(request);
 
             var errors = new List<string>();
             if (string.IsNullOrWhiteSpace(request.Title)) errors.Add("Title is required.");
@@ -1188,6 +1405,68 @@ namespace QCS.Application.Services
             };
         }
 
+        private void AddExpiredQuotationReferencesFromSource(Request targetRequest, Request sourceRequest)
+        {
+            if (sourceRequest.Id == targetRequest.Id)
+            {
+                throw new InvalidOperationException("A request cannot reference itself.");
+            }
+
+            if (sourceRequest.Status != (int)RequestStatus.Completed)
+            {
+                throw new InvalidOperationException("The referenced request must be Completed.");
+            }
+
+            if (!sourceRequest.ValidUntil.HasValue || sourceRequest.ValidUntil.Value >= _dateTime.Now)
+            {
+                throw new InvalidOperationException("The referenced request has not expired.");
+            }
+
+            if (string.IsNullOrWhiteSpace(targetRequest.VendorCode) ||
+                !string.Equals(targetRequest.VendorCode.Trim(), sourceRequest.VendorCode?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("The referenced request must use the same Vendor Code.");
+            }
+
+            var sourceQuotations = sourceRequest.Quotations
+                .Where(quotation => quotation.DocumentTypeId == (int)DocumentType.OriginalQuotation
+                    && quotation.SourceQuotationId == null
+                    && quotation.AttachmentFileId.HasValue)
+                .OrderBy(quotation => quotation.SortOrder)
+                .ThenBy(quotation => quotation.Id)
+                .ToList();
+
+            if (sourceQuotations.Count == 0)
+            {
+                throw new InvalidOperationException("The referenced request has no Original Quotation PDF.");
+            }
+
+            var sourceIds = sourceQuotations.Select(quotation => quotation.Id).ToHashSet();
+            if (targetRequest.Quotations.Any(quotation => quotation.SourceQuotationId.HasValue
+                && sourceIds.Contains(quotation.SourceQuotationId.Value)))
+            {
+                throw new InvalidOperationException($"Request {sourceRequest.Code} is already referenced.");
+            }
+
+            var nextSortOrder = targetRequest.Quotations.Count == 0
+                ? 1
+                : targetRequest.Quotations.Max(quotation => quotation.SortOrder) + 1;
+
+            foreach (var sourceQuotation in sourceQuotations)
+            {
+                targetRequest.Quotations.Add(new Quotation
+                {
+                    FileName = sourceQuotation.FileName,
+                    FilePath = "Reference",
+                    ContentType = sourceQuotation.ContentType,
+                    FileSize = sourceQuotation.FileSize,
+                    DocumentTypeId = (int)DocumentType.ExpiredQuotation,
+                    SortOrder = nextSortOrder++,
+                    SourceQuotationId = sourceQuotation.Id
+                });
+            }
+        }
+
         public async Task AddExpiredQuotationReferenceAsync(int requestId, AddExpiredQuotationReferenceDto input, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(input.Code))
@@ -1225,64 +1504,7 @@ namespace QCS.Application.Services
                 throw new KeyNotFoundException($"Request {normalizedCode} not found.");
             }
 
-            if (sourceRequest.Id == request.Id)
-            {
-                throw new InvalidOperationException("A request cannot reference itself.");
-            }
-
-            if (sourceRequest.Status != (int)RequestStatus.Completed)
-            {
-                throw new InvalidOperationException("The referenced request must be Completed.");
-            }
-
-            if (!sourceRequest.ValidUntil.HasValue || sourceRequest.ValidUntil.Value >= _dateTime.Now)
-            {
-                throw new InvalidOperationException("The referenced request has not expired.");
-            }
-
-            if (string.IsNullOrWhiteSpace(request.VendorCode) ||
-                !string.Equals(request.VendorCode.Trim(), sourceRequest.VendorCode?.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("The referenced request must use the same Vendor Code.");
-            }
-
-            var sourceQuotations = sourceRequest.Quotations
-                .Where(quotation => quotation.DocumentTypeId == (int)DocumentType.OriginalQuotation
-                    && quotation.SourceQuotationId == null
-                    && quotation.AttachmentFileId.HasValue)
-                .OrderBy(quotation => quotation.SortOrder)
-                .ThenBy(quotation => quotation.Id)
-                .ToList();
-
-            if (sourceQuotations.Count == 0)
-            {
-                throw new InvalidOperationException("The referenced request has no Original Quotation PDF.");
-            }
-
-            var sourceIds = sourceQuotations.Select(quotation => quotation.Id).ToHashSet();
-            if (request.Quotations.Any(quotation => quotation.SourceQuotationId.HasValue
-                && sourceIds.Contains(quotation.SourceQuotationId.Value)))
-            {
-                throw new InvalidOperationException($"Request {normalizedCode} is already referenced.");
-            }
-
-            var nextSortOrder = request.Quotations.Count == 0
-                ? 1
-                : request.Quotations.Max(quotation => quotation.SortOrder) + 1;
-
-            foreach (var sourceQuotation in sourceQuotations)
-            {
-                request.Quotations.Add(new Quotation
-                {
-                    FileName = sourceQuotation.FileName,
-                    FilePath = "Reference",
-                    ContentType = sourceQuotation.ContentType,
-                    FileSize = sourceQuotation.FileSize,
-                    DocumentTypeId = (int)DocumentType.ExpiredQuotation,
-                    SortOrder = nextSortOrder++,
-                    SourceQuotationId = sourceQuotation.Id
-                });
-            }
+            AddExpiredQuotationReferencesFromSource(request, sourceRequest);
 
             await _unitOfWork.Repository<Request>().UpdateAsync(request);
             await _unitOfWork.CommitAsync();

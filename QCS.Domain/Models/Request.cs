@@ -22,6 +22,10 @@ namespace QCS.Domain.Models
         public string? SourceSystem { get; set; }
         public string? SourceCode { get; set; }
 
+        public RequestIntent Intent { get; set; } = RequestIntent.New;
+        public int? RenewedFromRequestId { get; set; }
+        public virtual Request? RenewedFromRequest { get; set; }
+
         // [New] ย้ายมาไว้ที่ Header ตาม JSON Requirement
         public DateTime? ValidFrom { get; set; }
         public DateTime? ValidUntil { get; set; }

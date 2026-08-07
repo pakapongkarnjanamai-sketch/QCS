@@ -5,7 +5,7 @@ namespace QCS.API.Integration
 {
     public interface IQrsSourcingClient
     {
-        Task<HttpResponseMessage> SearchAsync(string? search, CancellationToken cancellationToken);
+        Task<HttpResponseMessage> SearchAsync(string? search, int page, int pageSize, CancellationToken cancellationToken);
         Task<HttpResponseMessage> GetByCodeAsync(string code, CancellationToken cancellationToken);
     }
 
@@ -20,11 +20,13 @@ namespace QCS.API.Integration
             _options = options;
         }
 
-        public Task<HttpResponseMessage> SearchAsync(string? search, CancellationToken cancellationToken)
+        public Task<HttpResponseMessage> SearchAsync(string? search, int page, int pageSize, CancellationToken cancellationToken)
         {
+            var validPage = Math.Max(1, page);
+            var validPageSize = Math.Clamp(pageSize <= 0 ? 10 : pageSize, 1, 100);
             var query = string.IsNullOrWhiteSpace(search)
-                ? "?page=1&pageSize=50"
-                : $"?search={Uri.EscapeDataString(search)}&page=1&pageSize=50";
+                ? $"?page={validPage}&pageSize={validPageSize}"
+                : $"?search={Uri.EscapeDataString(search.Trim())}&page={validPage}&pageSize={validPageSize}";
 
             return SendAsync($"api/Integration/SourcingRequests{query}", cancellationToken);
         }

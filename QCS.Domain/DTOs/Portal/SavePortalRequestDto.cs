@@ -1,9 +1,12 @@
+using QCS.Domain.Enum;
 using System;
 
 namespace QCS.Domain.DTOs.Portal
 {
     public class SavePortalRequestDto
     {
+        public RequestIntent Intent { get; set; } = RequestIntent.New;
+        public int? RenewedFromRequestId { get; set; }
         public string? Title { get; set; }
         public string? VendorCode { get; set; }
         public string? VendorName { get; set; }

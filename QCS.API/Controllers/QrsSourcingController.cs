@@ -21,8 +21,12 @@ namespace QCS.API.Controllers
         }
 
         [HttpGet("Requests")]
-        public Task<IActionResult> Search([FromQuery] string? search, CancellationToken cancellationToken) =>
-            ForwardAsync(() => _qrsSourcingClient.SearchAsync(search, cancellationToken), cancellationToken);
+        public Task<IActionResult> Search(
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken cancellationToken = default) =>
+            ForwardAsync(() => _qrsSourcingClient.SearchAsync(search, page, pageSize, cancellationToken), cancellationToken);
 
         [HttpGet("Requests/{code}")]
         public Task<IActionResult> GetByCode(string code, CancellationToken cancellationToken) =>

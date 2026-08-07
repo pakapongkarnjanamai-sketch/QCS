@@ -16,6 +16,7 @@ const documentTypes = [
 interface TypedDocumentEditorProps {
   documents: PortalDocument[]
   disabled: boolean
+  disabledReason?: string
   uploading: boolean
   error?: string
   onUpload: (files: File[]) => void
@@ -32,6 +33,7 @@ function isPdf(file: File) {
 export function TypedDocumentEditor({
   documents,
   disabled,
+  disabledReason,
   uploading,
   error,
   onUpload,
@@ -86,6 +88,12 @@ export function TypedDocumentEditor({
           </label>
         </div>
       </div>
+
+      {disabledReason && (
+        <p className="border-b border-border-subtle bg-surface-muted px-4 py-2 text-caption text-ink-muted">
+          {disabledReason}
+        </p>
+      )}
 
       <form
         className="flex flex-col gap-2 border-b border-border-subtle bg-surface-muted px-4 py-3 sm:flex-row sm:items-end"

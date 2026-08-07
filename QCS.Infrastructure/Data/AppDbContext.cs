@@ -68,6 +68,14 @@ namespace QCS.Infrastructure.Data
                     .IsUnique()
                     .HasFilter("[ApprovalDocumentId] IS NOT NULL")
                     .HasDatabaseName("IX_Requests_ApprovalDocumentId");
+
+                entity.HasOne(r => r.RenewedFromRequest)
+                    .WithMany()
+                    .HasForeignKey(r => r.RenewedFromRequestId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(r => r.RenewedFromRequestId)
+                    .HasDatabaseName("IX_Requests_RenewedFromRequestId");
             });
 
             modelBuilder.Entity<Quotation>(entity =>

@@ -300,5 +300,96 @@ namespace QCS.Api.IntegrationTests
             result.Documents.ShouldContain(d => d.DocumentTypeName == "FinalPdf" && d.ViewUrl == "/api/Quotation/ViewFile/2");
             result.Histories.Count.ShouldBeGreaterThan(0);
         }
+
+        [Fact]
+        public async Task GetRenewalCandidates_ReturnsOnlyCallersExpiredCompletedRequests()
+        {
+            const string userOwner = "CAND_USER1";
+            const string userOther = "CAND_USER2";
+            int reqUser1 = 5710;
+            int reqUser2OtherUser = 5711;
+            int reqNotExpired = 5712;
+            int reqNoOriginalQuotation = 5713;
+
+            _factory.SeedDatabase(db =>
+            {
+                if (db.Requests.Find(reqUser1) != null) return;
+
+                var r1 = new Request
+                {
+                    Id = reqUser1,
+                    Code = "QC-20260806-5710",
+                    Title = "User1 Expired Completed",
+                    VendorCode = "V1",
+                    VendorName = "Vendor 1",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(-10),
+                    CreatedBy = userOwner,
+                    IsActive = true
+                };
+                var file1 = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
+                db.AttachmentFiles.Add(file1);
+                db.SaveChanges();
+                r1.Quotations.Add(new Quotation { FileName = "f1.pdf", FilePath = "test", ContentType = "application/pdf", DocumentTypeId = (int)DocumentType.OriginalQuotation, AttachmentFileId = file1.Id, SortOrder = 1 });
+                db.Requests.Add(r1);
+
+                var r2 = new Request
+                {
+                    Id = reqUser2OtherUser,
+                    Code = "QC-20260806-5711",
+                    Title = "Other User Expired Completed",
+                    VendorCode = "V2",
+                    VendorName = "Vendor 2",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(-10),
+                    CreatedBy = userOther,
+                    IsActive = true
+                };
+                var file2 = new AttachmentFile { ContentType = "application/pdf", Data = "%PDF-1.4"u8.ToArray() };
+                db.AttachmentFiles.Add(file2);
+                db.SaveChanges();
+                r2.Quotations.Add(new Quotation { FileName = "f2.pdf", FilePath = "test", ContentType = "application/pdf", DocumentTypeId = (int)DocumentType.OriginalQuotation, AttachmentFileId = file2.Id, SortOrder = 1 });
+                db.Requests.Add(r2);
+
+                var r3 = new Request
+                {
+                    Id = reqNotExpired,
+                    Code = "QC-20260806-5712",
+                    Title = "Active Completed",
+                    VendorCode = "V1",
+                    VendorName = "Vendor 1",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(10),
+                    CreatedBy = userOwner,
+                    IsActive = true
+                };
+                r3.Quotations.Add(new Quotation { FileName = "f1.pdf", FilePath = "test", ContentType = "application/pdf", DocumentTypeId = (int)DocumentType.OriginalQuotation, AttachmentFileId = file1.Id, SortOrder = 1 });
+                db.Requests.Add(r3);
+
+                var r4 = new Request
+                {
+                    Id = reqNoOriginalQuotation,
+                    Code = "QC-20260806-5713",
+                    Title = "No Original PDF",
+                    VendorCode = "V1",
+                    VendorName = "Vendor 1",
+                    Status = (int)RequestStatus.Completed,
+                    ValidUntil = DateTime.Now.AddDays(-5),
+                    CreatedBy = userOwner,
+                    IsActive = true
+                };
+                r4.Quotations.Add(new Quotation { FileName = "ref.pdf", FilePath = "Reference", ContentType = "application/pdf", DocumentTypeId = (int)DocumentType.ExpiredQuotation, SourceQuotationId = 1, SortOrder = 1 });
+                db.Requests.Add(r4);
+            });
+
+            var client = CreateAuthenticatedClient(userOwner);
+            var page = await client.GetFromJsonAsync<PortalPage<RenewalCandidateDto>>("/api/Portal/Requests/renewal-candidates");
+
+            page.ShouldNotBeNull();
+            page.Items.ShouldContain(x => x.Id == reqUser1);
+            page.Items.ShouldNotContain(x => x.Id == reqUser2OtherUser);
+            page.Items.ShouldNotContain(x => x.Id == reqNotExpired);
+            page.Items.ShouldNotContain(x => x.Id == reqNoOriginalQuotation);
+        }
     }
 }

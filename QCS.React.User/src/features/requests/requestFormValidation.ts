@@ -5,8 +5,34 @@ export type RequestFormErrors = Record<string, string>
 
 export function createEmptyRequest(): SavePortalRequest {
   return {
-    title: '', vendorCode: '', vendorName: '', sourceSystem: '', sourceCode: '', validFrom: '', validUntil: '', remark: '',
+    intent: 0,
+    renewedFromRequestId: undefined,
+    title: '',
+    vendorCode: '',
+    vendorName: '',
+    sourceSystem: '',
+    sourceCode: '',
+    validFrom: '',
+    validUntil: '',
+    remark: '',
   }
+}
+
+export function validateSetup(input: SavePortalRequest): RequestFormErrors {
+  const errors: RequestFormErrors = {}
+  if (input.intent === 0) {
+    if (input.sourceSystem === 'QRS' && !input.sourceCode.trim()) {
+      errors.sourceCode = 'Select or enter a QRS source code.'
+    }
+  } else if (input.intent === 1) {
+    if (!input.renewedFromRequestId) {
+      errors.renewedFromRequestId = 'Select an expired QCS request to renew.'
+    }
+    if (input.sourceSystem === 'QRS' && !input.sourceCode.trim()) {
+      errors.sourceCode = 'Select or enter a QRS source code.'
+    }
+  }
+  return errors
 }
 
 export function validateRequest(input: SavePortalRequest, mode: RequestValidationMode, hasOriginalQuotation: boolean): RequestFormErrors {
@@ -25,7 +51,7 @@ export function validateRequest(input: SavePortalRequest, mode: RequestValidatio
 export function mapServerFieldErrors(fieldErrors?: Record<string, string[]>): RequestFormErrors {
   const fields: RequestFormErrors = {}
   const keyMap: Record<string, string> = {
-    Title: 'title', VendorCode: 'vendor', VendorName: 'vendor', ValidFrom: 'validFrom', ValidUntil: 'validUntil', Remark: 'remark',
+    Title: 'title', VendorCode: 'vendor', VendorName: 'vendor', ValidFrom: 'validFrom', ValidUntil: 'validUntil', Remark: 'remark', Intent: 'intent', RenewedFromRequestId: 'renewedFromRequestId', SourceCode: 'sourceCode',
   }
   for (const [serverKey, messages] of Object.entries(fieldErrors ?? {})) {
     const key = keyMap[serverKey] ?? serverKey

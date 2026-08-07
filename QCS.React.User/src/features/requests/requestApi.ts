@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { appConfig } from '@/config/appConfig'
-import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalRequestDetail, PortalSaveResult, RoutePreview, SavePortalRequest, SavePortalRequestPayload, UpdatePortalDocuments } from './types'
+import type { AddExpiredQuotationReference, PortalApprovalAction, PortalAttachment, PortalDocument, PortalPage, PortalRequestDetail, PortalSaveResult, QrsSourcingPage, QrsSourcingRequest, RenewalCandidate, RoutePreview, SavePortalRequest, SavePortalRequestPayload, UpdatePortalDocuments } from './types'
 
 function toSavePortalRequestPayload(input: SavePortalRequest): SavePortalRequestPayload {
   return {
@@ -82,6 +82,30 @@ export async function rejectPortalRequest(id: number, input: PortalApprovalActio
 export async function returnPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/return`, input) }
 
 export async function cancelPortalRequest(id: number, input: PortalApprovalAction): Promise<void> { await apiClient.post(`/Portal/Requests/${id}/cancel`, input) }
+
+export async function getRenewalCandidates(
+  params?: { search?: string; page?: number; pageSize?: number },
+  signal?: AbortSignal,
+): Promise<PortalPage<RenewalCandidate>> {
+  const query = new URLSearchParams()
+  if (params?.search) query.set('search', params.search)
+  if (params?.page) query.set('page', String(params.page))
+  if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+  const qs = query.toString()
+  const { data } = await apiClient.get<PortalPage<RenewalCandidate>>(`/Portal/Requests/renewal-candidates${qs ? `?${qs}` : ''}`, { signal })
+  return data
+}
+
+export async function getQrsSourcingRequests(
+  params: { search?: string; page: number; pageSize: number },
+  signal?: AbortSignal,
+): Promise<QrsSourcingPage<QrsSourcingRequest>> {
+  const { data } = await apiClient.get<QrsSourcingPage<QrsSourcingRequest>>('/QrsSourcing/Requests', {
+    params,
+    signal,
+  })
+  return data
+}
 
 /**
  * Asks the server which route this request would take if submitted now. It writes nothing, and it

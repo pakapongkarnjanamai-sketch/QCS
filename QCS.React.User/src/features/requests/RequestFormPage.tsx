@@ -1,6 +1,6 @@
-import { ExternalLink, Eye, Save, Send, Trash2 } from 'lucide-react'
+import { ExternalLink, Eye, Save, Send, Trash2, Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useBeforeUnload } from 'react-router'
+import { Link, useNavigate, useParams, useBeforeUnload, useSearchParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Field } from '@/components/ui/Field'
@@ -12,20 +12,28 @@ import { toApiError, type ApiError } from '@/lib/apiClient'
 import { toast } from '@/lib/toast'
 import { ApprovalActionDialog, type ApprovalActionKind } from './ApprovalActionDialog'
 import { ApprovalSteps } from './ApprovalSteps'
-import { QrsSourceLookup } from './QrsSourceLookup'
+import { RequestSetupPanel } from './RequestSetupPanel'
 import { TypedDocumentEditor } from './TypedDocumentEditor'
 import { VendorLookup } from './VendorLookup'
 import { PdfViewer, type PdfPreview } from '@/features/quotations/PdfViewer'
 import { WorkflowRoutePreview } from './WorkflowRoutePreview'
 import { addExpiredQuotationReference, approvePortalRequest, cancelPortalRequest, createPortalDraft, deletePortalAttachment, deletePortalDraft, getPortalRequestById, getRoutePreview, previewPortalRequest, rejectPortalRequest, returnPortalRequest, submitPortalRequest, updatePortalDocuments, updatePortalDraft, uploadPortalAttachment } from './requestApi'
-import { createEmptyRequest, mapServerFieldErrors, validateRequest, type RequestFormErrors } from './requestFormValidation'
-import type { PortalApprovalAction, PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest } from './types'
+import { createEmptyRequest, mapServerFieldErrors, validateRequest, validateSetup, type RequestFormErrors } from './requestFormValidation'
+import type { DiscriminatedSetupState, PortalApprovalAction, PortalDocument, PortalRequestDetail, RoutePreview, SavePortalRequest, SetupFlow } from './types'
 
 type Action = 'save' | 'submit' | 'preview' | 'delete' | 'upload' | 'remove' | 'documents' | 'reference'
 const defaultUploadDocumentTypeId = 40
 
+function formatDate(value?: string): string {
+  return value
+    ? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(value))
+    : '-'
+}
+
 function fromDetail(detail: PortalRequestDetail): SavePortalRequest {
   return {
+    intent: detail.intent ?? 0,
+    renewedFromRequestId: detail.renewedFromRequestId,
     title: detail.title ?? '',
     vendorCode: detail.vendorCode ?? '',
     vendorName: detail.vendorName ?? '',
@@ -36,6 +44,53 @@ function fromDetail(detail: PortalRequestDetail): SavePortalRequest {
     remark: detail.remark ?? '',
   }
 }
+
+function fromSetup(setup: DiscriminatedSetupState): Partial<SavePortalRequest> {
+  if (setup.intent === 'New' && setup.origin === 'QCS') {
+    return {
+      intent: 0,
+      renewedFromRequestId: undefined,
+      title: '',
+      vendorCode: '',
+      vendorName: '',
+      sourceSystem: '',
+      sourceCode: '',
+    }
+  }
+
+  if (setup.intent === 'New') {
+    return {
+      intent: 0,
+      renewedFromRequestId: undefined,
+      title: setup.qrsTitle ?? '',
+      vendorCode: '',
+      vendorName: '',
+      sourceSystem: 'QRS',
+      sourceCode: setup.qrsSourceCode,
+    }
+  }
+
+  return {
+    intent: 1,
+    renewedFromRequestId: setup.renewedFromRequestId,
+    title: setup.origin === 'QRS' ? setup.qrsTitle ?? '' : setup.title,
+    vendorCode: setup.vendorCode,
+    vendorName: setup.vendorName,
+    sourceSystem: setup.origin === 'QRS' ? 'QRS' : '',
+    sourceCode: setup.origin === 'QRS' ? setup.qrsSourceCode : '',
+  }
+}
+
+function getSetupFlow(searchParams: URLSearchParams): SetupFlow | undefined {
+  const intent = searchParams.get('intent')
+  const origin = searchParams.get('origin')
+  if (intent === 'new' && origin === 'qcs') return 'new-qcs'
+  if (intent === 'new' && origin === 'qrs') return 'new-qrs'
+  if (intent === 'renewal' && origin === 'qcs') return 'renewal-qcs'
+  if (intent === 'renewal' && origin === 'qrs') return 'renewal-qrs'
+  return undefined
+}
+
 function focusFirstInvalid() {
   requestAnimationFrame(() => {
     const target = document.querySelector<HTMLElement>('[data-invalid="true"]')
@@ -47,7 +102,9 @@ function focusFirstInvalid() {
 export function RequestFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const requestId = id ? Number(id) : undefined
+  const selectedFlow = requestId ? undefined : getSetupFlow(searchParams)
   const [form, setForm] = useState(createEmptyRequest)
   const [request, setRequest] = useState<PortalRequestDetail>()
   const [loading, setLoading] = useState(Boolean(requestId))
@@ -55,9 +112,11 @@ export function RequestFormPage() {
   const [errors, setErrors] = useState<RequestFormErrors>({})
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState<Action>()
-  // One preview surface for both an attachment and the merged PDF — same modal the detail pages
-  // use. The merged PDF is a blob, which is why this holds a url and a name rather than a
-  // document row.
+  const [setupCompleted, setSetupCompleted] = useState(Boolean(requestId))
+  const [setupSummary, setSetupSummary] = useState<DiscriminatedSetupState>()
+  const [confirmSetupChange, setConfirmSetupChange] = useState(false)
+  const [retryToken, setRetryToken] = useState(0)
+
   const [preview, setPreview] = useState<PdfPreview>()
   const [routePreview, setRoutePreview] = useState<RoutePreview>()
   const [routeLoading, setRouteLoading] = useState(false)
@@ -65,16 +124,21 @@ export function RequestFormPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [approvalAction, setApprovalAction] = useState<ApprovalActionKind>()
   const [busyApprovalAction, setBusyApprovalAction] = useState<ApprovalActionKind>()
+
   useBeforeUnload((event) => {
     if (dirty) event.preventDefault()
   })
+
   useEffect(() => {
     if (!requestId || !Number.isInteger(requestId) || requestId <= 0) return undefined
     const controller = new AbortController()
+    setLoading(true)
+    setError(undefined)
     void getPortalRequestById(requestId, controller.signal)
       .then((detail) => {
         setRequest(detail)
         setForm(fromDetail(detail))
+        setSetupCompleted(true)
       })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) setError(toApiError(reason))
@@ -83,20 +147,68 @@ export function RequestFormPage() {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [requestId])
-  // Blob urls from the merged preview must be released; attachment urls are plain paths and
-  // startsWith keeps this from trying to revoke those.
+    }, [requestId, retryToken])
+
   useEffect(
     () => () => {
       if (preview?.url.startsWith('blob:')) URL.revokeObjectURL(preview.url)
     },
     [preview],
   )
+
   const patch = (next: Partial<SavePortalRequest>) => {
     setForm((current) => ({ ...current, ...next }))
     setDirty(true)
   }
+
+  const completeSetup = (setup: DiscriminatedSetupState) => {
+    setForm((current) => ({ ...current, ...fromSetup(setup) }))
+    setSetupSummary(setup)
+    setSetupCompleted(true)
+    setErrors({})
+    setDirty(true)
+  }
+
+  const selectFlow = (flow: SetupFlow) => {
+    const [intent, origin] = flow.split('-')
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.set('intent', intent)
+    nextSearchParams.set('origin', origin)
+    setSearchParams(nextSearchParams)
+  }
+
+  const changeSetup = () => {
+    setForm((current) => ({
+      ...current,
+      intent: 0,
+      renewedFromRequestId: undefined,
+      title: '',
+      vendorCode: '',
+      vendorName: '',
+      sourceSystem: '',
+      sourceCode: '',
+    }))
+    setSetupSummary(undefined)
+    setSetupCompleted(false)
+    setErrors({})
+    setDirty(true)
+    setConfirmSetupChange(false)
+  }
+
   const save = async () => {
+    if (!requestId && !setupCompleted) {
+      toast.warning('Complete request setup before saving the draft.')
+      return
+    }
+
+    const setupErrors = validateSetup(form)
+    if (Object.keys(setupErrors).length) {
+      setErrors(setupErrors)
+      setSetupCompleted(false)
+      focusFirstInvalid()
+      return
+    }
+
     const nextErrors = validateRequest(form, 'draft', Boolean(request?.documents.some((document) => document.documentTypeId === 10)))
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) {
@@ -119,6 +231,7 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const submit = async () => {
     if (!requestId) {
       await save()
@@ -148,7 +261,17 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const upload = async (files: File[]) => {
+    if (!requestId) {
+      const setupErrors = validateSetup(form)
+      if (!setupCompleted || Object.keys(setupErrors).length) {
+        setErrors(setupErrors)
+        toast.error('Complete request setup before uploading documents.')
+        return
+      }
+    }
+
     const nextErrors = validateRequest(
       form,
       'draft',
@@ -186,6 +309,7 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const updateDocuments = async (nextDocuments: PortalDocument[]) => {
     if (!requestId) return
     setBusy('documents')
@@ -199,6 +323,7 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const addReference = async (code: string): Promise<string | undefined> => {
     if (!requestId) {
       toast.warning('Save the draft before referencing an expired quotation.')
@@ -220,6 +345,7 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const remove = async (document: PortalDocument) => {
     if (!requestId) return
     setBusy('remove')
@@ -233,6 +359,7 @@ export function RequestFormPage() {
       setBusy(undefined)
     }
   }
+
   const runApprovalAction = async (input: PortalApprovalAction) => {
     const action = approvalAction
     if (!action || !requestId) return
@@ -257,114 +384,314 @@ export function RequestFormPage() {
       setBusyApprovalAction(undefined)
     }
   }
+
   if (loading) return <LoadingSurface />
-  if (error && !request && requestId) return <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>
+  if (error && !request && requestId) {
+    return (
+      <ErrorSurface>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>{error.detail ?? error.title}</span>
+          <AppButton
+            variant="secondary"
+            onClick={() => setRetryToken((value) => value + 1)}
+          >
+            Try again
+          </AppButton>
+        </div>
+      </ErrorSurface>
+    )
+  }
+
   const documents = request?.documents ?? []
   const disabled = Boolean(busy || busyApprovalAction)
   const canEdit = !requestId || request?.permissions.canEdit === true
   const formDisabled = disabled || !canEdit
+  const isRenewal = form.intent === 1 || request?.intent === 1
+  const isQrsOrigin = request?.originName === 'QRS' || form.sourceSystem.toUpperCase() === 'QRS'
+  const renewedFromCode = request?.renewedFromCode ?? (setupSummary?.intent === 'Renewal' ? setupSummary.renewedFromCode : undefined)
+  const renewedFromRequestId = request?.renewedFromRequestId ?? (setupSummary?.intent === 'Renewal' ? setupSummary.renewedFromRequestId : undefined)
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-title font-semibold">{requestId ? `${canEdit ? 'Edit ' : ''}${request?.code ?? 'request'}` : 'New request'}</h1>
+            <h1 className="text-title font-semibold">
+              {requestId ? `${canEdit ? 'Edit ' : ''}${request?.code ?? 'request'}` : 'New request'}
+            </h1>
             {request && <StatusBadge status={request.statusName} />}
           </div>
           <p className="mt-1 text-body text-ink-muted">
             {canEdit ? 'Save a draft at any time. Required fields apply when submitting.' : 'Request details and approval progress.'}
           </p>
         </div>
-        {request?.sourceSystem === 'QRS' && request.sourceCode && (
-          <a href={qrsRequestUrl(request.sourceCode)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        {request && isQrsOrigin && request.sourceCode && (
+          <a
+            href={qrsRequestUrl(request.sourceCode)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
             Open source request {request.sourceCode}
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
       </header>
+
       {error && <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>}
-      <section className="space-y-4 rounded-sm border border-border-subtle bg-white p-4">
-        <Field label="Title" required error={errors.title}>
-          <input value={form.title} disabled={formDisabled} onChange={(event) => patch({ title: event.target.value })} className={appInputClassName('md', 'w-full')} />
-        </Field>
-        <VendorLookup value={form} errors={errors} disabled={formDisabled} onChange={patch} />
-        <QrsSourceLookup value={form} disabled={formDisabled} onChange={patch} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Valid from" required error={errors.validFrom}>
-            <input type="date" value={form.validFrom} disabled={formDisabled} onChange={(event) => patch({ validFrom: event.target.value })} className={appInputClassName('md', 'w-full')} />
-          </Field>
-          <Field label="Valid until" required error={errors.validUntil}>
-            <input type="date" value={form.validUntil} disabled={formDisabled} onChange={(event) => patch({ validUntil: event.target.value })} className={appInputClassName('md', 'w-full')} />
-          </Field>
-        </div>
-        <Field label="Remark" error={errors.remark}>
-          <textarea value={form.remark} disabled={formDisabled} onChange={(event) => patch({ remark: event.target.value })} className={appTextareaClassName('min-h-24 w-full')} />
-        </Field>
-        <TypedDocumentEditor documents={documents} disabled={formDisabled} uploading={busy === 'upload'} error={errors.attachments} onUpload={upload} onAddReference={addReference} onUpdate={updateDocuments} onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })} onRemove={remove} />
-        {canEdit && <WorkflowRoutePreview
-          preview={routePreview}
-          loading={routeLoading}
-          error={routeError}
-          onLoad={() => {
-            setRouteLoading(true)
-            setRouteError(undefined)
-            // Sends the form as it stands, not the saved draft: the point is to answer "who will
-            // approve what I am about to submit", and unsaved edits can change the route.
-            void getRoutePreview(form)
-              .then(setRoutePreview)
-              .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
-              .finally(() => setRouteLoading(false))
-          }}
-        />}
-      </section>
-      <div className="flex flex-wrap justify-end gap-2">
-        <AppButton
-          variant="secondary"
-          onClick={async () => {
-            if (!requestId) return
-            setBusy('preview')
-            try {
-              const blob = await previewPortalRequest(requestId)
-              setPreview({ url: URL.createObjectURL(blob), fileName: `${form.title || "Request"} — merged preview.pdf` })
-            } catch (reason) {
-              setError(toApiError(reason))
-            } finally {
-              setBusy(undefined)
-            }
-          }}
-          disabled={disabled || !requestId}
-        >
-          <Eye className="size-4" aria-hidden /> Preview
-        </AppButton>
-        {canEdit && <AppButton onClick={() => void save()} disabled={disabled}>
-          <Save className="size-4" aria-hidden />
-          {busy === 'save' ? 'Saving...' : 'Save draft'}
-        </AppButton>}
-        {canEdit && <AppButton onClick={() => void submit()} disabled={disabled}>
-          <Send className="size-4" aria-hidden />
-          {busy === 'submit' ? 'Submitting...' : 'Submit'}
-        </AppButton>}
-        {!canEdit && request?.permissions.canSubmit && <AppButton disabled={disabled} onClick={() => setApprovalAction('submit')}>Submit</AppButton>}
-        {request?.permissions.canApprove && <AppButton disabled={disabled} onClick={() => setApprovalAction('approve')}>Approve</AppButton>}
-        {request?.permissions.canReject && <AppButton variant="danger" disabled={disabled} onClick={() => setApprovalAction('reject')}>Reject</AppButton>}
-        {request?.permissions.canReturn && <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('return')}>Return</AppButton>}
-        {request?.permissions.canCancel && <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('cancel')}>Cancel request</AppButton>}
-        {requestId && request?.permissions.canDelete && (
-          <AppButton variant="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
-            <Trash2 className="size-4" aria-hidden />
-            Delete
+
+      {requestId && request && (
+        <dl className="grid gap-x-6 gap-y-3 border-y border-border-subtle bg-surface-muted px-4 py-3 text-body sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="text-caption font-medium text-ink-muted">Requester</dt>
+            <dd className="mt-0.5 truncate font-medium text-ink-strong" title={`${request.requesterName} (${request.requesterNId})`}>
+              {request.requesterName || request.requesterNId}
+              {request.requesterName && request.requesterNId ? ` (${request.requesterNId})` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-caption font-medium text-ink-muted">Request date</dt>
+            <dd className="mt-0.5 font-medium text-ink-strong">{formatDate(request.requestDate)}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-caption font-medium text-ink-muted">Current step</dt>
+            <dd className="mt-0.5 truncate font-medium text-ink-strong" title={request.currentStepName ?? 'Not submitted'}>
+              {request.currentStepName ?? 'Not submitted'}
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      {!requestId && !setupCompleted ? (
+        <RequestSetupPanel
+          selectedFlow={selectedFlow}
+          onFlowChange={selectFlow}
+          onComplete={completeSetup}
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-between rounded-md border border-border-subtle bg-surface-panel px-4 py-3 text-caption">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <div>
+                <span className="text-ink-muted font-medium">Intent:</span>{' '}
+                <span className="font-semibold text-ink-strong">
+                  {isRenewal ? 'Renewal' : 'New'}
+                </span>
+              </div>
+              <div>
+                <span className="text-ink-muted font-medium">Origin:</span>{' '}
+                <span className="font-semibold text-ink-strong">
+                  {isQrsOrigin ? 'QRS' : 'QCS'}
+                </span>
+              </div>
+              {isRenewal && renewedFromRequestId && (
+                <div>
+                  <span className="text-ink-muted font-medium">Predecessor:</span>{' '}
+                  {requestId && renewedFromCode ? (
+                    <Link
+                      to={`/requests/${renewedFromRequestId}`}
+                      className="rounded-sm font-mono font-semibold text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      {renewedFromCode}
+                    </Link>
+                  ) : (
+                    <span className="font-mono font-semibold text-accent">
+                      {renewedFromCode ?? `ID #${renewedFromRequestId}`}
+                    </span>
+                  )}
+                </div>
+              )}
+              {(form.sourceCode || request?.sourceCode) && (
+                <div>
+                  <span className="text-ink-muted font-medium">QRS Code:</span>{' '}
+                  <span className="font-mono font-semibold text-accent">
+                    {request?.sourceCode ?? form.sourceCode}
+                  </span>
+                </div>
+              )}
+            </div>
+            {!requestId && canEdit && (
+              <button
+                type="button"
+                onClick={() => setConfirmSetupChange(true)}
+                className="inline-flex items-center gap-1.5 rounded-sm font-medium text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <Settings2 className="size-3.5" aria-hidden />
+                <span>Change setup</span>
+              </button>
+            )}
+          </div>
+
+          <section className="space-y-4 rounded-sm border border-border-subtle bg-white p-4">
+            <Field label="Title" required error={errors.title}>
+              <input
+                value={form.title}
+                disabled={formDisabled}
+                onChange={(event) => patch({ title: event.target.value })}
+                className={appInputClassName('md', 'w-full')}
+              />
+            </Field>
+
+            <VendorLookup
+              value={form}
+              errors={errors}
+              disabled={formDisabled || isRenewal}
+              onChange={patch}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Valid from" required error={errors.validFrom}>
+                <input
+                  type="date"
+                  value={form.validFrom}
+                  disabled={formDisabled}
+                  onChange={(event) => patch({ validFrom: event.target.value })}
+                  className={appInputClassName('md', 'w-full')}
+                />
+              </Field>
+              <Field label="Valid until" required error={errors.validUntil}>
+                <input
+                  type="date"
+                  value={form.validUntil}
+                  disabled={formDisabled}
+                  onChange={(event) => patch({ validUntil: event.target.value })}
+                  className={appInputClassName('md', 'w-full')}
+                />
+              </Field>
+            </div>
+
+            <Field label="Remark" error={errors.remark}>
+              <textarea
+                value={form.remark}
+                disabled={formDisabled}
+                onChange={(event) => patch({ remark: event.target.value })}
+                className={appTextareaClassName('min-h-24 w-full')}
+              />
+            </Field>
+
+            <TypedDocumentEditor
+              documents={documents}
+              disabled={formDisabled}
+              uploading={busy === 'upload'}
+              error={errors.attachments}
+              onUpload={upload}
+              onAddReference={addReference}
+              onUpdate={updateDocuments}
+              onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })}
+              onRemove={remove}
+            />
+
+            {canEdit && (
+              <WorkflowRoutePreview
+                preview={routePreview}
+                loading={routeLoading}
+                error={routeError}
+                onLoad={() => {
+                  setRouteLoading(true)
+                  setRouteError(undefined)
+                  void getRoutePreview(form)
+                    .then(setRoutePreview)
+                    .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
+                    .finally(() => setRouteLoading(false))
+                }}
+              />
+            )}
+          </section>
+        </>
+      )}
+
+      {(requestId || setupCompleted) && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AppButton
+            variant="secondary"
+            onClick={async () => {
+              if (!requestId) return
+              setBusy('preview')
+              try {
+                const blob = await previewPortalRequest(requestId)
+                setPreview({ url: URL.createObjectURL(blob), fileName: `${form.title || 'Request'} — merged preview.pdf` })
+              } catch (reason) {
+                setError(toApiError(reason))
+              } finally {
+                setBusy(undefined)
+              }
+            }}
+            disabled={disabled || !requestId}
+          >
+            <Eye className="size-4" aria-hidden /> Preview
           </AppButton>
-        )}
-      </div>
+          {canEdit && (
+            <AppButton onClick={() => void save()} disabled={disabled}>
+              <Save className="size-4" aria-hidden />
+              {busy === 'save' ? 'Saving...' : 'Save draft'}
+            </AppButton>
+          )}
+          {canEdit && (
+            <AppButton onClick={() => void submit()} disabled={disabled}>
+              <Send className="size-4" aria-hidden />
+              {busy === 'submit' ? 'Submitting...' : 'Submit'}
+            </AppButton>
+          )}
+          {!canEdit && request?.permissions.canSubmit && (
+            <AppButton disabled={disabled} onClick={() => setApprovalAction('submit')}>
+              Submit
+            </AppButton>
+          )}
+          {request?.permissions.canApprove && (
+            <AppButton disabled={disabled} onClick={() => setApprovalAction('approve')}>
+              Approve
+            </AppButton>
+          )}
+          {request?.permissions.canReject && (
+            <AppButton variant="danger" disabled={disabled} onClick={() => setApprovalAction('reject')}>
+              Reject
+            </AppButton>
+          )}
+          {request?.permissions.canReturn && (
+            <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('return')}>
+              Return
+            </AppButton>
+          )}
+          {request?.permissions.canCancel && (
+            <AppButton variant="secondary" disabled={disabled} onClick={() => setApprovalAction('cancel')}>
+              Cancel request
+            </AppButton>
+          )}
+          {requestId && request?.permissions.canDelete && (
+            <AppButton variant="danger" onClick={() => setConfirmDelete(true)} disabled={disabled}>
+              <Trash2 className="size-4" aria-hidden />
+              Delete
+            </AppButton>
+          )}
+        </div>
+      )}
+
       {requestId && !canEdit && <ApprovalSteps steps={request?.workflowSteps ?? []} histories={request?.histories ?? []} />}
-      <PdfViewer document={preview} onClose={() => { if (preview?.url.startsWith("blob:")) URL.revokeObjectURL(preview.url); setPreview(undefined) }} />
+      <PdfViewer
+        document={preview}
+        onClose={() => {
+          if (preview?.url.startsWith('blob:')) URL.revokeObjectURL(preview.url)
+          setPreview(undefined)
+        }}
+      />
       <ApprovalActionDialog
         action={approvalAction}
         busy={Boolean(busyApprovalAction)}
         steps={(request?.workflowSteps ?? []).filter((step) => !step.isCurrentStep && Boolean(step.actionDate))}
-        onClose={() => { if (!busyApprovalAction) setApprovalAction(undefined) }}
+        onClose={() => {
+          if (!busyApprovalAction) setApprovalAction(undefined)
+        }}
         onConfirm={(input) => void runApprovalAction(input)}
       />
+      <ConfirmDialog
+        open={confirmSetupChange}
+        title="Change request setup"
+        confirmText="Change setup"
+        onClose={() => setConfirmSetupChange(false)}
+        onConfirm={changeSetup}
+      >
+        Changing setup clears the Title, Vendor, QRS source and renewal predecessor selected from the current setup. Dates and Remark are retained.
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirmDelete}
         title="Delete draft"

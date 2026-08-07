@@ -1,3 +1,68 @@
+export type RequestIntent = 0 | 1
+export type SetupIntent = 'New' | 'Renewal'
+export type SetupOrigin = 'QCS' | 'QRS'
+export type SetupFlow = 'new-qcs' | 'new-qrs' | 'renewal-qcs' | 'renewal-qrs'
+
+// Mirrors QCS.Domain.DTOs.Portal.PortalPage.
+export interface PortalPage<T> {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  hasNextPage: boolean
+}
+
+// Mirrors QCS.Domain.DTOs.Portal.RenewalCandidateDto.
+export interface RenewalCandidate {
+  id: number
+  code: string
+  title: string
+  vendorCode: string
+  vendorName: string
+  validFrom?: string
+  validUntil?: string
+  sourceSystem?: string
+  sourceCode?: string
+  requestDate: string
+  originalQuotationCount: number
+}
+
+// Mirrors QRS.Application.Quotations.Dtos.SourcingRequestDto.
+export interface QrsSourcingRequest {
+  code: string
+  title: string
+  requestType: number
+  requestTypeName: string
+  requesterNId: string
+  requesterName: string
+  requesterDepartment?: string
+  currency: string
+  estimatedTotal: number
+  isUrgent: boolean
+  requiredBy?: string
+  submittedAt?: string
+  completedAt?: string
+  itemCount: number
+  attachmentCount: number
+}
+
+// Mirrors QRS.Application.Common.Models.PaginatedList<T>.
+export interface QrsSourcingPage<T> {
+  items: T[]
+  pageNumber: number
+  pageSize: number
+  totalPages: number
+  totalCount: number
+  hasPreviousPage: boolean
+  hasNextPage: boolean
+}
+
+export type DiscriminatedSetupState =
+  | { intent: 'New'; origin: 'QCS' }
+  | { intent: 'New'; origin: 'QRS'; qrsSourceCode: string; qrsTitle?: string }
+  | { intent: 'Renewal'; origin: 'QCS'; renewedFromRequestId: number; renewedFromCode: string; vendorCode: string; vendorName: string; title: string }
+  | { intent: 'Renewal'; origin: 'QRS'; renewedFromRequestId: number; renewedFromCode: string; vendorCode: string; vendorName: string; qrsSourceCode: string; qrsTitle?: string }
+
 // Mirrors QCS.Domain.DTOs.Portal.PortalRequestDetailDto.
 export interface PortalRequestDetail {
   id: number
@@ -12,6 +77,11 @@ export interface PortalRequestDetail {
   vendorName: string
   sourceSystem?: string
   sourceCode?: string
+  intent: RequestIntent
+  intentName: string
+  renewedFromRequestId?: number
+  renewedFromCode?: string
+  originName: string
   validFrom?: string
   validUntil?: string
   remark?: string
@@ -31,6 +101,8 @@ export interface PortalRequestDetail {
 
 // Browser form state. Date inputs require strings; requestApi maps blanks to null on the wire.
 export interface SavePortalRequest {
+  intent: RequestIntent
+  renewedFromRequestId?: number
   title: string
   vendorCode: string
   vendorName: string

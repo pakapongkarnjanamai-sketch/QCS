@@ -44,6 +44,16 @@ namespace QCS.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("renewal-candidates")]
+        [ProducesResponseType(typeof(PortalPage<RenewalCandidateDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PortalPage<RenewalCandidateDto>>> GetRenewalCandidates(
+            [FromQuery] RenewalCandidateQuery query,
+            CancellationToken cancellationToken)
+        {
+            var result = await _requestService.GetRenewalCandidatesAsync(query, cancellationToken);
+            return Ok(result);
+        }
+
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(PortalRequestDetailDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -121,12 +131,28 @@ namespace QCS.API.Controllers
         [HttpPost]
         [ProducesResponseType(typeof(PortalSaveResultDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreateDraft([FromBody] SavePortalRequestDto input, CancellationToken cancellationToken)
         {
             try
             {
                 var result = await _requestService.CreatePortalDraftAsync(input, cancellationToken);
                 return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Document not found",
+                    detail: ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Access denied",
+                    detail: ex.Message);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
