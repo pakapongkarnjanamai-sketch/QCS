@@ -1,7 +1,9 @@
-import { ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
+import { ExternalActionLink } from '@/components/ui/ExternalActionLink'
+import { FormPage, FormPageHeader } from '@/components/ui/FormPage'
+import { SectionCard } from '@/components/ui/SectionCard'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
 import { qrsRequestUrl } from '@/config/appConfig'
@@ -68,36 +70,18 @@ export function QuotationDetailPage() {
     /final|stamp/i.test(document.documentTypeName),
   )
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-title font-semibold">{request.code}</h1>
-          <StatusBadge status={request.statusName} />
-        </div>
-          <p className="mt-1 text-heading">{request.title}</p>
-          <p className="mt-0.5 text-caption text-ink-muted">
-            {request.vendorName || request.vendorCode} ·{' '}
-            {formatDate(request.requestDate)}
-          </p>
-        </div>
-        {request.sourceSystem === 'QRS' && request.sourceCode && (
-          <a
-            href={qrsRequestUrl(request.sourceCode)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            Open source request {request.sourceCode}
-            <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        )}
-        {request.canRenew && <RenewQuotationLink code={request.code} />}
-      </header>
-      <section className="rounded-sm border border-border-subtle bg-white">
-        <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-          Stamped final PDF
-        </h2>
+    <FormPage>
+      <FormPageHeader
+        title={request.code}
+        status={<StatusBadge status={request.statusName} />}
+        description={<><span className="block text-heading text-ink-strong">{request.title}</span><span className="mt-0.5 block text-caption text-ink-muted">{request.vendorName || request.vendorCode} · {formatDate(request.requestDate)}</span></>}
+        actions={(request.sourceSystem === 'QRS' && request.sourceCode) || request.canRenew ? <>
+          {request.sourceSystem === 'QRS' && request.sourceCode && <ExternalActionLink href={qrsRequestUrl(request.sourceCode)}>Open source request {request.sourceCode}</ExternalActionLink>}
+          {request.canRenew && <RenewQuotationLink code={request.code} />}
+        </> : undefined}
+      />
+      {error && <ErrorSurface>{error.title} Showing the previous details.</ErrorSurface>}
+      <SectionCard title="Stamped final PDF">
         {finalDocument ? (
           <DocumentList
             documents={[finalDocument]}
@@ -108,17 +92,11 @@ export function QuotationDetailPage() {
             A stamped final PDF is not available.
           </p>
         )}
-      </section>
-      {error && (
-        <ErrorSurface>{error.title} Showing the previous details.</ErrorSurface>
-      )}
-      <section className="rounded-sm border border-border-subtle bg-white">
-        <h2 className="border-b border-border-subtle px-4 py-3 text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-          Documents
-        </h2>
+      </SectionCard>
+      <SectionCard title="Documents">
         <DocumentList documents={request.documents} onPreview={setPreview} />
-      </section>
+      </SectionCard>
       <PdfViewer document={preview && { url: preview.viewUrl, fileName: preview.fileName }} onClose={() => setPreview(undefined)} />
-    </div>
+    </FormPage>
   )
 }

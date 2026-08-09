@@ -15,6 +15,7 @@
 - [ระบบยืนยันตัวตน](#ระบบยืนยันตัวตน)
 - [Authorization Policies](#authorization-policies)
 - [API Endpoints หลัก](#api-endpoints-หลัก)
+- [มาตรฐาน UX ของ QCS User](#มาตรฐาน-ux-ของ-qcs-user)
 - [Local Development](#local-development)
 - [การ Deploy (IIS)](#การ-deploy-iis)
 
@@ -128,6 +129,12 @@ QCS/
 | DevExtreme React | 24.2 | DataGrid, Chart, PieChart, TreeMap, Form |
 | react-router-dom | 7 | SPA routing with `BrowserRouter` + `basename` |
 | @microsoft/signalr | - | Real-time hub client |
+
+### มาตรฐาน UX ของ QCS User
+
+ทุก operational page ใน User Portal ใช้ shared page, section, action, feedback และ lookup
+primitives เดียวกัน อ่าน component ownership, responsive, async, accessibility และ QRS portability ที่
+[docs/QCS-USER-FORM-STANDARD.md](docs/QCS-USER-FORM-STANDARD.md)
 
 ### Infrastructure & Deployment
 

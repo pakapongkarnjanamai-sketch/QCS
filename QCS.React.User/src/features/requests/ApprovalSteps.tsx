@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { History } from 'lucide-react'
 import { AppButton } from '@/components/ui/AppButton'
+import { SectionCard } from '@/components/ui/SectionCard'
 import { HistoryList } from './HistoryList'
 import { WorkflowTimeline } from './WorkflowTimeline'
 import type { PortalHistory, PortalWorkflowStep } from './types'
@@ -20,12 +21,9 @@ export function ApprovalSteps({ steps, histories }: { steps: PortalWorkflowStep[
   const [showHistory, setShowHistory] = useState(false)
 
   return (
-    <section className="rounded-sm border border-border-subtle bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-3">
-        <h2 className="text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">
-          Approval steps
-        </h2>
-        <AppButton
+    <SectionCard
+      title="Approval steps"
+      action={<AppButton
           variant="ghost"
           size="sm"
           aria-expanded={showHistory}
@@ -33,8 +31,8 @@ export function ApprovalSteps({ steps, histories }: { steps: PortalWorkflowStep[
         >
           <History className="size-3.5" aria-hidden />
           {showHistory ? 'Hide history' : `History${histories.length > 0 ? ` (${histories.length})` : ''}`}
-        </AppButton>
-      </div>
+        </AppButton>}
+    >
 
       <div className="p-4">
         <WorkflowTimeline steps={steps} />
@@ -48,6 +46,6 @@ export function ApprovalSteps({ steps, histories }: { steps: PortalWorkflowStep[
           <HistoryList histories={histories} />
         </div>
       )}
-    </section>
+    </SectionCard>
   )
 }

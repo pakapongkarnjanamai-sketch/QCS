@@ -1,7 +1,9 @@
-import { Search, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AppButton } from '@/components/ui/AppButton'
 import { appInputClassName } from '@/components/ui/inputStyles'
-import { LoadingSurface } from '@/components/ui/Surfaces'
+import { IconButton } from '@/components/ui/IconButton'
+import { LookupTableShell } from '@/components/ui/LookupTableShell'
 import { toApiError } from '@/lib/apiClient'
 import { getQrsSourcingRequests } from './requestApi'
 import type { QrsSourcingPage, QrsSourcingRequest } from './types'
@@ -19,26 +21,41 @@ export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, 
   const [pageSize] = useState(10)
   const [data, setData] = useState<QrsSourcingPage<QrsSourcingRequest>>()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string>()
   const [retryToken, setRetryToken] = useState(0)
   const [manualCode, setManualCode] = useState('')
+  const hasDataRef = useRef(false)
+  const intentRef = useRef(intent)
 
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true)
+    const contextChanged = intentRef.current !== intent
+    if (contextChanged) {
+      intentRef.current = intent
+      hasDataRef.current = false
+      setData(undefined)
+    }
+    setLoading(!hasDataRef.current)
+    setRefreshing(hasDataRef.current)
     setError(undefined)
 
     const timer = setTimeout(() => {
       getQrsSourcingRequests({ search: search.trim(), page, pageSize, intent }, controller.signal)
-        .then(setData)
+        .then((result) => {
+          hasDataRef.current = true
+          setData(result)
+        })
         .catch((reason: unknown) => {
           if (!controller.signal.aborted) {
-            setError(toApiError(reason).title)
+            const apiError = toApiError(reason)
+            setError(apiError.detail ?? apiError.title)
           }
         })
         .finally(() => {
           if (!controller.signal.aborted) {
             setLoading(false)
+            setRefreshing(false)
           }
         })
     }, 300)
@@ -61,55 +78,45 @@ export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, 
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border-subtle bg-surface-panel p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-subheading font-medium text-ink-strong">
-          Select QRS Sourcing Request
-        </h4>
-        <div className="relative min-w-[240px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-ink-muted" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search QRS code or title..."
-            className={appInputClassName('sm', 'w-full pl-8')}
-          />
+    <LookupTableShell
+      title="Select QRS sourcing request"
+      search={search}
+      searchPlaceholder="Search QRS code or title..."
+      onSearchChange={handleSearchChange}
+      loading={loading}
+      refreshing={refreshing}
+      error={error}
+      hasData={Boolean(data)}
+      isEmpty={data?.items.length === 0}
+      emptyMessage="No QRS sourcing requests found."
+      onRetry={() => setRetryToken((token) => token + 1)}
+      footer={data && <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-3 text-caption text-ink-muted">
+        <span>Total {data.totalCount} item{data.totalCount !== 1 ? 's' : ''} (Page {data.pageNumber})</span>
+        <div className="flex items-center gap-1">
+          <IconButton size="sm" disabled={!data.hasPreviousPage} onClick={() => setPage((current) => Math.max(1, current - 1))} label="Previous page"><ChevronLeft className="size-4" /></IconButton>
+          <IconButton size="sm" disabled={!data.hasNextPage} onClick={() => setPage((current) => current + 1)} label="Next page"><ChevronRight className="size-4" /></IconButton>
         </div>
-      </div>
-
-      {loading && <LoadingSurface />}
-      {error && (
-        <div className="flex flex-col gap-2 rounded border border-warning/30 bg-warning-subtle/10 p-3 text-caption">
-          <div className="flex items-center gap-2 text-ink-strong font-medium">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            <span>QRS lookup unavailable</span>
-          </div>
-          <p className="text-ink-muted">Could not retrieve QRS list ({error}).</p>
-          <button type="button" onClick={() => setRetryToken((token) => token + 1)} className="w-fit rounded-sm text-accent underline underline-offset-2">Try again</button>
-        </div>
-      )}
-
-      {!loading && !error && data && (
-        <>
-          {data.items.length === 0 ? (
-            <div className="p-4 text-center text-body text-ink-muted">
-              No QRS sourcing requests found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-body">
+      </div>}
+      after={allowManualCode && <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
+        <span className="text-caption text-ink-muted">Manual QRS Code entry:</span>
+        <input type="text" value={manualCode} onChange={(event) => setManualCode(event.target.value)} placeholder="e.g. QRS-20260806-001" className={appInputClassName('sm', 'min-w-0 flex-1 basis-48')} />
+        <AppButton variant="secondary" size="sm" onClick={handleManualApply} disabled={!manualCode.trim()}>Use Code</AppButton>
+      </div>}
+    >
+      {data && (
+        <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] border-collapse text-left text-body">
                 <thead>
                   <tr className="border-b border-border-subtle bg-surface-muted text-caption font-medium text-ink-muted">
-                    <th className="px-3 py-2">Select</th>
-                    <th className="px-3 py-2">Code</th>
-                    <th className="px-3 py-2">Title</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Requester</th>
-                    <th className="px-3 py-2">Department</th>
-                    <th className="px-3 py-2">Required By</th>
-                    <th className="px-3 py-2">Urgency</th>
-                    <th className="px-3 py-2 text-right">Est. Total</th>
+                    <th className="px-4 py-2.5">Select</th>
+                    <th className="px-4 py-2.5">Code</th>
+                    <th className="px-4 py-2.5">Title</th>
+                    <th className="px-4 py-2.5">Type</th>
+                    <th className="px-4 py-2.5">Requester</th>
+                    <th className="px-4 py-2.5">Department</th>
+                    <th className="px-4 py-2.5">Required By</th>
+                    <th className="px-4 py-2.5">Urgency</th>
+                    <th className="px-4 py-2.5 text-right">Est. Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -120,10 +127,10 @@ export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, 
                         key={item.code}
                         onClick={() => onSelect({ code: item.code, title: item.title })}
                         className={`cursor-pointer transition-colors hover:bg-surface-muted ${
-                          isSelected ? 'bg-accent-subtle/20 font-medium' : ''
+                          isSelected ? 'bg-accent-soft font-medium' : ''
                         }`}
                       >
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-2.5">
                           <input
                             type="radio"
                             name="qrsSource"
@@ -132,16 +139,16 @@ export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, 
                             className="h-4 w-4 text-accent"
                           />
                         </td>
-                        <td className="px-3 py-2 font-mono text-ink-strong">{item.code}</td>
-                        <td className="px-3 py-2">{item.title}</td>
-                        <td className="px-3 py-2 text-caption text-ink-muted">{item.requestTypeName}</td>
-                        <td className="px-3 py-2 text-caption">{item.requesterName || '-'}</td>
-                        <td className="px-3 py-2 text-caption">{item.requesterDepartment || '-'}</td>
-                        <td className="px-3 py-2 text-caption text-ink-muted">
+                        <td className="px-4 py-2.5 font-mono text-ink-strong">{item.code}</td>
+                        <td className="px-4 py-2.5">{item.title}</td>
+                        <td className="px-4 py-2.5 text-caption text-ink-muted">{item.requestTypeName}</td>
+                        <td className="px-4 py-2.5 text-caption">{item.requesterName || '-'}</td>
+                        <td className="px-4 py-2.5 text-caption">{item.requesterDepartment || '-'}</td>
+                        <td className="px-4 py-2.5 text-caption text-ink-muted">
                           {item.requiredBy ? item.requiredBy.slice(0, 10) : '-'}
                         </td>
-                        <td className="px-3 py-2 text-caption">{item.isUrgent ? 'Urgent' : 'Normal'}</td>
-                        <td className="px-3 py-2 text-right text-caption font-medium">
+                        <td className="px-4 py-2.5 text-caption">{item.isUrgent ? 'Urgent' : 'Normal'}</td>
+                        <td className="px-4 py-2.5 text-right text-caption font-medium">
                           {item.estimatedTotal.toLocaleString()} {item.currency}
                         </td>
                       </tr>
@@ -149,55 +156,8 @@ export function QrsSourceTable({ selectedCode, intent, allowManualCode = false, 
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-caption text-ink-muted pt-2 border-t border-border-subtle">
-            <span>
-              Total {data.totalCount} item{data.totalCount !== 1 ? 's' : ''} (Page {data.pageNumber})
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={!data.hasPreviousPage}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded p-1 hover:bg-surface-muted disabled:opacity-40"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                disabled={!data.hasNextPage}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded p-1 hover:bg-surface-muted disabled:opacity-40"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </>
+        </div>
       )}
-
-      {allowManualCode && <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
-        <span className="text-caption text-ink-muted">Manual QRS Code entry:</span>
-        <input
-          type="text"
-          value={manualCode}
-          onChange={(e) => setManualCode(e.target.value)}
-          placeholder="e.g. QRS-20260806-001"
-          className={appInputClassName('sm', 'min-w-0 flex-1 basis-48')}
-        />
-        <button
-          type="button"
-          onClick={handleManualApply}
-          disabled={!manualCode.trim()}
-          className="rounded bg-surface-muted px-3 py-1 text-caption font-medium hover:bg-surface-subtle disabled:opacity-40"
-        >
-          Use Code
-        </button>
-      </div>}
-    </div>
+    </LookupTableShell>
   )
 }

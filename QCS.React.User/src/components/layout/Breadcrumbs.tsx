@@ -17,28 +17,41 @@ const labels: Record<string, string> = {
 }
 
 export function Breadcrumbs() {
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
+  const requestsSearch = (state as { requestsSearch?: string } | null)?.requestsSearch
   const parts = pathname.split('/').filter(Boolean)
   const crumbs = [{ label: 'Dashboard', to: '/' }]
 
   let path = ''
   for (const part of parts) {
     path += `/${part}`
-    // A numeric id carries no label of its own; it is named after the loop, from its collection.
-    if (!/^\d+$/.test(part)) crumbs.push({ label: labels[part] ?? part, to: path })
+    if (part === 'edit') crumbs.push({ label: 'Edit request', to: path })
+    else if (!/^\d+$/.test(part)) crumbs.push({ label: labels[part] ?? part, to: path })
   }
 
   const last = parts.at(-1) ?? ''
   if (/^\d+$/.test(last)) crumbs.push({ label: 'Request', to: pathname })
   else if (parts.length > 1 && parts[0] === 'quotations') {
-    // /quotations/{code}: the code segment is not numeric, so it was already pushed verbatim.
     crumbs[crumbs.length - 1] = { label: 'Quotation', to: pathname }
   }
 
-  return <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-body text-ink-muted">
-    {crumbs.map((crumb, index) => <span key={crumb.to} className="flex items-center gap-1">
-      {index > 0 && <ChevronRight className="size-3.5" aria-hidden />}
-      {crumb.to === pathname ? <span className="truncate text-ink-strong">{crumb.label}</span> : <Link to={crumb.to} className="rounded-sm hover:text-ink-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{crumb.label}</Link>}
-    </span>)}
-  </nav>
+  return (
+    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-body text-ink-muted">
+      {crumbs.map((crumb, index) => (
+        <span key={crumb.to} className="flex items-center gap-1">
+          {index > 0 && <ChevronRight className="size-3.5" aria-hidden />}
+          {crumb.to === pathname ? (
+            <span className="truncate text-ink-strong">{crumb.label}</span>
+          ) : (
+            <Link
+              to={crumb.to === '/requests' && requestsSearch ? `${crumb.to}?${requestsSearch}` : crumb.to}
+              className="rounded-sm hover:text-ink-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {crumb.label}
+            </Link>
+          )}
+        </span>
+      ))}
+    </nav>
+  )
 }

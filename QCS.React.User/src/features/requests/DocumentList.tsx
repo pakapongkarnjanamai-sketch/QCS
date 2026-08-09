@@ -1,4 +1,5 @@
 import { ExternalLink, Paperclip } from 'lucide-react'
+import { AppButton } from '@/components/ui/AppButton'
 import { formatFileSize } from './format'
 import type { PortalDocument } from './types'
 
@@ -33,14 +34,10 @@ export function DocumentList({
                 .join(' · ')}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onPreview(document)}
-            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-sm px-2 text-body text-accent hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
+          <AppButton variant="ghost" size="sm" className="shrink-0" onClick={() => onPreview(document)}>
             View
             <ExternalLink className="size-3.5" aria-hidden />
-          </button>
+          </AppButton>
         </li>
       ))}
     </ul>

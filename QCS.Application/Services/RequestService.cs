@@ -51,6 +51,7 @@ namespace QCS.Application.Services
         Task<PortalPage<RenewalCandidateDto>> GetRenewalCandidatesAsync(RenewalCandidateQuery query, CancellationToken cancellationToken = default);
         Task<PortalPage<IntegrationRenewalCandidateDto>> GetIntegrationRenewalCandidatesAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default);
         Task<IntegrationRenewalCandidateDto?> GetIntegrationRenewalCandidateByCodeAsync(string code, CancellationToken cancellationToken = default);
+        Task<IntegrationSourcedDocumentDto?> GetSourcedDocumentAsync(string qcCode, string qrsCode, int documentId, CancellationToken cancellationToken = default);
         Task<PortalSetupResolutionDto> ResolveSetupFromQrsAsync(string qrsCode, CancellationToken cancellationToken = default);
         Task<PortalSetupResolutionDto> ResolveSetupFromQcsAsync(string qcCode, CancellationToken cancellationToken = default);
         Task<PortalRequestDetailDto?> GetPortalRequestByIdAsync(int id, CancellationToken cancellationToken = default);
@@ -1054,6 +1055,38 @@ namespace QCS.Application.Services
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        public async Task<IntegrationSourcedDocumentDto?> GetSourcedDocumentAsync(
+            string qcCode,
+            string qrsCode,
+            int documentId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(qcCode) || string.IsNullOrWhiteSpace(qrsCode) || documentId <= 0)
+            {
+                return null;
+            }
+
+            var trimmedQcCode = qcCode.Trim();
+            var trimmedQrsCode = qrsCode.Trim();
+
+            return await _unitOfWork.Repository<Quotation>().GetAll()
+                .AsNoTracking()
+                .Where(q => q.Id == documentId &&
+                            q.Request.Code == trimmedQcCode &&
+                            q.Request.SourceSystem == "QRS" &&
+                            q.Request.SourceCode == trimmedQrsCode &&
+                            q.AttachmentFile != null &&
+                            q.AttachmentFile.Data != null &&
+                            q.AttachmentFile.Data.Length > 0)
+                .Select(q => new IntegrationSourcedDocumentDto
+                {
+                    FileName = q.FileName,
+                    ContentType = !string.IsNullOrEmpty(q.ContentType) ? q.ContentType : (q.AttachmentFile.ContentType ?? "application/octet-stream"),
+                    Content = q.AttachmentFile.Data
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public async Task<PortalSetupResolutionDto> ResolveSetupFromQrsAsync(string qrsCode, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(qrsCode))
@@ -1210,7 +1243,7 @@ namespace QCS.Application.Services
             }
         }
 
-        private static bool IsPredecessorUniqueConflict(DbUpdateException exception)
+        internal static bool IsPredecessorUniqueConflict(DbUpdateException exception)
         {
             return exception.InnerException?.Message.Contains(RenewedFromRequestIdUniqueIndexName, StringComparison.OrdinalIgnoreCase) == true
                 || exception.Message.Contains(RenewedFromRequestIdUniqueIndexName, StringComparison.OrdinalIgnoreCase);

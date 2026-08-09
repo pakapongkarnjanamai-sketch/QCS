@@ -128,5 +128,39 @@ namespace QCS.API.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet("Requests/{qcCode}/Sources/QRS/{qrsCode}/Documents/{documentId}")]
+        [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName, Policy = "IntegrationClient")]
+        public async Task<IActionResult> GetSourcedDocument(
+            [FromRoute] string qcCode,
+            [FromRoute] string qrsCode,
+            [FromRoute] int documentId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(qcCode) || string.IsNullOrWhiteSpace(qrsCode) || documentId <= 0)
+            {
+                return NotFound();
+            }
+
+            var document = await _requestService.GetSourcedDocumentAsync(qcCode, qrsCode, documentId, cancellationToken);
+            if (document == null || document.Content == null || document.Content.Length == 0)
+            {
+                return NotFound();
+            }
+
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers.Expires = "0";
+
+            var contentType = document.ContentType ?? "application/octet-stream";
+            if (string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                var disposition = new Microsoft.Net.Http.Headers.ContentDispositionHeaderValue("inline");
+                disposition.SetHttpFileName(document.FileName);
+                Response.Headers.ContentDisposition = disposition.ToString();
+                return File(document.Content, contentType);
+            }
+
+            return File(document.Content, contentType, document.FileName);
+        }
     }
 }

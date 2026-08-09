@@ -48,7 +48,7 @@ export function RequestTable({ data, refreshing, loadingMore, loadMoreError, ret
             (PLAN-037), and the table has its own scroll region so it never pushes the page
             sideways. Everything else matches QRS: no border-collapse, and text-left on the
             thead rather than the table. */}
-        <table className="min-w-[960px] w-full text-body">
+        <table className="w-full min-w-[960px] border-collapse text-body">
           <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-muted text-left text-caption uppercase tracking-[0.08em] text-ink-muted">
             <tr>
               <th scope="col" className="whitespace-nowrap px-4 py-2.5 font-medium"><SortButton label="CODE" sortKey="code" active={sortBy === 'code'} descending={sortDescending} onSort={onSort} /></th>

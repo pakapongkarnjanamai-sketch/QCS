@@ -96,7 +96,7 @@ export function VendorLookup({ value, errors, disabled = false, onChange }: Vend
       </div>
       {showLoading && <p className="text-caption text-ink-muted">Loading active vendors...</p>}
       {options.length > 0 && (
-        <ul id="vendor-suggestions" className="max-h-48 overflow-auto rounded-sm border border-border-subtle bg-white" aria-label="Vendor suggestions">
+        <ul id="vendor-suggestions" className="max-h-48 overflow-auto rounded-sm border border-border-subtle bg-surface-panel" aria-label="Vendor suggestions">
           {options.map((option) => (
             <li key={option.id}>
               <button
@@ -105,7 +105,7 @@ export function VendorLookup({ value, errors, disabled = false, onChange }: Vend
                   onChange({ vendorCode: option.code, vendorName: option.name })
                   setQuery('')
                 }}
-                className="w-full px-3 py-2 text-left text-body hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                className="flex min-h-9 w-full items-center px-4 text-left text-body hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
               >
                 <span className="font-medium">{option.code}</span>
                 <span className="ml-2 text-ink-muted">{option.name}</span>

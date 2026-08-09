@@ -1,7 +1,7 @@
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { appInputClassName } from '@/components/ui/inputStyles'
-import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { IconButton } from '@/components/ui/IconButton'
+import { LookupTableShell } from '@/components/ui/LookupTableShell'
 import { toApiError } from '@/lib/apiClient'
 import { getRenewalCandidates } from './requestApi'
 import type { PortalPage, RenewalCandidate } from './types'
@@ -17,27 +17,33 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
   const [pageSize] = useState(10)
   const [data, setData] = useState<PortalPage<RenewalCandidate>>()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string>()
   const [retryToken, setRetryToken] = useState(0)
+  const hasDataRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true)
+    setLoading(!hasDataRef.current)
+    setRefreshing(hasDataRef.current)
     setError(undefined)
 
     const timer = setTimeout(() => {
       getRenewalCandidates({ search: search.trim(), page, pageSize }, controller.signal)
         .then((result) => {
+          hasDataRef.current = true
           setData(result)
         })
         .catch((reason: unknown) => {
           if (!controller.signal.aborted) {
-            setError(toApiError(reason).title)
+            const apiError = toApiError(reason)
+            setError(apiError.detail ?? apiError.title)
           }
         })
         .finally(() => {
           if (!controller.signal.aborted) {
             setLoading(false)
+            setRefreshing(false)
           }
         })
     }, 300)
@@ -54,45 +60,39 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border-subtle bg-surface-panel p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-subheading font-medium text-ink-strong">
-          Select QCS Quotation to Renew
-        </h4>
-        <div className="relative min-w-[240px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-ink-muted" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search code, title, vendor..."
-            className={appInputClassName('sm', 'w-full pl-8')}
-          />
+    <LookupTableShell
+      title="Select QCS quotation to renew"
+      search={search}
+      searchPlaceholder="Search code, title, vendor..."
+      onSearchChange={handleSearchChange}
+      loading={loading}
+      refreshing={refreshing}
+      error={error}
+      hasData={Boolean(data)}
+      isEmpty={data?.items.length === 0}
+      emptyMessage="No eligible quotations found for renewal."
+      onRetry={() => setRetryToken((token) => token + 1)}
+      footer={data && <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-3 text-caption text-ink-muted">
+        <span>Total {data.totalCount} item{data.totalCount !== 1 ? 's' : ''} (Page {data.page})</span>
+        <div className="flex items-center gap-1">
+          <IconButton size="sm" disabled={data.page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} label="Previous page"><ChevronLeft className="size-4" /></IconButton>
+          <IconButton size="sm" disabled={!data.hasNextPage} onClick={() => setPage((current) => current + 1)} label="Next page"><ChevronRight className="size-4" /></IconButton>
         </div>
-      </div>
-
-      {loading && <LoadingSurface />}
-      {error && <ErrorSurface><div className="flex flex-wrap items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => setRetryToken((token) => token + 1)} className="rounded-sm text-accent underline underline-offset-2">Try again</button></div></ErrorSurface>}
-
-      {!loading && !error && data && (
-        <>
-          {data.items.length === 0 ? (
-            <div className="p-4 text-center text-body text-ink-muted">
-              No eligible quotations found for renewal.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-body">
+      </div>}
+    >
+      {data && (
+        <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] border-collapse text-left text-body">
                 <thead>
                   <tr className="border-b border-border-subtle bg-surface-muted text-caption font-medium text-ink-muted">
-                    <th className="px-3 py-2">Select</th>
-                    <th className="px-3 py-2">Code</th>
-                    <th className="px-3 py-2">Title</th>
-                    <th className="px-3 py-2">Vendor</th>
-                    <th className="px-3 py-2">Valid Until</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">QRS Source</th>
-                    <th className="px-3 py-2 text-right">PDFs</th>
+                    <th className="px-4 py-2.5">Select</th>
+                    <th className="px-4 py-2.5">Code</th>
+                    <th className="px-4 py-2.5">Title</th>
+                    <th className="px-4 py-2.5">Vendor</th>
+                    <th className="px-4 py-2.5">Valid Until</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">QRS Source</th>
+                    <th className="px-4 py-2.5 text-right">PDFs</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -103,10 +103,10 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
                         key={item.id}
                         onClick={() => onSelect(item)}
                         className={`cursor-pointer transition-colors hover:bg-surface-muted ${
-                          isSelected ? 'bg-accent-subtle/20 font-medium' : ''
+                          isSelected ? 'bg-accent-soft font-medium' : ''
                         }`}
                       >
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-2.5">
                           <input
                             type="radio"
                             name="renewalCandidate"
@@ -115,15 +115,15 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
                             className="h-4 w-4 text-accent"
                           />
                         </td>
-                        <td className="px-3 py-2 font-mono text-ink-strong">{item.code}</td>
-                        <td className="px-3 py-2">{item.title}</td>
-                        <td className="px-3 py-2">{item.vendorName || item.vendorCode}</td>
-                        <td className="px-3 py-2 text-caption text-ink-muted">
+                        <td className="px-4 py-2.5 font-mono text-ink-strong">{item.code}</td>
+                        <td className="px-4 py-2.5">{item.title}</td>
+                        <td className="px-4 py-2.5">{item.vendorName || item.vendorCode}</td>
+                        <td className="px-4 py-2.5 text-caption text-ink-muted">
                           {item.validUntil ? item.validUntil.slice(0, 10) : '-'}
                         </td>
-                        <td className="px-3 py-2 text-caption text-ink-muted">{item.renewalWindowStatus === 'Expired' ? 'Expired' : 'Expiring soon'}</td>
-                        <td className="px-3 py-2 font-mono text-caption">{item.sourceCode || '-'}</td>
-                        <td className="px-3 py-2 text-right text-caption font-medium">
+                        <td className="px-4 py-2.5 text-caption text-ink-muted">{item.renewalWindowStatus === 'Expired' ? 'Expired' : 'Expiring soon'}</td>
+                        <td className="px-4 py-2.5 font-mono text-caption">{item.sourceCode || '-'}</td>
+                        <td className="px-4 py-2.5 text-right text-caption font-medium">
                           {item.originalQuotationCount}
                         </td>
                       </tr>
@@ -131,36 +131,8 @@ export function RenewalCandidateTable({ selectedId, onSelect }: RenewalCandidate
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-caption text-ink-muted pt-2 border-t border-border-subtle">
-            <span>
-              Total {data.totalCount} item{data.totalCount !== 1 ? 's' : ''} (Page {data.page})
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={data.page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded p-1 hover:bg-surface-muted disabled:opacity-40"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                disabled={!data.hasNextPage}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded p-1 hover:bg-surface-muted disabled:opacity-40"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </>
+        </div>
       )}
-    </div>
+    </LookupTableShell>
   )
 }

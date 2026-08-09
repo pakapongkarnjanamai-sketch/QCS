@@ -1,9 +1,11 @@
-import { ExternalLink, Eye, Save, Send, Trash2, Settings2 } from 'lucide-react'
+import { Eye, Save, Send, Trash2, Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useBeforeUnload, useSearchParams } from 'react-router'
 import { AppButton } from '@/components/ui/AppButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Field } from '@/components/ui/Field'
+import { ExternalActionLink } from '@/components/ui/ExternalActionLink'
+import { FormActions, FormPage, FormPageHeader, FormSection, FormSummary, FormSummaryItem } from '@/components/ui/FormPage'
 import { appInputClassName, appTextareaClassName } from '@/components/ui/inputStyles'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ErrorSurface, LoadingSurface } from '@/components/ui/Surfaces'
@@ -466,55 +468,34 @@ export function RequestFormPage() {
   const renewedFromRequestId = request?.renewedFromRequestId ?? (setupSummary?.intent === 'Renewal' ? setupSummary.renewedFromRequestId : undefined)
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-title font-semibold">
-              {requestId ? `${canEdit ? 'Edit ' : ''}${request?.code ?? 'request'}` : 'New request'}
-            </h1>
-            {request && <StatusBadge status={request.statusName} />}
-          </div>
-          <p className="mt-1 text-body text-ink-muted">
-            {canEdit ? 'Save a draft at any time. Required fields apply when submitting.' : 'Request details and approval progress.'}
-          </p>
-        </div>
-        {request && isQrsOrigin && request.sourceCode && (
-          <a
-            href={qrsRequestUrl(request.sourceCode)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-sm text-body text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            Open source request {request.sourceCode}
-            <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        )}
-        {request?.canRenew && <RenewQuotationLink code={request.code} />}
-      </header>
+    <FormPage>
+      <FormPageHeader
+        title={requestId ? `${canEdit ? 'Edit ' : ''}${request?.code ?? 'request'}` : 'New request'}
+        description={canEdit ? 'Save a draft at any time. Required fields apply when submitting.' : 'Request details and approval progress.'}
+        status={request && <StatusBadge status={request.statusName} />}
+        actions={request && ((isQrsOrigin && request.sourceCode) || request.canRenew) ? <>
+          {isQrsOrigin && request.sourceCode && (
+            <ExternalActionLink href={qrsRequestUrl(request.sourceCode)}>
+              Open source request {request.sourceCode}
+            </ExternalActionLink>
+          )}
+          {request.canRenew && <RenewQuotationLink code={request.code} />}
+        </> : undefined}
+      />
 
       {error && <ErrorSurface>{error.detail ?? error.title}</ErrorSurface>}
 
       {requestId && request && (
-        <dl className="grid gap-x-6 gap-y-3 border-y border-border-subtle bg-surface-muted px-4 py-3 text-body sm:grid-cols-3">
-          <div className="min-w-0">
-            <dt className="text-caption font-medium text-ink-muted">Requester</dt>
-            <dd className="mt-0.5 truncate font-medium text-ink-strong" title={`${request.requesterName} (${request.requesterNId})`}>
-              {request.requesterName || request.requesterNId}
-              {request.requesterName && request.requesterNId ? ` (${request.requesterNId})` : ''}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-caption font-medium text-ink-muted">Request date</dt>
-            <dd className="mt-0.5 font-medium text-ink-strong">{formatDate(request.requestDate)}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-caption font-medium text-ink-muted">Current step</dt>
-            <dd className="mt-0.5 truncate font-medium text-ink-strong" title={request.currentStepName ?? 'Not submitted'}>
-              {request.currentStepName ?? 'Not submitted'}
-            </dd>
-          </div>
-        </dl>
+        <FormSummary>
+          <FormSummaryItem label="Requester" title={`${request.requesterName} (${request.requesterNId})`} truncate>
+            {request.requesterName || request.requesterNId}
+            {request.requesterName && request.requesterNId ? ` (${request.requesterNId})` : ''}
+          </FormSummaryItem>
+          <FormSummaryItem label="Request date">{formatDate(request.requestDate)}</FormSummaryItem>
+          <FormSummaryItem label="Current step" title={request.currentStepName ?? 'Not submitted'} truncate>
+            {request.currentStepName ?? 'Not submitted'}
+          </FormSummaryItem>
+        </FormSummary>
       )}
 
       {!requestId && !setupCompleted ? (
@@ -527,7 +508,7 @@ export function RequestFormPage() {
         />
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-md border border-border-subtle bg-surface-panel px-4 py-3 text-caption">
+          <div className="flex items-center justify-between rounded-sm border border-border-subtle bg-surface-panel px-4 py-3 text-caption">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <div>
                 <span className="text-ink-muted font-medium">Intent:</span>{' '}
@@ -568,18 +549,14 @@ export function RequestFormPage() {
               )}
             </div>
             {!requestId && canEdit && (
-              <button
-                type="button"
-                onClick={() => setConfirmSetupChange(true)}
-                className="inline-flex items-center gap-1.5 rounded-sm font-medium text-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
+              <AppButton variant="ghost" size="sm" onClick={() => setConfirmSetupChange(true)}>
                 <Settings2 className="size-3.5" aria-hidden />
                 <span>Change setup</span>
-              </button>
+              </AppButton>
             )}
           </div>
 
-          <section className="space-y-4 rounded-sm border border-border-subtle bg-white p-4">
+          <FormSection>
             <Field label="Title" required error={errors.title}>
               <input
                 value={form.title}
@@ -625,40 +602,40 @@ export function RequestFormPage() {
                 className={appTextareaClassName('min-h-24 w-full')}
               />
             </Field>
+          </FormSection>
 
-            <TypedDocumentEditor
-              documents={documents}
-              disabled={formDisabled}
-              uploading={busy === 'upload'}
-              error={errors.attachments}
-              onUpload={upload}
-              onAddReference={addReference}
-              onUpdate={updateDocuments}
-              onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })}
-              onRemove={remove}
+          <TypedDocumentEditor
+            documents={documents}
+            disabled={formDisabled}
+            uploading={busy === 'upload'}
+            error={errors.attachments}
+            onUpload={upload}
+            onAddReference={addReference}
+            onUpdate={updateDocuments}
+            onView={(document) => setPreview({ url: document.viewUrl, fileName: document.fileName })}
+            onRemove={remove}
+          />
+
+          {canEdit && (
+            <WorkflowRoutePreview
+              preview={routePreview}
+              loading={routeLoading}
+              error={routeError}
+              onLoad={() => {
+                setRouteLoading(true)
+                setRouteError(undefined)
+                void getRoutePreview(form)
+                  .then(setRoutePreview)
+                  .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
+                  .finally(() => setRouteLoading(false))
+              }}
             />
-
-            {canEdit && (
-              <WorkflowRoutePreview
-                preview={routePreview}
-                loading={routeLoading}
-                error={routeError}
-                onLoad={() => {
-                  setRouteLoading(true)
-                  setRouteError(undefined)
-                  void getRoutePreview(form)
-                    .then(setRoutePreview)
-                    .catch((reason: unknown) => setRouteError(toApiError(reason).detail ?? toApiError(reason).title))
-                    .finally(() => setRouteLoading(false))
-                }}
-              />
-            )}
-          </section>
+          )}
         </>
       )}
 
       {(requestId || setupCompleted) && (
-        <div className="flex flex-wrap justify-end gap-2">
+        <FormActions>
           <AppButton
             variant="secondary"
             onClick={async () => {
@@ -720,7 +697,7 @@ export function RequestFormPage() {
               Delete
             </AppButton>
           )}
-        </div>
+        </FormActions>
       )}
 
       {requestId && !canEdit && <ApprovalSteps steps={request?.workflowSteps ?? []} histories={request?.histories ?? []} />}
@@ -774,6 +751,6 @@ export function RequestFormPage() {
       >
         Delete this draft permanently?
       </ConfirmDialog>
-    </div>
+    </FormPage>
   )
 }

@@ -1,4 +1,5 @@
 import { AppButton } from '@/components/ui/AppButton'
+import { SectionCard } from '@/components/ui/SectionCard'
 import type { RoutePreview } from './types'
 
 /**
@@ -24,13 +25,12 @@ export function WorkflowRoutePreview({
   onLoad: () => void
 }) {
   return (
-    <section className="rounded-sm border border-border-subtle bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-3">
-        <h2 className="text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">Approval route</h2>
-        <AppButton variant="secondary" size="sm" disabled={loading} onClick={onLoad}>
+    <SectionCard
+      title="Approval route"
+      action={<AppButton variant="secondary" size="sm" disabled={loading} onClick={onLoad}>
           {loading ? 'Resolving...' : preview ? 'Refresh route' : 'Preview route'}
-        </AppButton>
-      </div>
+        </AppButton>}
+    >
 
       {error && <p className="px-4 py-3 text-body text-danger">{error}</p>}
 
@@ -74,6 +74,6 @@ export function WorkflowRoutePreview({
           )}
         </>
       )}
-    </section>
+    </SectionCard>
   )
 }

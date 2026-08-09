@@ -1,7 +1,9 @@
 import { ArrowDown, ArrowUp, ExternalLink, FileText, Link2, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
+import { AppButton } from '@/components/ui/AppButton'
 import { IconButton } from '@/components/ui/IconButton'
 import { appInputClassName } from '@/components/ui/inputStyles'
+import { SectionCard } from '@/components/ui/SectionCard'
 import { formatFileSize } from './format'
 import type { PortalDocument } from './types'
 
@@ -57,14 +59,12 @@ export function TypedDocumentEditor({
   const displayedError = referenceError ?? fileError ?? error
 
   return (
-    <section className="rounded-sm border border-border-subtle bg-white" data-invalid={displayedError ? 'true' : undefined}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
-        <div>
-          <h2 className="text-caption font-semibold uppercase tracking-[0.12em] text-ink-muted">Documents</h2>
-          <p className="mt-0.5 text-caption text-ink-muted">PDF files only. Original Quotation is required when submitting.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-sm border border-border-subtle bg-white px-3 text-body font-medium hover:bg-surface-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+    <SectionCard
+      title="Documents"
+      description="PDF files only. Original Quotation is required when submitting."
+      invalid={Boolean(displayedError)}
+      action={
+        <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-sm border border-border-subtle bg-surface-panel px-3 text-body font-medium hover:bg-surface-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
             <Upload className="size-3.5" aria-hidden />
             {uploading ? 'Uploading...' : 'Upload PDFs'}
             <input
@@ -86,8 +86,8 @@ export function TypedDocumentEditor({
               }}
             />
           </label>
-        </div>
-      </div>
+      }
+    >
 
       {disabledReason && (
         <p className="border-b border-border-subtle bg-surface-muted px-4 py-2 text-caption text-ink-muted">
@@ -121,14 +121,10 @@ export function TypedDocumentEditor({
             className={appInputClassName('sm', 'w-full')}
           />
         </label>
-        <button
-          type="submit"
-          disabled={disabled || !referenceCode.trim()}
-          className="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-border-subtle bg-white px-3 text-body font-medium hover:bg-surface-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <AppButton type="submit" variant="secondary" size="sm" disabled={disabled || !referenceCode.trim()}>
           <Link2 className="size-3.5" aria-hidden />
           Add reference
-        </button>
+        </AppButton>
       </form>
 
       {displayedError && <p className="border-b border-border-subtle px-4 py-2 text-caption text-danger">{displayedError}</p>}
@@ -140,16 +136,16 @@ export function TypedDocumentEditor({
           <table className="w-full min-w-[680px] border-collapse text-left text-body">
             <thead className="bg-surface-muted text-caption uppercase text-ink-muted">
               <tr>
-                <th className="w-28 px-3 py-2 font-semibold">Order</th>
-                <th className="px-3 py-2 font-semibold">File name</th>
-                <th className="w-64 px-3 py-2 font-semibold">Type</th>
-                <th className="w-24 px-3 py-2 text-right font-semibold">Actions</th>
+                <th className="w-28 px-4 py-2.5 font-semibold">Order</th>
+                <th className="px-4 py-2.5 font-semibold">File name</th>
+                <th className="w-64 px-4 py-2.5 font-semibold">Type</th>
+                <th className="w-24 px-4 py-2.5 text-right font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
               {documents.map((document, index) => (
                 <tr key={document.id}>
-                  <td className="px-2 py-1.5">
+                  <td className="px-4 py-2.5">
                     <div className="flex items-center gap-0.5">
                       <span className="w-6 text-center text-caption tabular-nums text-ink-muted">{index + 1}</span>
                       <IconButton size="sm" label={`Move ${document.fileName} up`} disabled={disabled || index === 0} onClick={() => moveDocument(index, -1)}>
@@ -160,7 +156,7 @@ export function TypedDocumentEditor({
                       </IconButton>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2.5">
                     <div className="flex min-w-0 items-center gap-2">
                       {document.referenceCode
                         ? <Link2 className="size-4 shrink-0 text-accent" aria-hidden />
@@ -173,7 +169,7 @@ export function TypedDocumentEditor({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2.5">
                     <select
                       aria-label={`Document type for ${document.fileName}`}
                       value={document.documentTypeId}
@@ -186,7 +182,7 @@ export function TypedDocumentEditor({
                       {documentTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                     </select>
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-4 py-2.5">
                     <div className="flex justify-end">
                       <IconButton size="sm" label={`View ${document.fileName}`} onClick={() => onView(document)}>
                         <ExternalLink className="size-3.5" aria-hidden />
@@ -202,6 +198,6 @@ export function TypedDocumentEditor({
           </table>
         </div>
       )}
-    </section>
+    </SectionCard>
   )
 }

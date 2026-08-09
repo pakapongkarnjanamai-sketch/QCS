@@ -1,5 +1,4 @@
-import { ExternalLink } from 'lucide-react'
-import { appButtonClassName } from '@/components/ui/appButtonStyles'
+import { ExternalActionLink } from '@/components/ui/ExternalActionLink'
 import { Modal } from '@/components/ui/Modal'
 
 /**
@@ -34,10 +33,7 @@ export function PdfViewer({ document, onClose }: PdfViewerProps) {
       // nothing to resolve against and the object rendered at zero height.
       contentClassName="flex min-h-0 flex-1 flex-col gap-3 p-5"
     >
-      <a href={document?.url} target="_blank" rel="noreferrer" className={appButtonClassName('secondary', 'sm', 'w-fit')}>
-        <ExternalLink className="size-3.5" aria-hidden />
-        Open in a new tab
-      </a>
+      {document && <ExternalActionLink href={document.url} className="w-fit">Open in a new tab</ExternalActionLink>}
       {document && (
         <object data={document.url} type="application/pdf" className="min-h-0 w-full flex-1 border border-border-subtle" aria-label={`Preview of ${document.fileName}`}>
           <p className="p-4 text-body text-ink-muted">This browser cannot preview the document. Use Open in a new tab.</p>
